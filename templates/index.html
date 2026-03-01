@@ -168,6 +168,7 @@
             <button onclick="location.href='/edit_spots'">{{ lang_dict['📍 My Spots 編集'] }}</button>
             <button onclick="if(confirm('Switch language?\n言語を切り替えますか？')) { location.href='/change_lang'; }">🌐 Language / 言語</button>
             <button onclick="confirmReset()" style="color: #ff6b6b; margin-top: 20px;">🔄 {{ lang_dict['リセット'] }}</button>
+            <button onclick="showShareQR()">📲 {{ lang_dict['SHARE_APP'] or 'アプリを共有' }}</button>
         </div>
     </div>
 
@@ -310,6 +311,25 @@
         }
         {{ gps_script|safe }}
         // ======================================================================================
+        // 90. QRコード共有サブルーチン
+        // ======================================================================================
+        function showShareQR() {
+            const currentUrl = window.location.origin; // サーバーのURLを取得
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(currentUrl)}`;
+            
+            // 簡易的なアラート風モーダルで表示（あるいは既存のモーダルを流用）
+            const shareModal = document.createElement('div');
+            shareModal.style = "position:fixed; z-index:500; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; flex-direction:column; color:white;";
+            shareModal.innerHTML = `
+                <div style="background:white; padding:20px; border-radius:15px; text-align:center;">
+                    <img src="${qrUrl}" alt="QR Code" style="margin-bottom:15px;">
+                    <div style="color:#333; font-weight:bold; margin-bottom:10px;">Scan to Open</div>
+                    <button onclick="this.parentElement.parentElement.remove()" style="padding:8px 20px; border-radius:5px; border:none; background:#0078ff; color:white; cursor:pointer;">Close</button>
+                </div>
+            `;
+            document.body.appendChild(shareModal);
+        }
+        // ======================================================================================
         // 98. LocalStorage 同期マネージャー (スマホ安定版)
         // ======================================================================================
         const STORAGE_KEY = "pin_weather_backup_v1";
@@ -369,6 +389,7 @@
 </body>
 
 </html>
+
 
 
 
