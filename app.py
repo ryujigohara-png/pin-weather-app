@@ -914,28 +914,48 @@ def render_tide_curve_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, 
         render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_dict)
 
 # ======================================================================================
-# 28. 海洋データの地点情報を描画するサブルーチン (方位・距離・Y軸-1.0)
+# 28. 海洋データの地点情報を描画するサブルーチン (位置自動計算・多言語対応版)
 # ======================================================================================
 def render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_dict):
+    """
+    指定地点とAPI取得地点の距離・方位を計算し、グラフ下部に重ならないよう自動配置します。
+    """
     import numpy as np
-    # 距離計算
+    from matplotlib.transforms import ScaledTranslation
+
+    # 1. 距離の近似計算 (km)
     dx = (res_lon - lon) * 111 * np.cos(np.radians(lat))
     dy = (res_lat - lat) * 111
     dist_km = round(np.sqrt(dx**2 + dy**2), 1)
 
-    # 8方位判定ロジック
-    def get_direction_label(dx, dy):
-        angle = np.degrees(np.arctan2(dy, dx))
-        degree = (90 - angle) % 360
-        dirs = ["北", "北東", "東", "南東", "南", "南西", "西", "北西", "北"]
-        return dirs[int((degree + 22.5) / 45)]
-
+    # 2. 0.5km以上の乖離がある場合のみ表示
     if dist_km >= 0.5:
-        dir_name = get_direction_label(dx, dy)
-        msg = f"※データ地点: {dir_name}方向に約{dist_km}km"
-        # ご指示通り Y座標を -1.0 に下げて表示
-        ax.text(0.01, -1.0, msg, transform=ax.transAxes, color="#d62728", 
-                fontsize=label_fs - 1, ha='left', va='top')
+        # 方位角の計算 (北を0度として時計回り)
+        angle = np.degrees(np.arctan2(dx, dy))
+        # 多言語辞書から8方位を取得 (デフォルトは日本語)
+        base_dirs = lang_dict.get("DIRECTIONS_8", ["北", "北東", "東", "南東", "南", "南西", "西", "北西"])
+        # 360度を45度刻みで判定
+        res_dir = base_dirs[int(((angle + 22.5) % 360) // 45)]
+        
+        # 多言語辞書からメッセージテンプレートを取得
+        # 辞書にない場合はデフォルトの日本語フォーマットを使用
+        msg_tmpl = lang_dict.get("OCEAN_INFO", "※データ地点: {res_dir}方向に約{dist_km}km")
+        info_text = msg_tmpl.format(res_dir=res_dir, dist_km=dist_km)
+        
+        # 3. テキスト位置の動的オフセット設定
+        # label_fs（フォントサイズ）に基づき、インチ単位で位置を計算します。
+        # これにより、グラフの高さが変わっても文字が重なりません。
+        # 72は1インチあたりのポイント数。3.5は行間調整係数です。
+        offset_in_points = - (label_fs * 3.5)
+        offset_trans = ScaledTranslation(0, offset_in_points / 72, ax.figure.dpi_scale_trans)
+        
+        # 表示実行
+        ax.text(0.01, 0.0, info_text, 
+                transform=ax.transAxes + offset_trans, 
+                color="#d62728", 
+                fontsize=label_fs - 1, 
+                ha='left', 
+                va='top')
 
 # ======================================================================================
 # 29. 天気アイコン部分のHTMLを生成するサブルーチン (はみ出し防止・連動修正版)
@@ -2057,6 +2077,7 @@ if __name__ == "__main__":
     # Renderで起動を安定させるため debug=False は必須
     # threaded=True を追加し、複数のアクセス（Health Check等）を同時に捌けるようにします
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
+
 
 
 
