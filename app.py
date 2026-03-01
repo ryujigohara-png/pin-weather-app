@@ -538,7 +538,7 @@ def clear_weather_cache_files():
 # 16. 海洋データを取得するサブルーチン
 # ======================================================================================
 def get_marine_data(time_series, lat, lon):
-    url = f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto"
+    url = f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto&orecast_days=9"
     try:
         res = requests.get(url, timeout=10).json()
         if "hourly" not in res:
@@ -2077,6 +2077,7 @@ if __name__ == "__main__":
     # Renderで起動を安定させるため debug=False は必須
     # threaded=True を追加し、複数のアクセス（Health Check等）を同時に捌けるようにします
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
+
 
 
 
