@@ -2046,27 +2046,16 @@ def restore_settings():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ======================================================================================
-# 100. メインエントリーポイント (サーバー公開対応版)
+# 100. メインエントリーポイント (Render最適化版)
 # ======================================================================================
-if __name__ == '__main__':
-    # 1. 必要なディレクトリの整合性チェック
-    directories = ['templates', 'static', 'static/icons']
-    for directory in directories:
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-    
-    # 2. サーバー起動設定
-    # Render環境のポート(PORT)を優先し、なければ10000を使用
+if __name__ == "__main__":
+    import os
+    # Renderでは環境変数 PORT が指定されるため、それを優先的に使用する
+    # 指定がない場合は 10000番をデフォルトにする
     port = int(os.environ.get("PORT", 10000))
     
-    # Render公開時は False にするのが安全
-    is_debug = os.environ.get('FLASK_DEBUG', 'False') == 'True'
-
-    app.run(
-        debug=is_debug, 
-        host='0.0.0.0', 
-        port=port
-    )
+    # debug=False にすることで、再起動ループを抑制し安定性を高める
+    app.run(host="0.0.0.0", port=port, debug=False)
 
 
 
