@@ -534,53 +534,69 @@ def clear_weather_cache_files():
     else:
         return False, "削除対象のキャッシュファイルはありません。"
 
+
 # ======================================================================================
-# 16. 海洋データを取得するサブルーチン
+# 16. 海洋データを取得するサブルーチン (9日分完全対応版)
 # ======================================================================================
 def get_marine_data(time_series, lat, lon):
-    # APIリクエスト用パラメータ
-    url = "[https://marine-api.open-meteo.com/v1/marine](https://marine-api.open-meteo.com/v1/marine)"
+    import requests
+    import pandas as pd
+    import numpy as np
+
+    # 1. URLとパラメータの修正
+    # ご指摘の通り、正しいエンドポイントと明示的なパラメータ指定を行います
+    url = "https://marine-api.open-meteo.com/v1/marine"
     params = {
         "latitude": round(float(lat), 4),
         "longitude": round(float(lon), 4),
         "hourly": "wave_height,sea_surface_temperature,sea_level_height_msl",
         "timezone": "auto",
-        "forecast_days": "9",        # 確実に9日分を指定
-        "cell_selection": "sea"      # 海洋データを優先取得
+        "forecast_days": 9,  # 正しいURLであれば9日分(またはそれ以上)取得可能です
+        "cell_selection": "sea"
     }
-    
+
     try:
-        res = requests.get(url, params=params, timeout=10).json()
+        # APIリクエスト
+        res = requests.get(url, params=params, timeout=15).json()
+        
         if "hourly" not in res:
             return None, lat, lon
         
-        # API取得データをDataFrame化
+        # 2. API取得データをDataFrame化
         m_df = pd.DataFrame(res["hourly"])
+        # APIの時間を naive (タイムゾーンなし) に統一
         m_df['time'] = pd.to_datetime(m_df['time']).dt.tz_localize(None)
         
         # 実際にデータが取得された座標を保持
         res_lat = res.get("latitude", lat)
         res_lon = res.get("longitude", lon)
         
-        # 渡された時間軸(time_series)に取得データをマージして整合性を確保
-        time_df = pd.DataFrame({'time': [t.replace(tzinfo=None) for t in time_series]})
+        # 3. 9日間の時間軸(time_series)に取得データを正確にマージ
+        # Flask側から渡される time_series も naive に変換して比較します
+        time_df = pd.DataFrame({'time': [pd.to_datetime(t).replace(tzinfo=None) for t in time_series]})
+        
+        # left join により、APIから取得できた全期間を time_series にマッピングします
         merged = pd.merge(time_df, m_df, on='time', how='left')
         
-        # 結果を辞書形式で抽出
+        # 4. 辞書形式で抽出 (Noneをnp.nanに置換してグラフ描画の断線を防ぐ)
         results = {
-            "wave": merged['wave_height'].tolist(),
-            "temp": merged['sea_surface_temperature'].tolist(),
-            "tide": merged['sea_level_height_msl'].tolist()
+            "wave": merged['wave_height'].infer_objects(copy=False).fillna(np.nan).tolist(),
+            "temp": merged['sea_surface_temperature'].infer_objects(copy=False).fillna(np.nan).tolist(),
+            "tide": merged['sea_level_height_msl'].infer_objects(copy=False).fillna(np.nan).tolist()
         }
         
-        # 全データが空（すべてNone）でないか確認
-        if all(x is None for x in results["wave"]) and all(x is None for x in results["tide"]):
+        # 有効なデータが1つでもあるかチェック
+        # 全ての要素が NaN でなければ有効とみなす
+        if pd.Series(results["wave"]).isna().all() and pd.Series(results["tide"]).isna().all():
             return None, res_lat, res_lon
-    
+
         return results, res_lat, res_lon
+
     except Exception as e:
-        print(f"Marine API Error: {e}")
+        # エラー時はログに出力（デバッグ用）
+        print(f"Marine API Access Error: {e}")
         return None, lat, lon
+
 # ======================================================================================
 # 17. 天気コードからテキストと色を取得するサブルーチン
 # ======================================================================================
@@ -2096,6 +2112,7 @@ if __name__ == "__main__":
     # host="0.0.0.0" は 502 Bad Gateway 回避のために必須
     # debug=False はデプロイ時のタイムアウトを防ぐために必須
     app.run(host="0.0.0.0", port=port, debug=False)
+
 
 
 
