@@ -7,17 +7,6 @@
     
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <meta name="theme-color" content="#0078ff">
-    
-    <script>
-      // サービスワーカーの登録
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register("{{ url_for('static', filename='service-worker.js') }}")
-            .then(reg => console.log('SW registered!', reg))
-            .catch(err => console.log('SW error!', err));
-        });
-      }
-    </script>
 
     <style>
         body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0; background-color: #f0f2f5; color: #31333f; }
@@ -329,36 +318,24 @@
             `;
             document.body.appendChild(shareModal);
         }
+
         // ======================================================================================
-        // 98. LocalStorage 同期マネージャー (スマホ安定版)
+        // 98. LocalStorage 同期マネージャー (サーバー負荷軽減版)
         // ======================================================================================
         const STORAGE_KEY = "pin_weather_backup_v1";
         
-        // 1. 【書き込み】必要な時だけ保存する（通信を阻害しない）
-        function syncToLocal() {
-            const data = {
-                user_locations: {{ session.get('user_locations', []) | tojson }},
-                design_params: {{ session.get('design_params', {}) | tojson }},
-                last_basho: {{ session.get('last_basho', '') | tojson }},
-                sel_dirs: {{ session.get('sel_dirs', []) | tojson }},
-                lang: {{ session.get('lang', 'ja') | tojson }}
-            };
-            if (data.user_locations.length > 0 || Object.keys(data.design_params).length > 0) {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-            }
-        }
-        
-        // 2. 【読み込み】データの差異がある場合のみ復元し、無限リロードを防ぐ
         async function checkAndRestore() {
+            // 既にリ元が完了している(URLに restore=1 がある)場合は何もしない
+            if (window.location.search.includes('restore=1')) return;
+        
             const localData = localStorage.getItem(STORAGE_KEY);
             if (!localData) return;
         
             const backup = JSON.parse(localData);
             const currentSpots = {{ session.get('user_locations', []) | tojson }};
         
-            // サーバーが空っぽ、かつバックアップがある場合のみ実行
+            // サーバーが空の状態のみ、データを送り込む
             if (currentSpots.length === 0 && backup.user_locations.length > 0) {
-                console.log("Restoring settings...");
                 try {
                     const response = await fetch('/restore_settings', {
                         method: 'POST',
@@ -366,29 +343,27 @@
                         body: JSON.stringify(backup)
                     });
                     if (response.ok) {
-                        // URLに restore=1 を付与して、リロードが1回で済むようにする
-                        if (!window.location.search.includes('restore=1')) {
-                            window.location.href = window.location.pathname + '?restore=1';
-                        }
+                        // リロード。キャッシュを回避するためタイムスタンプを付与
+                        window.location.href = window.location.pathname + '?restore=1&t=' + new Date().getTime();
                     }
-                } catch (error) {
-                    console.error("Restore failed:", error);
-                }
+                } catch (e) { console.error("Restore skip:", e); }
             }
         }
         
-        // 3. 実行タイミング制御（ページ表示時に一度だけ）
+        // 起動時の負荷を分散させるため、1秒遅らせて同期を開始
         window.addEventListener('load', () => {
-            checkAndRestore();
-            syncToLocal();
+            setTimeout(() => {
+                checkAndRestore();
+                syncToLocal();
+            }, 1000); 
         });
         
-        // スマホでは pagehide の方が安定して動作します
         window.addEventListener('pagehide', syncToLocal);
     </script>
 </body>
 
 </html>
+
 
 
 
