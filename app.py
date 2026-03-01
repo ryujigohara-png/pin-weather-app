@@ -1334,6 +1334,28 @@ def reset_settings_handler():
     return redirect(url_for('index', refresh='1', t=int(time.time())))
 
 # ======================================================================================
+# 80. 言語切り替え用サブルーチン
+# ======================================================================================
+@app.route('/change_lang')
+def change_lang():
+    from flask import session, redirect, request, url_for
+    
+    # 現在の言語を取得（デフォルトは 'ja'）
+    current_lang = session.get('lang', 'ja')
+    
+    # 言語を反転させる
+    if current_lang == 'ja':
+        session['lang'] = 'en'
+    else:
+        session['lang'] = 'ja'
+    
+    # 永続化のためにセッションを修正済みにする
+    session.modified = True
+    
+    # 直前のページに戻る（リファラがない場合はトップへ）
+    return redirect(request.referrer or url_for('index'))
+
+# ======================================================================================
 # 33. 地図・位置情報連携サブルーチン (検索モード対応・一本化)
 # ======================================================================================
 
@@ -2076,6 +2098,7 @@ if __name__ == '__main__':
         port=port
 
     )
+
 
 
 
