@@ -60,6 +60,31 @@
     {% endfor %}
 
     <script>
+        // ======================================================================================
+        // 99. My Spots 編集画面用 同期マネージャー (完全版)
+        // ======================================================================================
+        const STORAGE_KEY = "pin_weather_backup_v1";
+
+        // 現在のサーバーの状態（編集後の状態）をブラウザに同期する
+        function syncEditToLocal() {
+            const data = {
+                user_locations: {{ spots | tojson }},
+                design_params: {{ session.get('design_params', {}) | tojson }},
+                last_basho: {{ session.get('last_basho', '') | tojson }},
+                sel_dirs: {{ session.get('sel_dirs', []) | tojson }},
+                lang: {{ session.get('lang', 'ja') | tojson }}
+            };
+            
+            // 地点データが存在するか、あるいは意図的に空にされた場合もバックアップを更新
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            console.log("Edit synchronized to LocalStorage.");
+        }
+
+        // ページが表示されたら即座に実行（編集・削除後のリダイレクト時など）
+        window.addEventListener('load', syncEditToLocal);
+        // スマホ向けにページを離れる際も同期
+        window.addEventListener('pagehide', syncEditToLocal);
+
         // 編集モードの切り替え
         function showEdit(idx) {
             document.getElementById('display_' + idx).style.display = 'none';
