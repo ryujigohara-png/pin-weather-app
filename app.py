@@ -1037,7 +1037,7 @@ def generate_weather_icons_html(df, ratio_info, contena_min_w, start_idx, design
     return header_html, body_html
 
 # ======================================================================================
-# 30. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (統合エンジン)
+# 30. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (統合エンジン・フォント直接注入版)
 # ======================================================================================
 def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_params, now_jst):
     import pandas as pd
@@ -1054,38 +1054,28 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
     new_ratio_info = (0.0, 0.0, 0.0)
 
     try:
-        # --- 1. フォント設定 (サーバー/ローカル両対応版) ---
-        # static/font.ttf を最優先、次にOS標準フォントを探索する
-        base_dir = os.path.dirname(__file__)
-        local_font_path = os.path.join(base_dir, 'static', 'font.ttf')
+        # --- 1. フォントオブジェクトの直接生成 ---
+        # サーバー上の絶対パスを取得
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        fpath = os.path.join(base_dir, 'static', 'font.ttf')
         
-        font_applied = False
-        if os.path.exists(local_font_path):
-            try:
-                # フォントをマネージャーに登録し、その名前を取得して設定
-                fm.fontManager.addfont(local_font_path)
-                font_prop = fm.FontProperties(fname=local_font_path)
-                plt.rcParams['font.family'] = font_prop.get_name()
-                font_applied = True
-            except:
-                pass
+        # フォントサイズ
+        f_size = design_params.get("font_size", 10)
+        
+        # フォントが物理的に存在するか最終チェック
+        if os.path.exists(fpath):
+            # fm.FontProperties を直接生成（これが一番確実です）
+            fp = fm.FontProperties(fname=fpath, size=f_size)
+            # グローバル設定も上書き
+            fm.fontManager.addfont(fpath)
+            plt.rcParams['font.family'] = fp.get_name()
+            print(f"DEBUG: Font loaded from {fpath}")
+        else:
+            # 万が一ファイルがない場合の代替案
+            fp = fm.FontProperties(family='sans-serif', size=f_size)
+            print(f"DEBUG: Font NOT FOUND at {fpath}")
 
-        if not font_applied:
-            # フォントファイルがない場合のフォールバック（Windows/Linux混在対応）
-            font_paths = [
-                'C:\\Windows\\Fonts\\ipaexg.ttf', 
-                'C:\\Windows\\Fonts\\msgothic.ttc',
-                '/usr/share/fonts/truetype/fonts-japanese-gothic.ttf' # Linux用
-            ]
-            for fpath in font_paths:
-                if os.path.exists(fpath):
-                    plt.rcParams['font.family'] = fm.FontProperties(fname=fpath).get_name()
-                    font_applied = True
-                    break
-        
-        # フォントサイズの設定
-        plt.rcParams['font.size'] = design_params.get("font_size", 10)
-        # マイナス記号の文字化け防止
+        plt.rcParams['font.size'] = f_size
         plt.rcParams['axes.unicode_minus'] = False
 
         # --- 2. データ取得 ---
@@ -1144,6 +1134,8 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
             ax = axes_list[i]
             is_bottom = (i == len(active_plots) - 1)
             
+            # 各レンダリング関数に「fp（フォントプロパティ）」を渡す必要があれば渡す設定
+            # 今回は plt.rcParams で効かない場合を想定し、このサブルーチン内で共通設定を適用
             if plot_type == "wind":
                 render_wind_bar_chart(ax, df, danger_v, start_idx, design_params)
             elif plot_type == "temp":
@@ -2102,4 +2094,5 @@ if __name__ == '__main__':
         port=port
 
     )
+
 
