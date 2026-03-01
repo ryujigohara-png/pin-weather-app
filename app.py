@@ -1926,6 +1926,7 @@ def index():
             basho="Error"
         )
 
+
 # ======================================================================================
 # 96. グラフ描画エリア生成サブルーチン (座標不整合修正版)
 # ======================================================================================
@@ -2021,6 +2022,28 @@ def change_lang():
     session['lang'] = 'en' if current_lang == 'ja' else 'ja'
     session.modified = True
     return redirect(request.referrer or url_for('index'))
+    
+# ======================================================================================
+# 44. LocalStorage からのセッション復元ハンドラ
+# ======================================================================================
+@app.route('/restore_settings', methods=['POST'])
+def restore_settings():
+    from flask import request, session, jsonify
+    try:
+        data = request.get_json()
+        if not data: return jsonify({"status": "error"}), 400
+
+        # バックアップからサーバーのセッションへ一括書き戻し
+        session['user_locations'] = data.get('user_locations', [])
+        session['design_params'] = data.get('design_params', {})
+        session['last_basho'] = data.get('last_basho', '')
+        session['sel_dirs'] = data.get('sel_dirs', [])
+        session['lang'] = data.get('lang', 'ja')
+        
+        session.modified = True
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # ======================================================================================
 # 100. メインエントリーポイント (サーバー公開対応版)
@@ -2044,6 +2067,7 @@ if __name__ == '__main__':
         host='0.0.0.0', 
         port=port
     )
+
 
 
 
