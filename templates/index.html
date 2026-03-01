@@ -166,7 +166,7 @@
             <div class="sidebar-header">TOOLS</div>
             <button onclick="openModal()">{{ lang_dict['⚙ 詳細設定'] }}</button>
             <button onclick="location.href='/edit_spots'">{{ lang_dict['📍 My Spots 編集'] }}</button>
-            <button onclick="location.href='/change_lang'">🌐 Language / 言語</button>
+            <button onclick="if(confirm('{{ lang_dict['CONFIRM_LANG_CHANGE'] or 'Switch language? / 言語を切り替えますか？' }}')) location.href='/change_lang'">🌐 Language / 言語</button>
             <button onclick="confirmReset()" style="color: #ff6b6b; margin-top: 20px;">🔄 {{ lang_dict['リセット'] }}</button>
         </div>
     </div>
@@ -311,4 +311,5 @@
         {{ gps_script|safe }}
     </script>
 </body>
+
 </html>
