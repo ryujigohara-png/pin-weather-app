@@ -220,15 +220,23 @@
                 </div>
             </div>
 
-            <div class="api-links-row">
+            <div class="api-links-row" style="margin-bottom: 20px;">
+                <span style="display: block; margin-bottom: 8px; color: gray;">
+                    Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" style="color: gray;">Open-Meteo.com</a> (CC BY 4.0)
+                </span>
                 <a href="{{ w_url }}" target="_blank" class="api-link-item">[ {{ lang_dict['LINK_WEATHER'] }} ]</a> 
                 &nbsp;&nbsp;
                 <a href="{{ m_url }}" target="_blank" class="api-link-item">[ {{ lang_dict['LINK_MARINE'] }} ]</a>
             </div>
-        </div>
-    </div>
 
-    <div id="configModal" class="modal">
+            <div style="border-top: 1px solid #e6e9ef; padding-top: 15px; text-align: left;">
+                <p style="font-size: 11px; color: #888; line-height: 1.6; margin-bottom: 15px;">
+                    {{ lang_dict.get("DISCLAIMER", "※本データは予測値であり、実際の天候と異なる場合があります。航海や活動の際は、必ず最新の気象情報を確認し、自己責任でご利用ください。") }}
+                </p>
+                <p style="text-align: center; font-size: 10px; color: #ccc;">- Beta Version -</p>
+            </div>
+        </div>
+    </div> <div id="configModal" class="modal">
         <div class="modal-content">
             <div class="modal-title">{{ lang_dict['デザイン微調整'] }}</div>
             <form action="/update_settings" method="post">
@@ -299,14 +307,10 @@
             } catch (error) { alert("{{ lang_dict['ERR_LOC_FAILED'] }}"); }
         }
         {{ gps_script|safe }}
-        // ======================================================================================
-        // 90. QRコード共有サブルーチン
-        // ======================================================================================
+
         function showShareQR() {
-            const currentUrl = window.location.origin; // サーバーのURLを取得
+            const currentUrl = window.location.origin;
             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(currentUrl)}`;
-            
-            // 簡易的なアラート風モーダルで表示（あるいは既存のモーダルを流用）
             const shareModal = document.createElement('div');
             shareModal.style = "position:fixed; z-index:500; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; flex-direction:column; color:white;";
             shareModal.innerHTML = `
@@ -319,22 +323,13 @@
             document.body.appendChild(shareModal);
         }
 
-        // ======================================================================================
-        // 98. LocalStorage 同期マネージャー (サーバー負荷軽減版)
-        // ======================================================================================
         const STORAGE_KEY = "pin_weather_backup_v1";
-        
         async function checkAndRestore() {
-            // 既にリ元が完了している(URLに restore=1 がある)場合は何もしない
             if (window.location.search.includes('restore=1')) return;
-        
             const localData = localStorage.getItem(STORAGE_KEY);
             if (!localData) return;
-        
             const backup = JSON.parse(localData);
             const currentSpots = {{ session.get('user_locations', []) | tojson }};
-        
-            // サーバーが空の状態のみ、データを送り込む
             if (currentSpots.length === 0 && backup.user_locations.length > 0) {
                 try {
                     const response = await fetch('/restore_settings', {
@@ -343,28 +338,18 @@
                         body: JSON.stringify(backup)
                     });
                     if (response.ok) {
-                        // リロード。キャッシュを回避するためタイムスタンプを付与
                         window.location.href = window.location.pathname + '?restore=1&t=' + new Date().getTime();
                     }
                 } catch (e) { console.error("Restore skip:", e); }
             }
         }
         
-        // 起動時の負荷を分散させるため、1秒遅らせて同期を開始
         window.addEventListener('load', () => {
             setTimeout(() => {
                 checkAndRestore();
-                syncToLocal();
+                // syncToLocal は app.py 側で定義される javascript 経由で実行
             }, 1000); 
         });
-        
-        window.addEventListener('pagehide', syncToLocal);
     </script>
 </body>
-
 </html>
-
-
-
-
-
