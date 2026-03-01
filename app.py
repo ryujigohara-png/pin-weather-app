@@ -1037,7 +1037,7 @@ def generate_weather_icons_html(df, ratio_info, contena_min_w, start_idx, design
     return header_html, body_html
 
 # ======================================================================================
-# 30. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (統合エンジン・フォント直接注入版)
+# 30. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (フォント直接指定・完全版)
 # ======================================================================================
 def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_params, now_jst):
     import pandas as pd
@@ -1054,28 +1054,22 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
     new_ratio_info = (0.0, 0.0, 0.0)
 
     try:
-        # --- 1. フォントオブジェクトの直接生成 ---
-        # サーバー上の絶対パスを取得
+        # --- 1. フォントオブジェクトの絶対パス生成 ---
         base_dir = os.path.dirname(os.path.abspath(__file__))
         fpath = os.path.join(base_dir, 'static', 'font.ttf')
-        
-        # フォントサイズ
         f_size = design_params.get("font_size", 10)
         
-        # フォントが物理的に存在するか最終チェック
+        # フォントオブジェクトを生成 (各描画関数でこれを使います)
         if os.path.exists(fpath):
-            # fm.FontProperties を直接生成（これが一番確実です）
+            # fm.FontProperties を生成
             fp = fm.FontProperties(fname=fpath, size=f_size)
-            # グローバル設定も上書き
+            # 念のため全体設定も行うが、今回は個別指定を優先する
             fm.fontManager.addfont(fpath)
             plt.rcParams['font.family'] = fp.get_name()
-            print(f"DEBUG: Font loaded from {fpath}")
         else:
-            # 万が一ファイルがない場合の代替案
+            # 異常系：ファイルがない場合は標準フォント
             fp = fm.FontProperties(family='sans-serif', size=f_size)
-            print(f"DEBUG: Font NOT FOUND at {fpath}")
 
-        plt.rcParams['font.size'] = f_size
         plt.rcParams['axes.unicode_minus'] = False
 
         # --- 2. データ取得 ---
@@ -1104,9 +1098,6 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         if design_params.get("show_wave", True): active_plots.append("wave"); height_ratios.append(1)
         if design_params.get("show_ocean_temp", True): active_plots.append("ocean_temp"); height_ratios.append(1)
         if design_params.get("show_tide", True): active_plots.append("tide"); height_ratios.append(1)
-        
-        if not active_plots:
-            raise RuntimeError("表示対象のグラフが選択されていません。")
 
         # --- 5. 海洋データ準備 ---
         marine_results, r_lat, r_lon = None, lat, lon
@@ -1124,18 +1115,14 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         # --- 7. グラフ描画 ---
         fig, axes = plt.subplots(len(active_plots), 1, figsize=(fig_w_inch, fig_h_inch), dpi=dpi_value,
                                     gridspec_kw={'height_ratios': height_ratios})
-        if len(active_plots) == 1:
-            axes_list = np.array([axes])
-        else:
-            axes_list = np.array(axes).flatten()
+        axes_list = np.array([axes]).flatten()
 
         formatter = get_x_axis_formatter()
         for i, plot_type in enumerate(active_plots):
             ax = axes_list[i]
             is_bottom = (i == len(active_plots) - 1)
             
-            # 各レンダリング関数に「fp（フォントプロパティ）」を渡す必要があれば渡す設定
-            # 今回は plt.rcParams で効かない場合を想定し、このサブルーチン内で共通設定を適用
+            # 各レンダリング関数を呼び出し
             if plot_type == "wind":
                 render_wind_bar_chart(ax, df, danger_v, start_idx, design_params)
             elif plot_type == "temp":
@@ -1147,28 +1134,27 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
             elif plot_type == "tide":
                 render_tide_curve_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom)
 
+            # 共通設定を適用
             apply_common_axis_settings(ax, df, formatter, now_jst, design_params)
+            
+            # --- ここが豆腐対策の核心：生成した軸ラベルやタイトルに直接フォントを注入 ---
+            for text in ax.get_xticklabels() + ax.get_yticklabels():
+                text.set_fontproperties(fp)
+            ax.set_xlabel(ax.get_xlabel(), fontproperties=fp)
+            ax.set_ylabel(ax.get_ylabel(), fontproperties=fp)
+            if ax.get_title():
+                ax.set_title(ax.get_title(), fontproperties=fp)
 
-        plt.subplots_adjust(
-            left=left_margin_ratio, 
-            right=0.98, 
-            top=0.92, 
-            bottom=0.15, 
-            hspace=design_params.get("hspace_inch", 0.4)
-        )
+        plt.subplots_adjust(left=left_margin_ratio, right=0.98, top=0.92, bottom=0.15, hspace=design_params.get("hspace_inch", 0.4))
 
-        # --- 8. 画像出力・分割 ---
-        pos = axes_list[0].get_position() 
+        # --- 8. 画像出力 ---
         buf = io.BytesIO()
         fig.savefig(buf, format="png", bbox_inches=None, pad_inches=0, dpi=dpi_value)
         buf.seek(0)
         full_img = Image.open(buf)
         img_w, img_h = full_img.size
-        split_px = int(img_w * pos.x0)
-        right_img_w_px = float(img_w - split_px)
-        hour_w_px = (pos.width * img_w) / (len(df) - 1)
-        plot_offset_px = 0.0  
-        new_ratio_info = (right_img_w_px, hour_w_px, plot_offset_px)
+        split_px = int(img_w * axes_list[0].get_position().x0)
+        new_ratio_info = (float(img_w - split_px), (axes_list[0].get_position().width * img_w) / (len(df) - 1), 0.0)
         plt.close(fig)
         
         left_part = full_img.crop((0, 0, split_px, img_h))
@@ -1182,12 +1168,8 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         return img_to_b64(left_part), img_to_b64(right_part), new_ratio_info, start_idx, df, split_px
 
     except Exception as e:
-        if 'fig' in locals():
-            plt.close(fig)
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        import traceback
-        tb_str = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        raise RuntimeError("".join(tb_str))
+        if 'fig' in locals(): plt.close(fig)
+        raise RuntimeError(str(e))
 
 
 # ======================================================================================
@@ -2094,5 +2076,6 @@ if __name__ == '__main__':
         port=port
 
     )
+
 
 
