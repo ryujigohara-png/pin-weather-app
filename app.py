@@ -436,21 +436,63 @@ def initialize_app_settings():
 # 13. 日本語フォントセットアップサブルーチン
 # ======================================================================================
 def setup_font(font_size=None):
+    """
+    matplotlib の日本語文字化けを防止するためのセットアップ。
+    static/font.ttf が存在する場合はそれを優先的にシステムへ登録し、全体適用する。
+    """
+    import os
+    import matplotlib.font_manager as fm
+    import matplotlib.pyplot as plt
+
+    # 引数がない場合は CONFIG からデフォルト値を取得
     if font_size is None:
-        font_size = CONFIG["GRAPH_FONT_SIZE"]
+        # CONFIG が未定義の場合のフォールバック (安全策)
+        try:
+            font_size = CONFIG.get("GRAPH_FONT_SIZE", 9)
+        except NameError:
+            font_size = 9
     
-    font_names = ['MSP Gothic', 'Meiryo', 'Yu Gothic', 'Hiragino Sans', 'IPAexGothic']
-    found = False
-    for f_name in font_names:
-        if f_name in [f.name for f in fm.fontManager.ttflist]:
-            plt.rc('font', family=f_name, size=font_size)
-            found = True
-            break
+    # 1. ローカルに配置したフォントファイルのパス
+    local_font_path = os.path.join('static', 'font.ttf')
+    
+    found_custom_font = False
+
+    # 2. font.ttf が存在する場合の処理
+    if os.path.exists(local_font_path):
+        try:
+            # フォントマネージャーに直接登録
+            fm.fontManager.addfont(local_font_path)
+            # 登録したフォントのプロパティ（名前）を取得
+            prop = fm.FontProperties(fname=local_font_path)
+            custom_font_name = prop.get_name()
             
-    if not found:
-        plt.rc('font', family='sans-serif', size=font_size)
+            # 全体の標準フォントとして設定
+            plt.rcParams['font.family'] = custom_font_name
+            plt.rcParams['font.size'] = font_size
+            found_custom_font = True
+            # print(f"Font Setup: Successfully loaded {custom_font_name}")
+        except Exception as e:
+            print(f"Font Setup Error: {e}")
+
+    # 3. font.ttf がない、または読み込み失敗時のフォールバック処理
+    if not found_custom_font:
+        # OS標準フォントの候補
+        font_names = ['IPAexGothic', 'Meiryo', 'MSP Gothic', 'Yu Gothic', 'Hiragino Sans']
+        found_system_font = False
         
-    plt.rcParams['axes.unicode_minus'] = False 
+        for f_name in font_names:
+            if f_name in [f.name for f in fm.fontManager.ttflist]:
+                plt.rc('font', family=f_name, size=font_size)
+                found_system_font = True
+                break
+        
+        if not found_system_font:
+            # 最終手段：標準のサンセリフ体を使用
+            plt.rc('font', family='sans-serif', size=font_size)
+            print("Font Setup: Custom font not found. Using system default.")
+
+    # マイナス記号の文字化け（□になる現象）を防止
+    plt.rcParams['axes.unicode_minus'] = False
 
 
 # ======================================================================================
@@ -2042,4 +2084,5 @@ if __name__ == '__main__':
         debug=is_debug, 
         host='0.0.0.0', 
         port=port
+
     )
