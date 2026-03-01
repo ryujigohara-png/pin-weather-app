@@ -2046,16 +2046,17 @@ def restore_settings():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ======================================================================================
-# 100. メインエントリーポイント (Render最適化版)
+# 100. アプリケーション起動サブルーチン (Render強制安定版)
 # ======================================================================================
 if __name__ == "__main__":
     import os
-    # Renderでは環境変数 PORT が指定されるため、それを優先的に使用する
-    # 指定がない場合は 10000番をデフォルトにする
-    port = int(os.environ.get("PORT", 10000))
+    # Renderの環境変数PORTを最優先し、数値として確実に取得
+    port_str = os.environ.get("PORT", "10000")
+    port = int(port_str)
     
-    # debug=False にすることで、再起動ループを抑制し安定性を高める
-    app.run(host="0.0.0.0", port=port, debug=False)
+    # Renderで起動を安定させるため debug=False は必須
+    # threaded=True を追加し、複数のアクセス（Health Check等）を同時に捌けるようにします
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
 
 
 
