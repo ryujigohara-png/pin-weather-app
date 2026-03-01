@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>地点選択 - Pin_Weather!</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; font-family: sans-serif; overflow: hidden; }
+        #map { height: 100vh; width: 100vw; z-index: 1; }
+        
+        /* 検索ボックス */
+        .search-box {
+            position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+            z-index: 1000; width: 90%; max-width: 400px;
+            display: flex; gap: 5px; background: white; padding: 8px;
+            border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        #search-input { flex: 1; border: 1px solid #ccc; border-radius: 4px; padding: 8px; font-size: 16px; }
+        .search-highlight { border: 2px solid #0078ff !important; background-color: #f0f7ff; }
+        .btn-search { background: #0078ff; color: white; border: none; padding: 0 15px; border-radius: 4px; cursor: pointer; }
+
+        .map-controls {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 1000; background: white; padding: 15px; border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: 90%; max-width: 400px;
+        }
+        .btn-group { display: flex; gap: 8px; margin-top: 8px; }
+        .btn {
+            flex: 1; padding: 12px 5px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px;
+        }
+        .btn-confirm { background-color: #ff4b4b; color: white; }
+        .btn-cancel { background-color: #f0f2f6; color: #31333f; }
+        .marker-info { font-size: 13px; text-align: center; margin-bottom: 5px; color: #333; font-weight: bold; }
+        #status-msg { font-size: 11px; color: #0078ff; display: block; text-align: center; margin-bottom: 2px; height: 14px; }
+    </style>
+</head>
+<body>
+
+    <div class="search-box">
+        <input type="text" id="search-input" placeholder="地名や施設名を入力...">
+        <button class="btn-search" onclick="searchLocation()">検索</button>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="map-controls">
+        <span id="status-msg"></span>
+        <div id="coords-display" class="marker-info">ピンを動かして地点を選択</div>
+        <div class="btn-group">
+            <button class="btn btn-cancel" onclick="location.href='/'">中止</button>
+            <button class="btn btn-confirm" onclick="confirmLocation()">決定</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        var initialLat = {{ lat }};
+        var initialLon = {{ lon }};
+        var searchMode = "{{ search_mode }}"; 
+
+        var map = L.map('map', { zoomControl: false }).setView([initialLat, initialLon], 13);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var marker = L.marker([initialLat, initialLon], { draggable: true }).addTo(map);
+
+        if (searchMode !== "1" && "geolocation" in navigator) {
+            document.getElementById('status-msg').innerText = "現在地を取得中...";
+            navigator.geolocation.getCurrentPosition(function(position) {
+                var lat = position.coords.latitude;
+                var lon = position.coords.longitude;
+                map.setView([lat, lon], 14);
+                marker.setLatLng([lat, lon]);
+                updateInfo(lat, lon);
+                document.getElementById('status-msg').innerText = "現在地を表示しました";
+            }, function(error) {
+                document.getElementById('status-msg').innerText = "現在地を取得できませんでした";
+            }, { enableHighAccuracy: true, timeout: 5000 });
+        }
+
+        window.addEventListener('load', function() {
+            if (searchMode === "1") {
+                const input = document.getElementById('search-input');
+                input.classList.add('search-highlight');
+                input.focus();
+                document.getElementById('status-msg').innerText = "地名を入力して検索してください";
+            }
+        });
+
+        async function updateInfo(lat, lon) {
+            document.getElementById('coords-display').innerText = "取得中...";
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18`, {
+                    headers: { 'Accept-Language': 'ja' }
+                });
+                const data = await res.json();
+                const addr = data.address;
+                const label = addr.quarter || addr.suburb || addr.neighbourhood || addr.city_district || addr.village || addr.town || addr.city || "指定地点";
+                document.getElementById('coords-display').innerText = label + " (" + lat.toFixed(3) + ", " + lon.toFixed(3) + ")";
+                return label;
+            } catch (e) {
+                document.getElementById('coords-display').innerText = "緯度: " + lat.toFixed(4) + " / 経度: " + lon.toFixed(4);
+                return "指定地点";
+            }
+        }
+
+        updateInfo(initialLat, initialLon);
+
+        marker.on('dragend', function() {
+            var pos = marker.getLatLng();
+            updateInfo(pos.lat, pos.lng);
+        });
+
+        map.on('click', function(e) {
+            marker.setLatLng(e.latlng);
+            updateInfo(e.latlng.lat, e.latlng.lng);
+        });
+
+        async function searchLocation() {
+            const query = document.getElementById('search-input').value;
+            if (!query) return;
+            document.getElementById('status-msg').innerText = "検索中...";
+            document.getElementById('search-input').classList.remove('search-highlight');
+
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
+                const data = await res.json();
+                if (data.length > 0) {
+                    const lat = parseFloat(data[0].lat);
+                    const lon = parseFloat(data[0].lon);
+                    map.setView([lat, lon], 15);
+                    marker.setLatLng([lat, lon]);
+                    updateInfo(lat, lon);
+                    document.getElementById('status-msg').innerText = "";
+                } else {
+                    document.getElementById('status-msg').innerText = "見つかりませんでした";
+                }
+            } catch (e) {
+                document.getElementById('status-msg').innerText = "検索エラー";
+            }
+        }
+
+        function confirmLocation() {
+            var pos = marker.getLatLng();
+            // フラグ管理された index 側へ遷移させるためのエンドポイントへ飛ばす
+            window.location.href = "/update_by_map?lat=" + pos.lat + "&lon=" + pos.lng;
+        }
+
+        document.getElementById('search-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') searchLocation();
+        });
+    </script>
+</body>
+</html>

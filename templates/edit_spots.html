@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Spots 編集</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding: 15px; color: #31333f; }
+        .header { display: flex; align-items: center; margin-bottom: 20px; }
+        /* 戻るボタンの当たり判定を広く */
+        .btn-back { text-decoration: none; font-size: 24px; color: #31333f; margin-right: 15px; padding: 5px; }
+        h2 { margin: 0; font-size: 1.2rem; }
+        
+        .spot-card { background: white; border-radius: 10px; padding: 12px; margin-bottom: 12px; border: 1px solid #dcdcdc; }
+        .spot-info { margin-bottom: 10px; }
+        .spot-name { font-weight: bold; font-size: 1rem; display: block; }
+        .spot-coords { font-size: 0.8rem; color: #666; }
+        
+        .controls { display: flex; gap: 8px; justify-content: flex-end; }
+        .btn-tool { padding: 8px 12px; border-radius: 6px; border: 1px solid #dcdcdc; background: #f8f9fb; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+        .btn-del { color: #ff4b4b; border-color: #ffcccc; }
+        
+        /* 編集フォーム用 */
+        .edit-form { display: none; margin-top: 10px; gap: 8px; align-items: center; }
+        .edit-input { flex: 1; padding: 10px; border: 2px solid #0078ff; border-radius: 6px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="/?t={{ range(1, 99999)|random }}" class="btn-back">←</a>
+        <h2>📍 My Spots 管理 ({{ spots|length }}/10)</h2>
+    </div>
+
+    {% if not spots %}
+    <p style="text-align: center; color: #888; margin-top: 50px;">登録されている地点はありません。</p>
+    {% endif %}
+
+    {% for spot in spots %}
+    <div class="spot-card">
+        <div id="display_{{ loop.index0 }}">
+            <div class="spot-info">
+                <span class="spot-name">{{ spot.name }}</span>
+                <span class="spot-coords">({{ "%.4f"|format(spot.lat) }}, {{ "%.4f"|format(spot.lon) }})</span>
+            </div>
+            <div class="controls">
+                <button onclick="showEdit({{ loop.index0 }})" class="btn-tool">✏️ 名前</button>
+                <button onclick="location.href='/move_spot/{{ loop.index0 }}/up'" class="btn-tool" {% if loop.first %}disabled style="opacity:0.3;"{% endif %}>▲</button>
+                <button onclick="location.href='/move_spot/{{ loop.index0 }}/down'" class="btn-tool" {% if loop.last %}disabled style="opacity:0.3;"{% endif %}>▼</button>
+                <button onclick="confirmDelete({{ loop.index0 }}, '{{ spot.name }}')" class="btn-tool btn-del">🗑️</button>
+            </div>
+        </div>
+
+        <form id="form_{{ loop.index0 }}" class="edit-form" action="/update_spot_name" method="POST">
+            <input type="hidden" name="idx" value="{{ loop.index0 }}">
+            <input type="text" name="new_name" class="edit-input" value="{{ spot.name }}" required>
+            <button type="submit" class="btn-tool" style="background: #0078ff; color: white; border: none; font-weight: bold;">保存</button>
+            <button type="button" onclick="hideEdit({{ loop.index0 }})" class="btn-tool">戻る</button>
+        </form>
+    </div>
+    {% endfor %}
+
+    <script>
+        // 編集モードの切り替え
+        function showEdit(idx) {
+            document.getElementById('display_' + idx).style.display = 'none';
+            document.getElementById('form_' + idx).style.display = 'flex';
+        }
+        function hideEdit(idx) {
+            document.getElementById('display_' + idx).style.display = 'block';
+            document.getElementById('form_' + idx).style.display = 'none';
+        }
+        // 削除確認
+        function confirmDelete(idx, name) {
+            if (confirm('「' + name + '」を削除しますか？')) {
+                location.href = '/delete_spot/' + idx;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="{{ session.get('lang', 'ja') }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{{ lang_dict['⛵Pin_Weather!'] }}</title>
+    
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#0078ff">
+    
+    <script>
+      // サービスワーカーの登録
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register("{{ url_for('static', filename='service-worker.js') }}")
+            .then(reg => console.log('SW registered!', reg))
+            .catch(err => console.log('SW error!', err));
+        });
+      }
+    </script>
+
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0; background-color: #f0f2f5; color: #31333f; }
+        
+        /* サイドバー基本設定 */
+        .sidebar {
+            height: 100%; width: 0; position: fixed; z-index: 300; top: 0; left: 0;
+            background-color: #f8f9fb; 
+            overflow-x: hidden; 
+            overflow-y: auto; 
+            transition: 0.3s; padding-top: 60px;
+            border-right: 1px solid #e6e9ef;
+        }
+
+        .sidebar-content {
+            padding-bottom: 80px; 
+        }
+
+        .sidebar button, .sidebar a {
+            padding: 10px 20px; text-decoration: none; font-size: 14px; color: #31333f;
+            display: block; border: 1px solid #dcdcdc; background: white; width: calc(100% - 40px); 
+            margin: 10px auto; text-align: left; cursor: pointer; border-radius: 8px;
+        }
+        .sidebar button:hover { border-color: #ff4b4b; color: #ff4b4b; }
+        .sidebar .closebtn { position: absolute; top: 10px; right: 20px; font-size: 24px; color: #31333f; border: none; background: none; }
+        .sidebar-header { color: #555; padding: 10px 25px; font-size: 12px; font-weight: bold; }
+
+        /* 風向選択エリア */
+        .wind-dir-container { padding: 0 20px; margin-bottom: 20px; }
+        .wind-dir-box {
+            background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #dcdcdc;
+            border-left: 4px solid #ff4b4b;
+            display: flex; flex-direction: column; align-items: flex-start;
+            gap: 8px;
+        }
+        .wind-dir-grid { 
+            display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; width: 100%;
+        }
+        .wind-dir-item { 
+            font-size: 11px; color: #555; cursor: pointer; 
+            display: flex; align-items: center; justify-content: flex-start;
+            gap: 4px; 
+        }
+
+        /* メインコンテンツエリア */
+        #main { padding: 10px; transition: margin-left .3s; }
+        .location-header {
+            background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e6e9ef;
+        }
+        .loc-top-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+        .loc-name-area { display: flex; align-items: center; gap: 10px; flex: 1; }
+        .loc-info { display: flex; flex-direction: column; flex: 1; }
+        .loc-name-row { display: flex; align-items: center; gap: 8px; }
+        .loc-name { font-size: 1.1rem; font-weight: 600; color: #31333f; }
+        .loc-coords { font-size: 0.85rem; color: #666; margin-top: 2px; }
+        
+        .action-bar { display: flex; flex-direction: column; gap: 10px; }
+        .btn-action {
+            flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #dcdcdc;
+            font-size: 14px; font-weight: 500; cursor: pointer; display: flex;
+            align-items: center; justify-content: center; gap: 6px;
+            text-decoration: none; background-color: #f0f2f6; color: #31333f;
+        }
+
+        .openbtn { background: #f0f2f6; border: 1px solid #dcdcdc; border-radius: 6px; padding: 8px 12px; cursor: pointer; }
+        .spot-selector {
+            width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #dcdcdc;
+            font-size: 14px; background-color: white; color: #31333f; cursor: pointer;
+        }
+        .btn-refresh {
+            background: #f0f2f6; border: 1px solid #dcdcdc; border-radius: 6px;
+            padding: 6px 10px; font-size: 13px; font-weight: 500; color: #31333f;
+            cursor: pointer; display: flex; align-items: center; gap: 4px;
+        }
+        .btn-star { background: none; border: none; font-size: 1.3rem; cursor: pointer; padding: 0; line-height: 1; }
+
+        .graph-outer-container { position: relative; width: 100%; }
+
+        /* モーダル設定 */
+        .modal { display: none; position: fixed; z-index: 400; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+        .modal-content { background: white; margin: 5% auto; padding: 25px; width: 90%; max-width: 450px; border-radius: 12px; }
+        .st-slider-row { margin-bottom: 18px; }
+        .st-slider-label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .st-slider-value { font-weight: bold; color: #0078ff; }
+        input[type=range] { width: 100%; height: 6px; border-radius: 3px; background: #dfe1e6; }
+        .modal-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 30px; gap: 10px; }
+        .btn-update-st { background: #0078ff; color: white; border: none; padding: 10px 25px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .modal-title { font-weight: bold; font-size: 1.1rem; margin-bottom: 20px; }
+
+        /* フッター情報表示 */
+        .footer-info-container { margin-top: 20px; padding: 15px; border-top: 1px solid #e6e9ef; background-color: #fff; border-radius: 0 0 10px 10px; }
+        .legend-box { padding: 12px; border-radius: 8px; background-color: #f0f2f6; margin-bottom: 15px; line-height: 1.6; border: 1px solid #dcdcdc; }
+        .api-links-row { text-align: right; font-size: 11px; color: gray; margin-bottom: 15px; }
+        .api-link-item { color: gray; text-decoration: none; border: 1px solid #ddd; padding: 2px 6px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <div id="mySidebar" class="sidebar">
+        <div class="sidebar-content">
+            <button class="closebtn" onclick="closeNav()">×</button>
+            <div class="sidebar-header">{{ lang_dict['表示設定'] }}</div>
+            <form action="/update_display_toggle?redirect_to_home=1" method="POST" style="padding: 0 20px;">
+                <div style="background: white; border: 1px solid #dcdcdc; border-radius: 8px; padding: 10px; margin-bottom: 10px;">
+                    {% for key, label in [
+                        ('show_wind','風向・風速グラフ表示'),
+                        ('show_temp','気温グラフ表示'),
+                        ('show_wave','波高グラフ表示'),
+                        ('show_ocean_temp','海面水温グラフ表示'),
+                        ('show_tide','潮位グラフ表示'),
+                        ('show_w_text','天気文字表示')
+                    ] %}
+                    <label style="display: block; font-size: 13px; margin-bottom: 5px; cursor: pointer;">
+                        <input type="checkbox" name="{{ key }}" {% if design_params[key] %}checked{% endif %}> {{ lang_dict[label] }}
+                    </label>
+                    {% endfor %}
+                </div>
+
+                <div class="sidebar-header" style="padding-left:0;">{{ lang_dict['色付風向選択'] }}</div>
+                <div class="wind-dir-container">
+                    <div class="wind-dir-box">
+                        <label class="wind-dir-item">
+                            <input type="checkbox" name="wind_dirs" value="{{ lang_dict['ALL_DIRECTIONS'][0] }}" {% if sel_dirs[0] %}checked{% endif %}>{{ lang_dict['ALL_DIRECTIONS'][0] }}
+                        </label>
+                        
+                        <div class="wind-dir-grid">
+                            {% set dir_indices = [15, 1, 14, 2, 13, 3, 12, 4, 11, 5, 10, 6, 9, 7] %}
+                            {% for idx in dir_indices %}
+                            <label class="wind-dir-item">
+                                <input type="checkbox" name="wind_dirs" value="{{ lang_dict['ALL_DIRECTIONS'][idx] }}" {% if sel_dirs[idx] %}checked{% endif %}>{{ lang_dict['ALL_DIRECTIONS'][idx] }}
+                            </label>
+                            {% endfor %}
+                        </div>
+                        
+                        <label class="wind-dir-item">
+                            <input type="checkbox" name="wind_dirs" value="{{ lang_dict['ALL_DIRECTIONS'][8] }}" {% if sel_dirs[8] %}checked{% endif %}>{{ lang_dict['ALL_DIRECTIONS'][8] }}
+                        </label>
+                    </div>
+                    <div style="font-size: 10px; color: #888; margin-top: 5px; text-align: left; padding-left: 5px;">{{ lang_dict['LEGEND_NOTE'] }}</div>
+                </div>
+
+                <button type="submit" style="background: #ff4b4b; color: white; border: none; text-align: center; width: 100%; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold;">{{ lang_dict['BTN_UPDATE'] or lang_dict['更新'] }}</button>
+            </form>
+
+            <div class="sidebar-header">TOOLS</div>
+            <button onclick="openModal()">{{ lang_dict['⚙ 詳細設定'] }}</button>
+            <button onclick="location.href='/edit_spots'">{{ lang_dict['📍 My Spots 編集'] }}</button>
+            <button onclick="location.href='/change_lang'">🌐 Language / 言語</button>
+            <button onclick="confirmReset()" style="color: #ff6b6b; margin-top: 20px;">🔄 {{ lang_dict['リセット'] }}</button>
+        </div>
+    </div>
+
+    <div id="main">
+        <div class="location-header">
+            <div class="loc-top-row">
+                <div class="loc-name-area">
+                    <button class="openbtn" onclick="openNav()">☰</button>
+                    <div class="loc-info">
+                        <div class="loc-name-row">
+                            <span class="loc-name">{{ basho }}</span>
+                            <button id="btn-star" class="btn-star" onclick="registerMySpot()">
+                                {% set is_saved = namespace(found=false) %}
+                                {% for s in session.get('user_locations', []) %}
+                                    {% if (s.lat|float - design_params.lat|float)|abs < 0.0001 and (s.lon|float - design_params.lon|float)|abs < 0.0001 %}
+                                        {% set is_saved.found = true %}
+                                    {% endif %}
+                                {% endfor %}
+                                {% if is_saved.found %}🌟{% else %}☆{% endif %}
+                            </button>
+                        </div>
+                        <span class="loc-coords">({{ "%.4f"|format(design_params.lat) }}, {{ "%.4f"|format(design_params.lon) }})</span>
+                    </div>
+                </div>
+                <button onclick="location.href='/?refresh=1&t=' + new Date().getTime()" class="btn-refresh">
+                    🔄 {{ now_jst.strftime('%H:%M') }}
+                </button>
+            </div>
+
+            <div class="action-bar">
+                <select class="spot-selector" onchange="if(this.value) location.href='/select_spot/' + this.value">
+                    <option value="">{{ lang_dict['SELECT_PLACE'] }}</option>
+                    {% for spot in session.get('user_locations', []) %}
+                    <option value="{{ loop.index0 }}">{{ spot.name }}</option>
+                    {% endfor %}
+                </select>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="getCurrentLocation(event)" class="btn-action" style="flex:1;">{{ lang_dict['BTN_CURRENT_LOC_SHORT'] }}</button>
+                    <button onclick="showSearchPrompt()" class="btn-action" style="flex:1;">{{ lang_dict['BTN_SEARCH_CITY'] or '🔍 地名検索' }}</button>
+                    <a href="/map_select" class="btn-action" style="flex:1;">🗺️ {{ lang_dict['MAP_SELECT_LABEL'] or '地図選択' }}</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="graph-outer-container">
+            {{ graph_html|safe }}
+        </div>
+
+        <div class="footer-info-container">
+            <div class="legend-box">
+                <span style="font-weight: bold; font-size: 14px;">{{ lang_dict['LEGEND_TITLE'] }}</span><br>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 5px; font-size: 13px;">
+                    <span><span style="color: #1f77b4;">■</span> {{ lang_dict['LEGEND_BLUE'] }}</span>
+                    <span><span style="color: #ff7f0e;">■</span> {{ lang_dict['LEGEND_ORANGE'] }}</span>
+                    <span><span style="color: #d62728;">■</span> {{ lang_dict['LEGEND_RED'] }}</span>
+                </div>
+                <div style="margin-top: 5px; font-size: 13px;">
+                    <span style="color: #d62728; font-weight: bold;">---</span> 
+                    <span style="color: #333;">{{ lang_dict['LEGEND_DANGER_LINE'].replace('{v}', design_params.danger_v|string) }}</span>
+                </div>
+            </div>
+
+            <div class="api-links-row">
+                <a href="{{ w_url }}" target="_blank" class="api-link-item">[ {{ lang_dict['LINK_WEATHER'] }} ]</a> 
+                &nbsp;&nbsp;
+                <a href="{{ m_url }}" target="_blank" class="api-link-item">[ {{ lang_dict['LINK_MARINE'] }} ]</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="configModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">{{ lang_dict['デザイン微調整'] }}</div>
+            <form action="/update_settings" method="post">
+                {% for field, label, unit in [('height_inch','グラフ縦幅','inch'),('top_margin_inch','上余白','inch'),('hspace_inch','上下間隔',''),('width_inch','グラフ横幅','inch'),('margin_left_inch','左余白','inch'),('font_size','フォントサイズ','')] %}
+                <div class="st-slider-row">
+                    <div class="st-slider-label-row">
+                        <span class="st-slider-label">{{ lang_dict[label] or label }}{% if unit %}({{ unit }}){% endif %}:</span>
+                        <span class="st-slider-value" id="val_{{ field }}">{{ design_params[field] }}</span>
+                    </div>
+                    <input type="range" name="{{ field }}" 
+                           min="{{ -3.0 if field == 'top_margin_inch' else 0 if ('margin' in field or 'hspace' in field) else 0.1 }}" 
+                           max="{{ 30 if 'width' in field else 20 if 'font' in field else 2.0 }}" 
+                           step="0.1" value="{{ design_params[field] }}" 
+                           oninput="document.getElementById('val_{{ field }}').innerText=this.value">
+                </div>
+                {% endfor %}
+                <div class="modal-footer">
+                    <button type="button" onclick="location.href='/reset_settings'">{{ lang_dict['デフォルトに戻す'] }}</button>
+                    <div>
+                        <button type="button" onclick="closeModal()">{{ lang_dict['閉じる'] }}</button>
+                        <button type="submit" class="btn-update-st">{{ lang_dict['更新'] }}</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openNav() { document.getElementById("mySidebar").style.width = "280px"; }
+        function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
+        function openModal() { document.getElementById("configModal").style.display = "block"; closeNav(); }
+        function closeModal() { document.getElementById("configModal").style.display = "none"; }
+        
+        function confirmReset() { 
+            const msg = "{{ lang_dict['CONFIRM_RESET'] or '表示設定をリセットしますか？\\n(My Spots の登録地点は削除されません)' }}";
+            if (confirm(msg)) { 
+                window.location.href = '/reset_settings'; 
+            } 
+        }
+
+        function showSearchPrompt() {
+            location.href = "/map_select?search_mode=1";
+        }
+
+        async function registerMySpot() {
+            const currentName = "{{ basho }}";
+            const lat = {{ design_params.lat }};
+            const lon = {{ design_params.lon }};
+            const btn = document.getElementById('btn-star');
+            if (btn.innerText.trim() === "🌟") {
+                alert("{{ lang_dict['登録済'] }}");
+                return;
+            }
+            const promptMsg = "{{ lang_dict['この地点を My Spots に保存します。'] }}";
+            const newName = prompt(promptMsg, currentName);
+            if (newName === null) return;
+            try {
+                const response = await fetch('/add_to_myspots', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ name: newName, lat: lat, lon: lon })
+                });
+                const result = await response.json();
+                if (result.status === "success") {
+                    btn.innerText = "🌟";
+                    location.reload();
+                } else { alert(result.message); }
+            } catch (error) { alert("{{ lang_dict['ERR_LOC_FAILED'] }}"); }
+        }
+        {{ gps_script|safe }}
+    </script>
+</body>
+</html>
