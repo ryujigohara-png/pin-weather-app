@@ -433,66 +433,56 @@ def initialize_app_settings():
     return config
 
 # ======================================================================================
-# 13. 日本語フォントセットアップサブルーチン
+# 13. 日本語フォントセットアップサブルーチン (Render/Linux 強化版)
 # ======================================================================================
 def setup_font(font_size=None):
     """
-    matplotlib の日本語文字化けを防止するためのセットアップ。
-    static/font.ttf が存在する場合はそれを優先的にシステムへ登録し、全体適用する。
+    matplotlib の描画エンジンに対して、直接日本語フォントを注入します。
     """
     import os
+    import matplotlib as mpl
     import matplotlib.font_manager as fm
     import matplotlib.pyplot as plt
 
-    # 引数がない場合は CONFIG からデフォルト値を取得
+    # 1. サイズの決定
     if font_size is None:
-        # CONFIG が未定義の場合のフォールバック (安全策)
         try:
             font_size = CONFIG.get("GRAPH_FONT_SIZE", 9)
-        except NameError:
+        except:
             font_size = 9
     
-    # 1. ローカルに配置したフォントファイルのパス
-    local_font_path = os.path.join('static', 'font.ttf')
+    # 2. フォントファイルのパス指定
+    # static 直下の font.ttf を絶対パスで確実に指定
+    base_dir = os.path.dirname(__file__)
+    font_path = os.path.abspath(os.path.join(base_dir, 'static', 'font.ttf'))
     
-    found_custom_font = False
-
-    # 2. font.ttf が存在する場合の処理
-    if os.path.exists(local_font_path):
+    if os.path.exists(font_path):
         try:
-            # フォントマネージャーに直接登録
-            fm.fontManager.addfont(local_font_path)
-            # 登録したフォントのプロパティ（名前）を取得
-            prop = fm.FontProperties(fname=local_font_path)
-            custom_font_name = prop.get_name()
+            # フォントをキャッシュを介さず直接追加
+            fm.fontManager.addfont(font_path)
+            prop = fm.FontProperties(fname=font_path)
+            font_name = prop.get_name()
             
-            # 全体の標準フォントとして設定
-            plt.rcParams['font.family'] = custom_font_name
+            # --- ここが最重要：matplotlib全体のデフォルトを強制上書き ---
+            plt.rcParams['font.family'] = font_name
             plt.rcParams['font.size'] = font_size
-            found_custom_font = True
-            # print(f"Font Setup: Successfully loaded {custom_font_name}")
+            # グラフ内の細かいフォント設定も念のため上書き
+            mpl.rc('font', family=font_name)
+            
+            # マイナス記号の文字化け防止
+            plt.rcParams['axes.unicode_minus'] = False
+            
+            # キャッシュによる不具合を防ぐため、今の描画オブジェクトにも適用
+            plt.gca().title.set_fontproperties(prop)
+            
+            print(f"Font successfully applied: {font_name}")
+            return prop # 呼び出し元で個別に使いたい場合のために返す
         except Exception as e:
-            print(f"Font Setup Error: {e}")
-
-    # 3. font.ttf がない、または読み込み失敗時のフォールバック処理
-    if not found_custom_font:
-        # OS標準フォントの候補
-        font_names = ['IPAexGothic', 'Meiryo', 'MSP Gothic', 'Yu Gothic', 'Hiragino Sans']
-        found_system_font = False
-        
-        for f_name in font_names:
-            if f_name in [f.name for f in fm.fontManager.ttflist]:
-                plt.rc('font', family=f_name, size=font_size)
-                found_system_font = True
-                break
-        
-        if not found_system_font:
-            # 最終手段：標準のサンセリフ体を使用
-            plt.rc('font', family='sans-serif', size=font_size)
-            print("Font Setup: Custom font not found. Using system default.")
-
-    # マイナス記号の文字化け（□になる現象）を防止
-    plt.rcParams['axes.unicode_minus'] = False
+            print(f"Font Apply Error: {e}")
+    else:
+        print(f"Font file NOT FOUND at: {font_path}")
+    
+    return None
 
 
 # ======================================================================================
@@ -1064,13 +1054,39 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
     new_ratio_info = (0.0, 0.0, 0.0)
 
     try:
-        # --- 1. フォント設定 ---
-        font_paths = ['C:\\Windows\\Fonts\\ipaexg.ttf', 'C:\\Windows\\Fonts\\msgothic.ttc']
-        for fpath in font_paths:
-            if os.path.exists(fpath):
-                plt.rcParams['font.family'] = fm.FontProperties(fname=fpath).get_name()
-                break
+        # --- 1. フォント設定 (サーバー/ローカル両対応版) ---
+        # static/font.ttf を最優先、次にOS標準フォントを探索する
+        base_dir = os.path.dirname(__file__)
+        local_font_path = os.path.join(base_dir, 'static', 'font.ttf')
+        
+        font_applied = False
+        if os.path.exists(local_font_path):
+            try:
+                # フォントをマネージャーに登録し、その名前を取得して設定
+                fm.fontManager.addfont(local_font_path)
+                font_prop = fm.FontProperties(fname=local_font_path)
+                plt.rcParams['font.family'] = font_prop.get_name()
+                font_applied = True
+            except:
+                pass
+
+        if not font_applied:
+            # フォントファイルがない場合のフォールバック（Windows/Linux混在対応）
+            font_paths = [
+                'C:\\Windows\\Fonts\\ipaexg.ttf', 
+                'C:\\Windows\\Fonts\\msgothic.ttc',
+                '/usr/share/fonts/truetype/fonts-japanese-gothic.ttf' # Linux用
+            ]
+            for fpath in font_paths:
+                if os.path.exists(fpath):
+                    plt.rcParams['font.family'] = fm.FontProperties(fname=fpath).get_name()
+                    font_applied = True
+                    break
+        
+        # フォントサイズの設定
         plt.rcParams['font.size'] = design_params.get("font_size", 10)
+        # マイナス記号の文字化け防止
+        plt.rcParams['axes.unicode_minus'] = False
 
         # --- 2. データ取得 ---
         df_raw = fetch_weather_data(lat, lon, 9)
@@ -1117,7 +1133,7 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
 
         # --- 7. グラフ描画 ---
         fig, axes = plt.subplots(len(active_plots), 1, figsize=(fig_w_inch, fig_h_inch), dpi=dpi_value,
-                                   gridspec_kw={'height_ratios': height_ratios})
+                                    gridspec_kw={'height_ratios': height_ratios})
         if len(active_plots) == 1:
             axes_list = np.array([axes])
         else:
@@ -2086,3 +2102,4 @@ if __name__ == '__main__':
         port=port
 
     )
+
