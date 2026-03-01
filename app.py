@@ -2086,24 +2086,17 @@ def restore_settings():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ======================================================================================
-# 100. アプリケーション起動サブルーチン (Render本番環境・502エラー完全回避版)
+# 100. アプリケーション起動サブルーチン (Render標準ポート同期版)
 # ======================================================================================
 if __name__ == "__main__":
     import os
-    # 1. Renderから指定されたポート番号を文字列で取得
-    env_port = os.environ.get("PORT")
+    # Renderの環境変数PORTを最優先で取得
+    port = int(os.environ.get("PORT", 10000))
     
-    # 2. ポートの決定（Render環境なら指定値を、ローカルなら10000を使用）
-    if env_port:
-        port = int(env_port)
-    else:
-        port = 10000
+    # host="0.0.0.0" は 502 Bad Gateway 回避のために必須
+    # debug=False はデプロイ時のタイムアウトを防ぐために必須
+    app.run(host="0.0.0.0", port=port, debug=False)
 
-    # 3. 起動設定
-    # host="0.0.0.0" : これが抜けると 502 Bad Gateway になります
-    # debug=False   : Renderで再起動ループを防ぐために必須です
-    # threaded=True : 複数のアクセスを同時に捌けるようにします
-    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
 
 
 
