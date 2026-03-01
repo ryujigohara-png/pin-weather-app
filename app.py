@@ -1,24 +1,27 @@
 # ======================================================================================
 # 10. インポートおよび Flask 基本設定
 # ======================================================================================
-from PIL import Image
-import matplotlib
-matplotlib.use('Agg') # GUIなしのバックエンド（サーバー用）を強制指定
-import matplotlib.pyplot as plt
 import os
 import io
 import time
 import base64
+import sys
 import requests
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use('Agg') # GUIなしのバックエンド（サーバー用）を強制指定
+import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import urllib.request
 from datetime import datetime, timezone, timedelta
-from flask import Flask, render_template, request, session, jsonify
+from PIL import Image
+from flask import Flask, render_template, request, session, jsonify, redirect, url_for
 
 app = Flask(__name__)
-app.secret_key = "pin_weather_secret_key"
+# 秘密鍵は環境変数から取得、なければ固定値。
+# [重要] インデント（行頭の空白）は一切入れないこと
+app.secret_key = os.environ.get('SECRET_KEY', 'pin_weather_secret_key_2026')
 
 # ======================================================================================
 # 11. 定数・基本設定 (CONFIG)
@@ -26,13 +29,9 @@ app.secret_key = "pin_weather_secret_key"
 CONFIG = {
     "TITLE_SIZE": 20,
     "SUBTITLE_SIZE": 16,
-    
-    # --- 地図表示設定 ---
     "DEFAULT_MAP_TILE": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
     "DEFAULT_MAP_TILE_LABEL": "道路図",
     "MAP_HEIGHT": 350,
-
-    # --- グラフ表示ON/OFF設定 (既存ネーミング厳守) ---
     "SHOW_WIND": True,
     "SHOW_TEMP": True,
     "SHOW_WAVE": True,
@@ -40,25 +39,13 @@ CONFIG = {
     "SHOW_TIDE": True,
     "SHOW_W_TEXT": False,
     "SHOW_DIR_NAME": False,
-
-    # --- グラフ物理レイアウト設定 ---
-    "GRAPH_WIDTH": 15.0,            # グラフ全体横幅(inch)
-    "FIXED_HSPACE_INCH": 0.2,       # グラフ間の固定余白(inch)
+    "GRAPH_WIDTH": 15.0,
+    "FIXED_HSPACE_INCH": 0.2,
     "GRAPH_ORDER": ["WIND", "TEMP", "WAVE", "OCEAN", "TIDE"],
-    "GRAPH_HEIGHTS": {              # 各グラフの個別高さ(inch)
-        "WIND": 1.2,
-        "TEMP": 0.4,
-        "WAVE": 0.4,
-        "OCEAN": 0.4,
-        "TIDE": 0.4
-    },
-
-    # --- 既存描画ロジック用 (互換性維持のために残す) ---
+    "GRAPH_HEIGHTS": {"WIND": 1.2, "TEMP": 0.4, "WAVE": 0.4, "OCEAN": 0.4, "TIDE": 0.4},
     "GRAPH_HIGHT": 3.0,
     "DEFAULT_RATIOS": [4.0, 1.0, 1.0, 1.0, 1.0],
     "HSPACE": 1.25,
-
-    # --- グラフ内デザイン設定 ---
     "GRAPH_FONT_SIZE": 10,
     "LABEL_SIZE": 7,
     "LABEL_PAD": 0,
@@ -72,8 +59,6 @@ CONFIG = {
     "ARROW_COLOR": "blue",
     "VLINE_WIDTH": 1.0,
     "HLINE_WIDTH": 1.0,
-
-    # --- UI・コンテナ調整 ---
     "CONTENA_MIN_W": 2500,
     "LEFT_VIEW_W": 116,
     "LEFT_SHIFT": -185,
@@ -81,42 +66,26 @@ CONFIG = {
     "DIAL_V_GAP": 0,
     "FAV_BTN_WIDTH": 30,
     "FAV_NAME_LEN": 12,
-
-    # --- スライダー等の制限範囲 ---
     "SLIDER_WIDTH": {"min": 13.0, "max": 30.0, "step": 1.0},
     "SLIDER_HEIGHT": {"min": 0.1, "max": 5.0, "step": 0.1},
     "SLIDER_FONT": {"min": 6, "max": 14, "step": 1},
-
-    # --- システム設定 ---
     "SHOW_DEV_MODE": False,
     "STORAGE_KEY": "wind_checker_settings_v2",
-    
-    # --- ロケーション・座標初期値 ---
     "DEFAULT_LAT": 31.337,
     "DEFAULT_LON": 130.795,
     "DEFAULT_BASHO": "高須沖(鹿児島県)",
     "DEFAULT_DIRS": ["南","南南西","南西","西南西","西","西北西","北西","北北西"],
     "LOCATION_MASTER": {
-        "高須沖(鹿児島県)": (31.337, 130.795), 
-        "ユクサ沖(鹿児島県)": (31.373, 130.777), 
-        "住吉浜沖(大分県)": (33.408, 131.674),
-        "逗子海岸沖(神奈川県)": (35.286, 139.546),
-        "津久井浜沖(神奈川県)": (35.194, 139.670),
-        "御前崎沖(静岡県)": (34.592, 138.205),
-        "本栖湖中央(山梨県)": (35.463, 138.582),
-        "浜名湖村櫛沖(静岡県)": (34.714, 137.577),
-        "甲子園浜沖(兵庫県)": (34.696, 135.326),
-        "柏原沖(鹿児島県)": (31.380, 131.020), 
-        "磯海岸沖(鹿児島県)": (31.614, 130.577), 
-        "江口浜沖(鹿児島県)": (31.643, 130.322),
-        "垂水港(鹿児島県)": (31.478, 130.668), 
-        "海潟(鹿児島県)": (31.539, 130.706), 
-        "カナハ沖(マウイ島)": (20.908, -156.446),
-        "ポゾ沖(グランカナリア)": (27.822, -15.417),
-        "グリュイッサン沖(DEFI)": (43.084, 3.150),
-        "アンスバタ沖(ニューカレドニア)": (-22.305, 166.442),
-        "ニューヨーク(米国)": (40.7128, -74.0060),
-        "ロンドン(英国)": (51.5074, -0.1278)
+        "高須沖(鹿児島県)": (31.337, 130.795), "ユクサ沖(鹿児島県)": (31.373, 130.777), 
+        "住吉浜沖(大分県)": (33.408, 131.674), "逗子海岸沖(神奈川県)": (35.286, 139.546),
+        "津久井浜沖(神奈川県)": (35.194, 139.670), "御前崎沖(静岡県)": (34.592, 138.205),
+        "本栖湖中央(山梨県)": (35.463, 138.582), "浜名湖村櫛沖(静岡県)": (34.714, 137.577),
+        "甲子園浜沖(兵庫県)": (34.696, 135.326), "柏原沖(鹿児島県)": (31.380, 131.020), 
+        "磯海岸沖(鹿児島県)": (31.614, 130.577), "江口浜沖(鹿児島県)": (31.643, 130.322),
+        "垂水港(鹿児島県)": (31.478, 130.668), "海潟(鹿児島県)": (31.539, 130.706), 
+        "カナハ沖(マウイ島)": (20.908, -156.446), "ポゾ沖(グランカナリア)": (27.822, -15.417),
+        "グリュイッサン沖(DEFI)": (43.084, 3.150), "アンスバタ沖(ニューカレドニア)": (-22.305, 166.442),
+        "ニューヨーク(米国)": (40.7128, -74.0060), "ロンドン(英国)": (51.5074, -0.1278)
     }
 }
 
@@ -1334,34 +1303,6 @@ def reset_settings_handler():
     return redirect(url_for('index', refresh='1', t=int(time.time())))
 
 # ======================================================================================
-# 80. 言語切り替えエンドポイント
-# ======================================================================================
-@app.route('/change_lang')
-def change_lang():
-    """
-    サイドバーの言語切替ボタンから呼び出され、セッションの言語設定を反転させます。
-    """
-    from flask import session, redirect, request, url_for
-
-    # 現在の言語を取得（未設定なら 'ja'）
-    current_lang = session.get('lang', 'ja')
-
-    # 言語を交互に切り替え (ja <-> en)
-    if current_lang == 'ja':
-        session['lang'] = 'en'
-    else:
-        session['lang'] = 'ja'
-
-    # セッションの変更を確定させる
-    session.modified = True
-
-    # 呼び出し元のページ（ホーム画面など）にリダイレクトして戻る
-    # リファラ（直前のURL）が取れない場合はトップページへ
-    target_url = request.referrer if request.referrer else url_for('index')
-    
-    return redirect(target_url)
-
-# ======================================================================================
 # 33. 地図・位置情報連携サブルーチン (検索モード対応・一本化)
 # ======================================================================================
 
@@ -2071,41 +2012,38 @@ def reset_settings():
         raise RuntimeError(traceback.format_exc())
 
 # ======================================================================================
+# 80. 言語切り替えエンドポイント (確実な登録版)
+# ======================================================================================
+@app.route('/change_lang')
+def change_lang():
+    from flask import session, redirect, request, url_for
+    current_lang = session.get('lang', 'ja')
+    session['lang'] = 'en' if current_lang == 'ja' else 'ja'
+    session.modified = True
+    return redirect(request.referrer or url_for('index'))
+
+# ======================================================================================
 # 100. メインエントリーポイント (サーバー公開対応版)
 # ======================================================================================
 if __name__ == '__main__':
-    import os
-    
     # 1. 必要なディレクトリの整合性チェック
-    # 構造化プログラミングの原則に基づき、実行環境を自動で整える
     directories = ['templates', 'static', 'static/icons']
     for directory in directories:
         if not os.path.exists(directory):
             os.makedirs(directory)
     
-    # 2. セッション管理用の秘密鍵
-    # サーバー公開時は本来環境変数から取るのが望ましいですが、
-    # まずは確実に動作させるために固定値をセットします。
-    app.secret_key = os.environ.get('SECRET_KEY', 'pin_weather_secret_key_2024')
+    # 2. サーバー起動設定
+    # Render環境のポート(PORT)を優先し、なければ10000を使用
+    port = int(os.environ.get("PORT", 10000))
     
-    # 3. サーバー起動設定
-    # 無料サーバー(Render等)では環境変数 PORT が割り当てられるため、それを優先的に使用する。
-    # 環境変数がない場合（ローカル実行）は 5000番ポートを使用。
-    port = int(os.environ.get("PORT", 5000))
-    
-    # デバッグモードの制御
-    # サーバー公開時はデバッグモードをOffにするのが一般的ですが、
-    # 開発初期は True にしておくとエラー箇所がブラウザで確認できて便利です。
-    is_debug = os.environ.get('FLASK_DEBUG', 'True') == 'True'
+    # Render公開時は False にするのが安全
+    is_debug = os.environ.get('FLASK_DEBUG', 'False') == 'True'
 
     app.run(
         debug=is_debug, 
         host='0.0.0.0', 
         port=port
-
     )
-
-
 
 
 
