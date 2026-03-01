@@ -538,29 +538,49 @@ def clear_weather_cache_files():
 # 16. 海洋データを取得するサブルーチン
 # ======================================================================================
 def get_marine_data(time_series, lat, lon):
-    url = f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto&orecast_days=9"
+    # APIリクエスト用パラメータ
+    url = "[https://marine-api.open-meteo.com/v1/marine](https://marine-api.open-meteo.com/v1/marine)"
+    params = {
+        "latitude": round(float(lat), 4),
+        "longitude": round(float(lon), 4),
+        "hourly": "wave_height,sea_surface_temperature,sea_level_height_msl",
+        "timezone": "auto",
+        "forecast_days": "9",        # 確実に9日分を指定
+        "cell_selection": "sea"      # 海洋データを優先取得
+    }
+    
     try:
-        res = requests.get(url, timeout=10).json()
+        res = requests.get(url, params=params, timeout=10).json()
         if "hourly" not in res:
             return None, lat, lon
         
+        # API取得データをDataFrame化
         m_df = pd.DataFrame(res["hourly"])
         m_df['time'] = pd.to_datetime(m_df['time']).dt.tz_localize(None)
         
+        # 実際にデータが取得された座標を保持
         res_lat = res.get("latitude", lat)
         res_lon = res.get("longitude", lon)
         
-        merged = pd.merge(pd.DataFrame({'time': time_series}), m_df, on='time', how='left')
+        # 渡された時間軸(time_series)に取得データをマージして整合性を確保
+        time_df = pd.DataFrame({'time': [t.replace(tzinfo=None) for t in time_series]})
+        merged = pd.merge(time_df, m_df, on='time', how='left')
         
+        # 結果を辞書形式で抽出
         results = {
             "wave": merged['wave_height'].tolist(),
             "temp": merged['sea_surface_temperature'].tolist(),
             "tide": merged['sea_level_height_msl'].tolist()
         }
+        
+        # 全データが空（すべてNone）でないか確認
+        if all(x is None for x in results["wave"]) and all(x is None for x in results["tide"]):
+            return None, res_lat, res_lon
+    
         return results, res_lat, res_lon
-    except:
+    except Exception as e:
+        print(f"Marine API Error: {e}")
         return None, lat, lon
-
 # ======================================================================================
 # 17. 天気コードからテキストと色を取得するサブルーチン
 # ======================================================================================
@@ -2077,6 +2097,7 @@ if __name__ == "__main__":
     # Renderで起動を安定させるため debug=False は必須
     # threaded=True を追加し、複数のアクセス（Health Check等）を同時に捌けるようにします
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
+
 
 
 
