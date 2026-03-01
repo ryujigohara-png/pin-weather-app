@@ -946,7 +946,7 @@ def render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_di
         # label_fs（フォントサイズ）に基づき、インチ単位で位置を計算します。
         # これにより、グラフの高さが変わっても文字が重なりません。
         # 72は1インチあたりのポイント数。3.5は行間調整係数です。
-        offset_in_points = - (label_fs * 3.5)
+        offset_in_points = - (label_fs * 3.6)
         offset_trans = ScaledTranslation(0, offset_in_points / 72, ax.figure.dpi_scale_trans)
         
         # 表示実行
@@ -2077,6 +2077,7 @@ if __name__ == "__main__":
     # Renderで起動を安定させるため debug=False は必須
     # threaded=True を追加し、複数のアクセス（Health Check等）を同時に捌けるようにします
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
+
 
 
 
