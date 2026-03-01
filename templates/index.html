@@ -310,11 +310,11 @@
         }
         {{ gps_script|safe }}
         // ======================================================================================
-        // 98. LocalStorage 同期マネージャー (完全版)
+        // 98. LocalStorage 同期マネージャー (スマホ安定版)
         // ======================================================================================
         const STORAGE_KEY = "pin_weather_backup_v1";
-    
-        // 1. 【書き込み】現在のサーバー状態をブラウザに保存する
+        
+        // 1. 【書き込み】必要な時だけ保存する（通信を阻害しない）
         function syncToLocal() {
             const data = {
                 user_locations: {{ session.get('user_locations', []) | tojson }},
@@ -323,24 +323,22 @@
                 sel_dirs: {{ session.get('sel_dirs', []) | tojson }},
                 lang: {{ session.get('lang', 'ja') | tojson }}
             };
-            // 地点データまたは設定データが存在する場合のみ保存
             if (data.user_locations.length > 0 || Object.keys(data.design_params).length > 0) {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-                console.log("LocalStorage synced.");
             }
         }
-    
-        // 2. 【読み込み】サーバーがリセットされていたら復元する
+        
+        // 2. 【読み込み】データの差異がある場合のみ復元し、無限リロードを防ぐ
         async function checkAndRestore() {
             const localData = localStorage.getItem(STORAGE_KEY);
             if (!localData) return;
-    
+        
             const backup = JSON.parse(localData);
             const currentSpots = {{ session.get('user_locations', []) | tojson }};
-    
-            // サーバー側が空（再起動直後など）かつバックアップがある場合に発動
+        
+            // サーバーが空っぽ、かつバックアップがある場合のみ実行
             if (currentSpots.length === 0 && backup.user_locations.length > 0) {
-                console.log("Session lost. Restoring from LocalStorage...");
+                console.log("Restoring settings...");
                 try {
                     const response = await fetch('/restore_settings', {
                         method: 'POST',
@@ -348,28 +346,29 @@
                         body: JSON.stringify(backup)
                     });
                     if (response.ok) {
-                        window.location.reload(); // 復元を反映させるためリロード
+                        // URLに restore=1 を付与して、リロードが1回で済むようにする
+                        if (!window.location.search.includes('restore=1')) {
+                            window.location.href = window.location.pathname + '?restore=1';
+                        }
                     }
                 } catch (error) {
                     console.error("Restore failed:", error);
                 }
             }
         }
-    
-        // 3. 実行タイミング制御
-        window.addEventListener('DOMContentLoaded', () => {
-            checkAndRestore(); // 復元チェック
-            syncToLocal();     // 現在の状態をバックアップ
+        
+        // 3. 実行タイミング制御（ページ表示時に一度だけ）
+        window.addEventListener('load', () => {
+            checkAndRestore();
+            syncToLocal();
         });
-    
-        // 4. ページを閉じる・離れる際にもバックアップを実行
-        window.addEventListener('beforeunload', syncToLocal);
-    
-        // 既存のGPSスクリプト等の挿入
-        {{ gps_script|safe }}
-   </script>
+        
+        // スマホでは pagehide の方が安定して動作します
+        window.addEventListener('pagehide', syncToLocal);
+    </script>
 </body>
 
 </html>
+
 
 
