@@ -33,9 +33,27 @@
         .btn-cancel { background-color: #f0f2f6; color: #31333f; }
         .marker-info { font-size: 13px; text-align: center; margin-bottom: 5px; color: #333; font-weight: bold; }
         #status-msg { font-size: 11px; color: #0078ff; display: block; text-align: center; margin-bottom: 2px; height: 14px; }
+
+        /* ローディングオーバーレイ (index.htmlと統一) */
+        #loading-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.85); z-index: 9999;
+            flex-direction: column; align-items: center; justify-content: center;
+        }
+        .spinner {
+            width: 50px; height: 50px; border: 5px solid #f3f3f3;
+            border-top: 5px solid #0078ff; border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
+
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div style="margin-top: 20px; font-weight: bold; color: #31333f; font-size: 16px;">グラフを作成中...</div>
+    </div>
 
     <div class="search-box">
         <input type="text" id="search-input" placeholder="地名や施設名を入力...">
@@ -59,7 +77,6 @@
         var initialLon = {{ lon }};
         var searchMode = "{{ search_mode }}"; 
 
-        // 初期表示は必ずFlaskから渡された（現在のグラフ地点）座標にする
         var map = L.map('map', { zoomControl: false }).setView([initialLat, initialLon], 13);
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -68,10 +85,6 @@
         }).addTo(map);
 
         var marker = L.marker([initialLat, initialLon], { draggable: true }).addTo(map);
-
-        // 【修正①】自動での現在地取得を「完全に停止」
-        // 地図選択ボタンを押しても、2秒後に勝手に動くことはありません。
-        document.getElementById('status-msg').innerText = "データ地点を表示中";
 
         window.addEventListener('load', function() {
             if (searchMode === "1") {
@@ -136,7 +149,11 @@
         }
 
         function confirmLocation() {
+            // ローディング画面を表示
+            document.getElementById('loading-overlay').style.display = 'flex';
+            
             var pos = marker.getLatLng();
+            // メイン画面へ遷移（ここから5~6秒かかる）
             window.location.href = "/update_by_map?lat=" + pos.lat + "&lon=" + pos.lng;
         }
 
