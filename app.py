@@ -195,7 +195,10 @@ def get_language_dict():
             "場所を検索": "場所を検索",
             "検索": "検索",
             "検索中...": "検索中...",
-            "見つかりませんでした": "場所が見つかりませんでした",
+            "PLACEHOLDER_SEARCH": "地名や施設名を入力...",
+            "MSG_MAP_GUIDE": "ピンを動かして地点を選択",
+            "MSG_SEARCH_GUIDE": "地名を入力して検索してください",
+            "SEARCH_ERROR": "検索エラー",
             "地図表示切替": "表示切替",
             "標準": "標準 (OSM)",
             "シンプル": "シンプル (白)",
@@ -334,7 +337,10 @@ def get_language_dict():
             "場所を検索": "Search location...",
             "検索": "Search",
             "検索中...": "Searching...",
-            "見つかりませんでした": "Location not found",
+            "PLACEHOLDER_SEARCH": "Enter place or facility...",
+            "MSG_MAP_GUIDE": "Drag pin to select location",
+            "MSG_SEARCH_GUIDE": "Enter a name to search",
+            "SEARCH_ERROR": "Search Error",
             "地図表示切替": "Switch View",
             "標準": "Standard (OSM)",
             "シンプル": "Simple (White)",
@@ -2153,6 +2159,7 @@ if __name__ == "__main__":
     # host="0.0.0.0" は 502 Bad Gateway 回避のために必須
     # debug=False はデプロイ時のタイムアウトを防ぐために必須
     app.run(host="0.0.0.0", port=port, debug=False)
+
 
 
 
