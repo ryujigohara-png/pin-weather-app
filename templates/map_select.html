@@ -59,6 +59,7 @@
         var initialLon = {{ lon }};
         var searchMode = "{{ search_mode }}"; 
 
+        // 初期表示は必ずFlaskから渡された（現在のグラフ地点）座標にする
         var map = L.map('map', { zoomControl: false }).setView([initialLat, initialLon], 13);
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -68,19 +69,9 @@
 
         var marker = L.marker([initialLat, initialLon], { draggable: true }).addTo(map);
 
-        if (searchMode !== "1" && "geolocation" in navigator) {
-            document.getElementById('status-msg').innerText = "現在地を取得中...";
-            navigator.geolocation.getCurrentPosition(function(position) {
-                var lat = position.coords.latitude;
-                var lon = position.coords.longitude;
-                map.setView([lat, lon], 14);
-                marker.setLatLng([lat, lon]);
-                updateInfo(lat, lon);
-                document.getElementById('status-msg').innerText = "現在地を表示しました";
-            }, function(error) {
-                document.getElementById('status-msg').innerText = "現在地を取得できませんでした";
-            }, { enableHighAccuracy: true, timeout: 5000 });
-        }
+        // 【修正①】自動での現在地取得を「完全に停止」
+        // 地図選択ボタンを押しても、2秒後に勝手に動くことはありません。
+        document.getElementById('status-msg').innerText = "データ地点を表示中";
 
         window.addEventListener('load', function() {
             if (searchMode === "1") {
@@ -146,7 +137,6 @@
 
         function confirmLocation() {
             var pos = marker.getLatLng();
-            // フラグ管理された index 側へ遷移させるためのエンドポイントへ飛ばす
             window.location.href = "/update_by_map?lat=" + pos.lat + "&lon=" + pos.lng;
         }
 
