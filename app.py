@@ -122,6 +122,7 @@ def get_language_dict():
             "MSG_GEN_GRAPH": "グラフを生成中...",
             "⚙ 詳細設定": "⚙ 詳細設定",
             "📍 My Spots 編集": "📍 My Spots 編集",
+            "HELP_ADD_SPOT": "追加はメイン画面の「☆」をタップ",
             "🚨 My Spots の登録制限（10件）に達しています。": "🚨 My Spots の登録制限（10件）に達しています。",
             "「My Spots 編集」から不要な地点を削除してください。": "「My Spots 編集」から不要な地点を削除してください。",
             "この地点を My Spots に保存します。": "この地点を My Spots に保存します。",
@@ -260,6 +261,7 @@ def get_language_dict():
             "MSG_GEN_GRAPH": "Generating graphs...",
             "⚙ 詳細設定": "⚙ Advanced Settings",
             "📍 My Spots 編集": "📍 Edit My Spots",
+            "HELP_ADD_SPOT": "Tap '☆' on Main Screen to add",
             "🚨 My Spots の登録制限（10件）に達しています。": "🚨 My Spots limit (10 items) reached.",
             "「My Spots 編集」から不要な地点を削除してください。": "Please delete unnecessary spots from 'My Spots Editor'.",
             "この地点を My Spots に保存します。": "Save this location to My Spots.",
@@ -2151,6 +2153,7 @@ if __name__ == "__main__":
     # host="0.0.0.0" は 502 Bad Gateway 回避のために必須
     # debug=False はデプロイ時のタイムアウトを防ぐために必須
     app.run(host="0.0.0.0", port=port, debug=False)
+
 
 
 
