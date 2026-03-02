@@ -1,27 +1,32 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="{{ session.get('lang', 'ja') }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Spots 編集</title>
+    <title>{{ lang_dict['📍 My Spots 編集'] }}</title>
     <style>
         body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding: 15px; color: #31333f; }
         
-        /* ヘッダー構造の調整 */
-        .header { margin-bottom: 20px; }
+        /* ヘッダー構造 */
+        .header { margin-bottom: 15px; }
         .header-top { display: flex; align-items: center; }
         .btn-back { text-decoration: none; font-size: 24px; color: #31333f; margin-right: 15px; padding: 5px; }
         h2 { margin: 0; font-size: 1.2rem; }
         
         /* ====================================================================================== */
-        /* 97. My Spots 追加方法のガイダンス表示 (タイトル真下) */
+        /* 97. My Spots 追加方法のガイダンス表示 (多言語対応・強調) */
         /* ====================================================================================== */
         .add-hint { 
-            font-size: 12px; 
+            font-size: 14px; /* サイズを大きく */
             color: #0078ff; 
-            margin-top: 8px;
-            margin-left: 45px; /* 戻るボタンの幅に合わせる */
+            margin-top: 10px;
+            margin-left: 45px;
             font-weight: bold;
+            background: #ffffff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #0078ff;
+            display: inline-block;
         }
         
         .spot-card { background: white; border-radius: 10px; padding: 12px; margin-bottom: 12px; border: 1px solid #dcdcdc; }
@@ -33,13 +38,9 @@
         .btn-tool { padding: 8px 12px; border-radius: 6px; border: 1px solid #dcdcdc; background: #f8f9fb; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
         .btn-del { color: #ff4b4b; border-color: #ffcccc; }
         
-        /* 編集フォーム用 */
         .edit-form { display: none; margin-top: 10px; gap: 8px; align-items: center; }
         .edit-input { flex: 1; padding: 10px; border: 2px solid #0078ff; border-radius: 6px; font-size: 14px; }
 
-        /* -------------------------------------------------------------------------------------- */
-        /* ローディング表示用CSS */
-        /* -------------------------------------------------------------------------------------- */
         #loading-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(255, 255, 255, 0.85); z-index: 9999;
@@ -59,7 +60,7 @@
     <div id="loading-overlay">
         <div class="spinner"></div>
         <div id="loading-message" style="margin-top: 20px; font-weight: bold; color: #31333f; font-size: 16px;">
-            更新中...
+            {{ lang_dict.get('更新中...', '更新中...') }}
         </div>
     </div>
 
@@ -67,15 +68,15 @@
         <div class="header">
             <div class="header-top">
                 <a href="/?t={{ range(1, 99999)|random }}" class="btn-back" onclick="showLoading()">←</a>
-                <h2>📍 My Spots 管理 ({{ spots|length }}/10)</h2>
+                <h2>{{ lang_dict['📍 My Spots 編集'] }} ({{ spots|length }}/10)</h2>
             </div>
             <div class="add-hint">
-                追加はメイン画面の「☆」をタップ
+                {{ lang_dict.get('HELP_ADD_SPOT', '追加はメイン画面の☆をタップ') }}
             </div>
         </div>
 
         {% if not spots %}
-        <p style="text-align: center; color: #888; margin-top: 50px;">登録されている地点はありません。</p>
+        <p style="text-align: center; color: #888; margin-top: 50px;">{{ lang_dict['登録されている地点はありません。'] }}</p>
         {% endif %}
 
         {% for spot in spots %}
@@ -86,7 +87,7 @@
                     <span class="spot-coords">({{ "%.4f"|format(spot.lat) }}, {{ "%.4f"|format(spot.lon) }})</span>
                 </div>
                 <div class="controls">
-                    <button onclick="showEdit({{ loop.index0 }})" class="btn-tool">✏️ 名前</button>
+                    <button onclick="showEdit({{ loop.index0 }})" class="btn-tool">✏️ {{ lang_dict.get('名前を変更', '名前') }}</button>
                     <button onclick="showLoading(); location.href='/move_spot/{{ loop.index0 }}/up'" class="btn-tool" {% if loop.first %}disabled style="opacity:0.3;"{% endif %}>▲</button>
                     <button onclick="showLoading(); location.href='/move_spot/{{ loop.index0 }}/down'" class="btn-tool" {% if loop.last %}disabled style="opacity:0.3;"{% endif %}>▼</button>
                     <button onclick="confirmDelete({{ loop.index0 }}, '{{ spot.name }}')" class="btn-tool btn-del">🗑️</button>
@@ -96,8 +97,8 @@
             <form id="form_{{ loop.index0 }}" class="edit-form" action="/update_spot_name" method="POST" onsubmit="showLoading()">
                 <input type="hidden" name="idx" value="{{ loop.index0 }}">
                 <input type="text" name="new_name" class="edit-input" value="{{ spot.name }}" required>
-                <button type="submit" class="btn-tool" style="background: #0078ff; color: white; border: none; font-weight: bold;">保存</button>
-                <button type="button" onclick="hideEdit({{ loop.index0 }})" class="btn-tool">戻る</button>
+                <button type="submit" class="btn-tool" style="background: #0078ff; color: white; border: none; font-weight: bold;">{{ lang_dict['保存'] }}</button>
+                <button type="button" onclick="hideEdit({{ loop.index0 }})" class="btn-tool">{{ lang_dict['戻る'] }}</button>
             </form>
         </div>
         {% endfor %}
@@ -134,7 +135,8 @@
             document.getElementById('form_' + idx).style.display = 'none';
         }
         function confirmDelete(idx, name) {
-            if (confirm('「' + name + '」を削除しますか？')) {
+            const msg = '「' + name + '」' + "{{ lang_dict['削除しますか？'] }}";
+            if (confirm(msg)) {
                 showLoading();
                 location.href = '/delete_spot/' + idx;
             }
