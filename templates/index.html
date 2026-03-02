@@ -102,15 +102,38 @@
         .legend-box { padding: 12px; border-radius: 8px; background-color: #f0f2f6; margin-bottom: 15px; line-height: 1.6; border: 1px solid #dcdcdc; }
         .api-links-row { text-align: right; font-size: 11px; color: gray; margin-bottom: 15px; }
         .api-link-item { color: gray; text-decoration: none; border: 1px solid #ddd; padding: 2px 6px; border-radius: 4px; }
+
+        /* -------------------------------------------------------------------------------------- */
+        /* 100. ローディング表示用CSS */
+        /* -------------------------------------------------------------------------------------- */
+        #loading-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.85); z-index: 9999;
+            flex-direction: column; align-items: center; justify-content: center;
+        }
+        .spinner {
+            width: 50px; height: 50px; border: 5px solid #f3f3f3;
+            border-top: 5px solid #0078ff; border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .pointer-none { pointer-events: none; opacity: 0.6; }
     </style>
 </head>
 <body>
+
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div id="loading-message" style="margin-top: 20px; font-weight: bold; color: #31333f; font-size: 16px;">
+            {{ lang_dict.get('LOADING_MSG', 'グラフを作成中...') }}
+        </div>
+    </div>
 
     <div id="mySidebar" class="sidebar">
         <div class="sidebar-content">
             <button class="closebtn" onclick="closeNav()">×</button>
             <div class="sidebar-header">{{ lang_dict['表示設定'] }}</div>
-            <form action="/update_display_toggle?redirect_to_home=1" method="POST" style="padding: 0 20px;">
+            <form action="/update_display_toggle?redirect_to_home=1" method="POST" style="padding: 0 20px;" onsubmit="showLoading()">
                 <div style="background: white; border: 1px solid #dcdcdc; border-radius: 8px; padding: 10px; margin-bottom: 10px;">
                     {% for key, label in [
                         ('show_wind','風向・風速グラフ表示'),
@@ -154,8 +177,8 @@
 
             <div class="sidebar-header">TOOLS</div>
             <button onclick="openModal()">{{ lang_dict['⚙ 詳細設定'] }}</button>
-            <button onclick="location.href='/edit_spots'">{{ lang_dict['📍 My Spots 編集'] }}</button>
-            <button onclick="if(confirm('Switch language?\n言語を切り替えますか？')) { location.href='/change_lang'; }">🌐 Language / 言語</button>
+            <button onclick="showLoading(); location.href='/edit_spots'">{{ lang_dict['📍 My Spots 編集'] }}</button>
+            <button onclick="if(confirm('Switch language?\n言語を切り替えますか？')) { showLoading(); location.href='/change_lang'; }">🌐 Language / 言語</button>
             <button onclick="confirmReset()" style="color: #ff6b6b; margin-top: 20px;">🔄 {{ lang_dict['リセット'] }}</button>
             <button onclick="showShareQR()">📲 {{ lang_dict['SHARE_APP'] or 'アプリを共有' }}</button>
         </div>
@@ -182,13 +205,13 @@
                         <span class="loc-coords">({{ "%.4f"|format(design_params.lat) }}, {{ "%.4f"|format(design_params.lon) }})</span>
                     </div>
                 </div>
-                <button onclick="location.href='/?refresh=1&t=' + new Date().getTime()" class="btn-refresh">
+                <button onclick="showLoading(); location.href='/?refresh=1&t=' + new Date().getTime()" class="btn-refresh">
                     🔄 {{ now_jst.strftime('%H:%M') }}
                 </button>
             </div>
 
             <div class="action-bar">
-                <select class="spot-selector" onchange="if(this.value) location.href='/select_spot/' + this.value">
+                <select class="spot-selector" onchange="if(this.value) { showLoading(); location.href='/select_spot/' + this.value; }">
                     <option value="">{{ lang_dict['SELECT_PLACE'] }}</option>
                     {% for spot in session.get('user_locations', []) %}
                     <option value="{{ loop.index0 }}">{{ spot.name }}</option>
@@ -197,7 +220,7 @@
                 <div style="display: flex; gap: 8px;">
                     <button onclick="getCurrentLocation(event)" class="btn-action" style="flex:1;">{{ lang_dict['BTN_CURRENT_LOC_SHORT'] }}</button>
                     <button onclick="showSearchPrompt()" class="btn-action" style="flex:1;">{{ lang_dict['BTN_SEARCH_CITY'] or '🔍 地名検索' }}</button>
-                    <a href="/map_select" class="btn-action" style="flex:1;">🗺️ {{ lang_dict['MAP_SELECT_LABEL'] or '地図選択' }}</a>
+                    <a href="/map_select" class="btn-action" style="flex:1;" onclick="showLoading()">🗺️ {{ lang_dict['MAP_SELECT_LABEL'] or '地図選択' }}</a>
                 </div>
             </div>
         </div>
@@ -236,10 +259,12 @@
                 <p style="text-align: center; font-size: 10px; color: #ccc;">- Beta Version -</p>
             </div>
         </div>
-    </div> <div id="configModal" class="modal">
+    </div> 
+
+    <div id="configModal" class="modal">
         <div class="modal-content">
             <div class="modal-title">{{ lang_dict['デザイン微調整'] }}</div>
-            <form action="/update_settings" method="post">
+            <form action="/update_settings" method="post" onsubmit="showLoading()">
                 {% for field, label, unit in [('height_inch','グラフ縦幅','inch'),('top_margin_inch','上余白','inch'),('hspace_inch','上下間隔',''),('width_inch','グラフ横幅','inch'),('margin_left_inch','左余白','inch'),('font_size','フォントサイズ','')] %}
                 <div class="st-slider-row">
                     <div class="st-slider-label-row">
@@ -254,7 +279,7 @@
                 </div>
                 {% endfor %}
                 <div class="modal-footer">
-                    <button type="button" onclick="location.href='/reset_settings'">{{ lang_dict['デフォルトに戻す'] }}</button>
+                    <button type="button" onclick="showLoading(); location.href='/reset_settings'">{{ lang_dict['デフォルトに戻す'] }}</button>
                     <div>
                         <button type="button" onclick="closeModal()">{{ lang_dict['閉じる'] }}</button>
                         <button type="submit" class="btn-update-st">{{ lang_dict['更新'] }}</button>
@@ -265,6 +290,12 @@
     </div>
 
     <script>
+        // ローディング表示用関数
+        function showLoading() {
+            document.getElementById('loading-overlay').style.display = 'flex';
+            document.getElementById('main').classList.add('pointer-none');
+        }
+
         function openNav() { document.getElementById("mySidebar").style.width = "280px"; }
         function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
         function openModal() { document.getElementById("configModal").style.display = "block"; closeNav(); }
@@ -273,11 +304,13 @@
         function confirmReset() { 
             const msg = "{{ lang_dict['CONFIRM_RESET'] or '表示設定をリセットしますか？\\n(My Spots の登録地点は削除されません)' }}";
             if (confirm(msg)) { 
+                showLoading();
                 window.location.href = '/reset_settings'; 
             } 
         }
 
         function showSearchPrompt() {
+            showLoading();
             location.href = "/map_select?search_mode=1";
         }
 
@@ -293,6 +326,9 @@
             const promptMsg = "{{ lang_dict['この地点を My Spots に保存します。'] }}";
             const newName = prompt(promptMsg, currentName);
             if (newName === null) return;
+
+            showLoading(); // 通信開始前に表示
+
             try {
                 const response = await fetch('/add_to_myspots', {
                     method: 'POST',
@@ -303,9 +339,26 @@
                 if (result.status === "success") {
                     btn.innerText = "🌟";
                     location.reload();
-                } else { alert(result.message); }
-            } catch (error) { alert("{{ lang_dict['ERR_LOC_FAILED'] }}"); }
+                } else { 
+                    document.getElementById('loading-overlay').style.display = 'none';
+                    document.getElementById('main').classList.remove('pointer-none');
+                    alert(result.message); 
+                }
+            } catch (error) { 
+                document.getElementById('loading-overlay').style.display = 'none';
+                document.getElementById('main').classList.remove('pointer-none');
+                alert("{{ lang_dict['ERR_LOC_FAILED'] }}"); 
+            }
         }
+
+        // GPSスクリプト内の遷移にもローディングを追加（app.py側のgps_script変数に依存）
+        // 手動呼び出し側を修正
+        const originalGetCurrentLocation = getCurrentLocation;
+        getCurrentLocation = function(e) {
+            showLoading();
+            originalGetCurrentLocation(e);
+        };
+
         {{ gps_script|safe }}
 
         function showShareQR() {
@@ -347,7 +400,6 @@
         window.addEventListener('load', () => {
             setTimeout(() => {
                 checkAndRestore();
-                // syncToLocal は app.py 側で定義される javascript 経由で実行
             }, 1000); 
         });
     </script>
