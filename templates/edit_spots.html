@@ -6,24 +6,22 @@
     <title>My Spots 編集</title>
     <style>
         body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding: 15px; color: #31333f; }
-        .header { display: flex; align-items: center; margin-bottom: 20px; }
-        /* 戻るボタンの当たり判定を広く */
+        
+        /* ヘッダー構造の調整 */
+        .header { margin-bottom: 20px; }
+        .header-top { display: flex; align-items: center; }
         .btn-back { text-decoration: none; font-size: 24px; color: #31333f; margin-right: 15px; padding: 5px; }
-        h2 { margin: 0; font-size: 1.1rem; flex-shrink: 0; }
+        h2 { margin: 0; font-size: 1.2rem; }
         
         /* ====================================================================================== */
-        /* 97. My Spots 追加方法のガイダンス表示 (C案) */
+        /* 97. My Spots 追加方法のガイダンス表示 (タイトル真下) */
         /* ====================================================================================== */
         .add-hint { 
-            font-size: 11px; 
-            color: #666; 
-            margin-left: auto; 
-            line-height: 1.3; 
-            text-align: right; 
-            background: #eef6ff;
-            padding: 4px 8px;
-            border-radius: 6px;
-            border: 1px solid #d0e3ff;
+            font-size: 12px; 
+            color: #0078ff; 
+            margin-top: 8px;
+            margin-left: 45px; /* 戻るボタンの幅に合わせる */
+            font-weight: bold;
         }
         
         .spot-card { background: white; border-radius: 10px; padding: 12px; margin-bottom: 12px; border: 1px solid #dcdcdc; }
@@ -67,11 +65,12 @@
 
     <div id="main-content">
         <div class="header">
-            <a href="/?t={{ range(1, 99999)|random }}" class="btn-back" onclick="showLoading()">←</a>
-            <h2>📍 My Spots 管理 ({{ spots|length }}/10)</h2>
-            
+            <div class="header-top">
+                <a href="/?t={{ range(1, 99999)|random }}" class="btn-back" onclick="showLoading()">←</a>
+                <h2>📍 My Spots 管理 ({{ spots|length }}/10)</h2>
+            </div>
             <div class="add-hint">
-                追加はメイン画面の<br><b>「☆」</b>をタップ
+                追加はメイン画面の「☆」をタップ
             </div>
         </div>
 
@@ -105,7 +104,6 @@
     </div>
 
     <script>
-        // ローディング表示用関数
         function showLoading() {
             document.getElementById('loading-overlay').style.display = 'flex';
             document.getElementById('main-content').classList.add('pointer-none');
