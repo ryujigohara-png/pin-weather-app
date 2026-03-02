@@ -319,7 +319,7 @@
         // ======================================================================================
         function sync_current_location() {
             if (!navigator.geolocation) {
-                alert("お使いのブラウザは位置情報に対応していません。");
+                alert("お使いのブラウザは位置情報に対応していません.");
                 return;
             }
 
@@ -328,21 +328,42 @@
                     showLoading();
                     const lat = position.coords.latitude;
                     const lon = position.coords.longitude;
-                    // サーバー側で地名を逆引きさせるため、nameは汎用的な「現在地」として送信
                     window.location.href = `/set_location?lat=${lat}&lon=${lon}&name=現在地`;
                 },
                 function(error) {
-                    let msg = "位置情報の取得に失敗しました。";
+                    let msg = "位置情報の取得に失敗しました.";
                     switch(error.code) {
-                        case error.PERMISSION_DENIED: msg = "位置情報の利用が許可されていません。"; break;
-                        case error.POSITION_UNAVAILABLE: msg = "位置情報が利用できません。"; break;
-                        case error.TIMEOUT: msg = "タイムアウトしました。"; break;
+                        case error.PERMISSION_DENIED: msg = "位置情報の利用が許可されていません."; break;
+                        case error.POSITION_UNAVAILABLE: msg = "位置情報が利用できません."; break;
+                        case error.TIMEOUT: msg = "タイムアウトしました."; break;
                     }
                     alert(msg);
                 },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         }
+
+        // ======================================================================================
+        // 96. ブラウザ戻る操作時のローディング解除サブルーチン (案A)
+        // ======================================================================================
+        (function() {
+            const hideLoading = function() {
+                const overlay = document.getElementById('loading-overlay');
+                const main = document.getElementById('main');
+                if (overlay) overlay.style.display = 'none';
+                if (main) main.classList.remove('pointer-none');
+            };
+
+            // ページが表示された時(キャッシュからの戻り含む)に実行
+            window.addEventListener('pageshow', function(event) {
+                if (event.persisted) {
+                    hideLoading();
+                }
+            });
+
+            // 念のためロード完了時にも安全策
+            window.addEventListener('load', hideLoading);
+        })();
 
         async function registerMySpot() {
             const currentName = "{{ basho }}";
