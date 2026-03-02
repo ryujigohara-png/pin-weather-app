@@ -23,43 +23,75 @@
         /* 編集フォーム用 */
         .edit-form { display: none; margin-top: 10px; gap: 8px; align-items: center; }
         .edit-input { flex: 1; padding: 10px; border: 2px solid #0078ff; border-radius: 6px; font-size: 14px; }
+
+        /* -------------------------------------------------------------------------------------- */
+        /* ローディング表示用CSS */
+        /* -------------------------------------------------------------------------------------- */
+        #loading-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.85); z-index: 9999;
+            flex-direction: column; align-items: center; justify-content: center;
+        }
+        .spinner {
+            width: 50px; height: 50px; border: 5px solid #f3f3f3;
+            border-top: 5px solid #0078ff; border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .pointer-none { pointer-events: none; opacity: 0.6; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <a href="/?t={{ range(1, 99999)|random }}" class="btn-back">←</a>
-        <h2>📍 My Spots 管理 ({{ spots|length }}/10)</h2>
+
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div id="loading-message" style="margin-top: 20px; font-weight: bold; color: #31333f; font-size: 16px;">
+            更新中...
+        </div>
     </div>
 
-    {% if not spots %}
-    <p style="text-align: center; color: #888; margin-top: 50px;">登録されている地点はありません。</p>
-    {% endif %}
-
-    {% for spot in spots %}
-    <div class="spot-card">
-        <div id="display_{{ loop.index0 }}">
-            <div class="spot-info">
-                <span class="spot-name">{{ spot.name }}</span>
-                <span class="spot-coords">({{ "%.4f"|format(spot.lat) }}, {{ "%.4f"|format(spot.lon) }})</span>
-            </div>
-            <div class="controls">
-                <button onclick="showEdit({{ loop.index0 }})" class="btn-tool">✏️ 名前</button>
-                <button onclick="location.href='/move_spot/{{ loop.index0 }}/up'" class="btn-tool" {% if loop.first %}disabled style="opacity:0.3;"{% endif %}>▲</button>
-                <button onclick="location.href='/move_spot/{{ loop.index0 }}/down'" class="btn-tool" {% if loop.last %}disabled style="opacity:0.3;"{% endif %}>▼</button>
-                <button onclick="confirmDelete({{ loop.index0 }}, '{{ spot.name }}')" class="btn-tool btn-del">🗑️</button>
-            </div>
+    <div id="main-content">
+        <div class="header">
+            <a href="/?t={{ range(1, 99999)|random }}" class="btn-back" onclick="showLoading()">←</a>
+            <h2>📍 My Spots 管理 ({{ spots|length }}/10)</h2>
         </div>
 
-        <form id="form_{{ loop.index0 }}" class="edit-form" action="/update_spot_name" method="POST">
-            <input type="hidden" name="idx" value="{{ loop.index0 }}">
-            <input type="text" name="new_name" class="edit-input" value="{{ spot.name }}" required>
-            <button type="submit" class="btn-tool" style="background: #0078ff; color: white; border: none; font-weight: bold;">保存</button>
-            <button type="button" onclick="hideEdit({{ loop.index0 }})" class="btn-tool">戻る</button>
-        </form>
+        {% if not spots %}
+        <p style="text-align: center; color: #888; margin-top: 50px;">登録されている地点はありません。</p>
+        {% endif %}
+
+        {% for spot in spots %}
+        <div class="spot-card">
+            <div id="display_{{ loop.index0 }}">
+                <div class="spot-info">
+                    <span class="spot-name">{{ spot.name }}</span>
+                    <span class="spot-coords">({{ "%.4f"|format(spot.lat) }}, {{ "%.4f"|format(spot.lon) }})</span>
+                </div>
+                <div class="controls">
+                    <button onclick="showEdit({{ loop.index0 }})" class="btn-tool">✏️ 名前</button>
+                    <button onclick="showLoading(); location.href='/move_spot/{{ loop.index0 }}/up'" class="btn-tool" {% if loop.first %}disabled style="opacity:0.3;"{% endif %}>▲</button>
+                    <button onclick="showLoading(); location.href='/move_spot/{{ loop.index0 }}/down'" class="btn-tool" {% if loop.last %}disabled style="opacity:0.3;"{% endif %}>▼</button>
+                    <button onclick="confirmDelete({{ loop.index0 }}, '{{ spot.name }}')" class="btn-tool btn-del">🗑️</button>
+                </div>
+            </div>
+
+            <form id="form_{{ loop.index0 }}" class="edit-form" action="/update_spot_name" method="POST" onsubmit="showLoading()">
+                <input type="hidden" name="idx" value="{{ loop.index0 }}">
+                <input type="text" name="new_name" class="edit-input" value="{{ spot.name }}" required>
+                <button type="submit" class="btn-tool" style="background: #0078ff; color: white; border: none; font-weight: bold;">保存</button>
+                <button type="button" onclick="hideEdit({{ loop.index0 }})" class="btn-tool">戻る</button>
+            </form>
+        </div>
+        {% endfor %}
     </div>
-    {% endfor %}
 
     <script>
+        // ローディング表示用関数
+        function showLoading() {
+            document.getElementById('loading-overlay').style.display = 'flex';
+            document.getElementById('main-content').classList.add('pointer-none');
+        }
+
         // ======================================================================================
         // 99. My Spots 編集画面用 同期マネージャー (完全版)
         // ======================================================================================
@@ -75,14 +107,11 @@
                 lang: {{ session.get('lang', 'ja') | tojson }}
             };
             
-            // 地点データが存在するか、あるいは意図的に空にされた場合もバックアップを更新
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
             console.log("Edit synchronized to LocalStorage.");
         }
 
-        // ページが表示されたら即座に実行（編集・削除後のリダイレクト時など）
         window.addEventListener('load', syncEditToLocal);
-        // スマホ向けにページを離れる際も同期
         window.addEventListener('pagehide', syncEditToLocal);
 
         // 編集モードの切り替え
@@ -97,6 +126,7 @@
         // 削除確認
         function confirmDelete(idx, name) {
             if (confirm('「' + name + '」を削除しますか？')) {
+                showLoading();
                 location.href = '/delete_spot/' + idx;
             }
         }
