@@ -1370,27 +1370,32 @@ def set_location_handler():
     name_raw = request.args.get('name') 
 
     if lat_raw and lon_raw:
-        lat, lon = float(lat_raw), float(lon_raw)
-        user_settings = session.get('design_params', {})
-        user_settings['lat'], user_settings['lon'] = lat, lon
-        session['design_params'] = user_settings
-        session['lat'], session['lon'] = lat, lon
-        
-        # 修正ポイント：名前が空、もしくは「現在地(Current Location)」系の固定文字なら、地名を逆引きする
-        is_generic_name = name_raw in [None, "", "現在地", "Current Location", "undefined"]
-        
-        if not is_generic_name:
-            session['last_basho'] = name_raw
-            session['basho'] = name_raw
-        else:
-            # 座標から具体的な地名を取得（サブルーチン内の既存関数を利用）
-            address = get_address_from_coords(lat, lon)
-            session['last_basho'] = address
-            session['basho'] = address
+        try:
+            lat, lon = float(lat_raw), float(lon_raw)
+            user_settings = session.get('design_params', {})
+            user_settings['lat'], user_settings['lon'] = lat, lon
+            session['design_params'] = user_settings
+            session['lat'], session['lon'] = lat, lon
             
-        if 'clear_weather_cache_files' in globals():
-            clear_weather_cache_files()
-        session.modified = True
+            # 【修正②】名前が「現在地」や空の場合、座標から地名を逆引きして上書きする
+            is_generic_name = name_raw in [None, "", "現在地", "Current Location", "undefined"]
+            
+            if not is_generic_name:
+                session['last_basho'] = name_raw
+                session['basho'] = name_raw
+            else:
+                # 座標から具体的な町名などを取得
+                address = get_address_from_coords(lat, lon)
+                session['last_basho'] = address
+                session['basho'] = address
+                
+            if 'clear_weather_cache_files' in globals():
+                clear_weather_cache_files()
+            session.modified = True
+            
+        except Exception as e:
+            print(f"Error in set_location_handler: {e}")
+
     return redirect(url_for('index'))
 
 # ======================================================================================
@@ -2116,6 +2121,7 @@ if __name__ == "__main__":
     # host="0.0.0.0" は 502 Bad Gateway 回避のために必須
     # debug=False はデプロイ時のタイムアウトを防ぐために必須
     app.run(host="0.0.0.0", port=port, debug=False)
+
 
 
 
