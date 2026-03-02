@@ -1496,6 +1496,35 @@ def update_by_map_handler():
             print(f"Error updating location from map: {e}")
             
     return redirect(url_for('index'))
+    
+# ======================================================================================
+# 35. 座標から住所ラベルを取得するサブルーチン (Reverse Geocoding)
+# ======================================================================================
+def get_address_from_coords(lat, lon):
+    """
+    Nominatim APIを使用して緯度経度から地名を取得する。
+    33番の set_location_handler から呼び出される不足関数。
+    """
+    import requests
+    try:
+        url = "https://nominatim.openstreetmap.org/reverse"
+        params = {'format': 'json', 'lat': lat, 'lon': lon, 'zoom': 18, 'addressdetails': 1}
+        headers = {'User-Agent': 'PinWeatherApp/1.0', 'Accept-Language': 'ja'}
+        
+        res = requests.get(url, params=params, headers=headers, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            addr = data.get('address', {})
+            # 市町村より下のレベル（丁目・字・区）を優先して返す設定を維持
+            label = (addr.get('quarter') or addr.get('suburb') or 
+                     addr.get('neighbourhood') or addr.get('city_district') or 
+                     addr.get('village') or addr.get('town') or 
+                     addr.get('city') or f"{lat:.4f}, {lon:.4f}")
+            return label
+    except Exception as e:
+        print(f"Geocoding Error: {e}")
+    
+    return f"{lat:.4f}, {lon:.4f}"
 
 # ======================================================================================
 # 34. 地名検索・地図連携サブルーチン (Search to Map Jump 改良版)
@@ -2122,6 +2151,7 @@ if __name__ == "__main__":
     # host="0.0.0.0" は 502 Bad Gateway 回避のために必須
     # debug=False はデプロイ時のタイムアウトを防ぐために必須
     app.run(host="0.0.0.0", port=port, debug=False)
+
 
 
 
