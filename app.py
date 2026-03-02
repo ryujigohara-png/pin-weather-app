@@ -1359,9 +1359,8 @@ def reset_settings_handler():
     return redirect(url_for('index', refresh='1', t=int(time.time())))
 
 # ======================================================================================
-# 33. 地図・位置情報連携サブルーチン (検索モード対応・一本化)
+# 33. 地図・位置情報連携サブルーチン (現在地名称の自動取得・一本化)
 # ======================================================================================
-
 @app.route('/set_location')
 def set_location_handler():
     """GPSや外部連携から座標を受け取り、地名を特定して保存する"""
@@ -1377,12 +1376,17 @@ def set_location_handler():
         session['design_params'] = user_settings
         session['lat'], session['lon'] = lat, lon
         
-        if name_raw:
+        # 修正ポイント：名前が空、もしくは「現在地(Current Location)」系の固定文字なら、地名を逆引きする
+        is_generic_name = name_raw in [None, "", "現在地", "Current Location", "undefined"]
+        
+        if not is_generic_name:
             session['last_basho'] = name_raw
             session['basho'] = name_raw
         else:
-            session['last_basho'] = get_address_from_coords(lat, lon)
-            session['basho'] = session['last_basho']
+            # 座標から具体的な地名を取得（サブルーチン内の既存関数を利用）
+            address = get_address_from_coords(lat, lon)
+            session['last_basho'] = address
+            session['basho'] = address
             
         if 'clear_weather_cache_files' in globals():
             clear_weather_cache_files()
@@ -2112,6 +2116,7 @@ if __name__ == "__main__":
     # host="0.0.0.0" は 502 Bad Gateway 回避のために必須
     # debug=False はデプロイ時のタイムアウトを防ぐために必須
     app.run(host="0.0.0.0", port=port, debug=False)
+
 
 
 
