@@ -107,7 +107,7 @@ def get_language_dict():
             "LABEL_FAV_ADD": "⭐ My Spots 追加",
             "LABEL_FAV_OK": "✅ My Spots 登録済",
             "FAV_PREFIX": "📍 ",
-            "MAP_SELECT_LABEL": "地図指定",
+            "MAP_SELECT_LABEL": "地図",
             "BTN_SEARCH_CITY": "🔍 地名検索",
             "BTN_CURRENT_LOC": "🔄📍現在地　　　　　　　　　　",
             "MSG_GETTING_LOC": "🛰️ 現在地を取得中...",
@@ -188,7 +188,7 @@ def get_language_dict():
             "経度": "経度",
             "地点を追加": "地点を追加",
             "閉じる": "閉じる",
-            "📍 地図指定": "📍 地図指定",
+            "📍 地図": "📍 地図",
             "地図中心に📍": "地図中心に📍",
             "確定": "確定",
             "場所を検索": "場所を検索",
@@ -326,7 +326,7 @@ def get_language_dict():
             "経度": "Lon",
             "地点を追加": "Add Spot",
             "閉じる": "Close",
-            "📍 地図指定": "📍 Select on Map",            
+            "📍 地図": "📍 Select on Map",            
             "地図中心に📍": "📍 Pin to Center",
             "確定": "Confirm",
             "場所を検索": "Search location...",
@@ -2151,6 +2151,7 @@ if __name__ == "__main__":
     # host="0.0.0.0" は 502 Bad Gateway 回避のために必須
     # debug=False はデプロイ時のタイムアウトを防ぐために必須
     app.run(host="0.0.0.0", port=port, debug=False)
+
 
 
 
