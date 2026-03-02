@@ -218,7 +218,7 @@
                     {% endfor %}
                 </select>
                 <div style="display: flex; gap: 8px;">
-                    <button onclick="getCurrentLocation(event)" class="btn-action" style="flex:1;">{{ lang_dict['BTN_CURRENT_LOC_SHORT'] }}</button>
+                    <button onclick="sync_current_location()" class="btn-action" style="flex:1;">{{ lang_dict['BTN_CURRENT_LOC_SHORT'] }}</button>
                     <button onclick="showSearchPrompt()" class="btn-action" style="flex:1;">{{ lang_dict['BTN_SEARCH_CITY'] or '🔍 地名検索' }}</button>
                     <a href="/map_select" class="btn-action" style="flex:1;" onclick="showLoading()">🗺️ {{ lang_dict['MAP_SELECT_LABEL'] or '地図選択' }}</a>
                 </div>
@@ -314,6 +314,36 @@
             location.href = "/map_select?search_mode=1";
         }
 
+        // ======================================================================================
+        // 95. 現在地取得・サーバー同期サブルーチン (リロード方式)
+        // ======================================================================================
+        function sync_current_location() {
+            if (!navigator.geolocation) {
+                alert("お使いのブラウザは位置情報に対応していません。");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    showLoading();
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    // サーバー側で地名を逆引きさせるため、nameは汎用的な「現在地」として送信
+                    window.location.href = `/set_location?lat=${lat}&lon=${lon}&name=現在地`;
+                },
+                function(error) {
+                    let msg = "位置情報の取得に失敗しました。";
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED: msg = "位置情報の利用が許可されていません。"; break;
+                        case error.POSITION_UNAVAILABLE: msg = "位置情報が利用できません。"; break;
+                        case error.TIMEOUT: msg = "タイムアウトしました。"; break;
+                    }
+                    alert(msg);
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        }
+
         async function registerMySpot() {
             const currentName = "{{ basho }}";
             const lat = {{ design_params.lat }};
@@ -327,7 +357,7 @@
             const newName = prompt(promptMsg, currentName);
             if (newName === null) return;
 
-            showLoading(); // 通信開始前に表示
+            showLoading(); 
 
             try {
                 const response = await fetch('/add_to_myspots', {
@@ -350,16 +380,6 @@
                 alert("{{ lang_dict['ERR_LOC_FAILED'] }}"); 
             }
         }
-
-        // GPSスクリプト内の遷移にもローディングを追加（app.py側のgps_script変数に依存）
-        // 手動呼び出し側を修正
-        const originalGetCurrentLocation = getCurrentLocation;
-        getCurrentLocation = function(e) {
-            showLoading();
-            originalGetCurrentLocation(e);
-        };
-
-        {{ gps_script|safe }}
 
         function showShareQR() {
             const currentUrl = window.location.origin;
