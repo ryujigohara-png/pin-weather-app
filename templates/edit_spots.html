@@ -9,7 +9,22 @@
         .header { display: flex; align-items: center; margin-bottom: 20px; }
         /* 戻るボタンの当たり判定を広く */
         .btn-back { text-decoration: none; font-size: 24px; color: #31333f; margin-right: 15px; padding: 5px; }
-        h2 { margin: 0; font-size: 1.2rem; }
+        h2 { margin: 0; font-size: 1.1rem; flex-shrink: 0; }
+        
+        /* ====================================================================================== */
+        /* 97. My Spots 追加方法のガイダンス表示 (C案) */
+        /* ====================================================================================== */
+        .add-hint { 
+            font-size: 11px; 
+            color: #666; 
+            margin-left: auto; 
+            line-height: 1.3; 
+            text-align: right; 
+            background: #eef6ff;
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid #d0e3ff;
+        }
         
         .spot-card { background: white; border-radius: 10px; padding: 12px; margin-bottom: 12px; border: 1px solid #dcdcdc; }
         .spot-info { margin-bottom: 10px; }
@@ -54,6 +69,10 @@
         <div class="header">
             <a href="/?t={{ range(1, 99999)|random }}" class="btn-back" onclick="showLoading()">←</a>
             <h2>📍 My Spots 管理 ({{ spots|length }}/10)</h2>
+            
+            <div class="add-hint">
+                追加はメイン画面の<br><b>「☆」</b>をタップ
+            </div>
         </div>
 
         {% if not spots %}
@@ -92,12 +111,8 @@
             document.getElementById('main-content').classList.add('pointer-none');
         }
 
-        // ======================================================================================
-        // 99. My Spots 編集画面用 同期マネージャー (完全版)
-        // ======================================================================================
         const STORAGE_KEY = "pin_weather_backup_v1";
 
-        // 現在のサーバーの状態（編集後の状態）をブラウザに同期する
         function syncEditToLocal() {
             const data = {
                 user_locations: {{ spots | tojson }},
@@ -106,15 +121,12 @@
                 sel_dirs: {{ session.get('sel_dirs', []) | tojson }},
                 lang: {{ session.get('lang', 'ja') | tojson }}
             };
-            
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-            console.log("Edit synchronized to LocalStorage.");
         }
 
         window.addEventListener('load', syncEditToLocal);
         window.addEventListener('pagehide', syncEditToLocal);
 
-        // 編集モードの切り替え
         function showEdit(idx) {
             document.getElementById('display_' + idx).style.display = 'none';
             document.getElementById('form_' + idx).style.display = 'flex';
@@ -123,7 +135,6 @@
             document.getElementById('display_' + idx).style.display = 'block';
             document.getElementById('form_' + idx).style.display = 'none';
         }
-        // 削除確認
         function confirmDelete(idx, name) {
             if (confirm('「' + name + '」を削除しますか？')) {
                 showLoading();
