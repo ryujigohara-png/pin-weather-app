@@ -1614,14 +1614,23 @@ def add_to_myspots():
     return jsonify({"status": "success", "name": display_name})
 
 # ======================================================================================
-# 42. My Spots 管理ハンドラ (完全版: 並び替え・編集・削除対応)
+# 42. My Spots 管理ハンドラ (完全版: 並び替え・編集・削除・多言語対応)
 # ======================================================================================
 @app.route('/edit_spots')
 def edit_spots():
     from flask import render_template, session
+    
+    # --- 多言語辞書の生成 ---
+    # get_language_dict() から現在の言語設定に応じた辞書を取得して lang_dict として定義
+    translations = get_language_dict()
+    lang = session.get('lang', 'ja')
+    lang_dict = translations.get(lang, translations['ja'])
+    
     # ユーザー登録地点のみを取得（プリセットは除外）
     spots = session.get('user_locations', [])
-    return render_template('edit_spots.html', spots=spots)
+    
+    # HTML側が必要としている spots と lang_dict を確実に渡してレンダリング
+    return render_template('edit_spots.html', spots=spots, lang_dict=lang_dict)
 
 @app.route('/update_spot_name', methods=['POST'])
 def update_spot_name():
@@ -2149,22 +2158,37 @@ def restore_settings():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ======================================================================================
-# 100. アプリケーション起動サブルーチン (Render標準ポート同期版)
+# 100. アプリケーション起動サブルーチン (全環境・VPN共存対応 完全版)
 # ======================================================================================
 if __name__ == "__main__":
     import os
-    # Renderの環境変数PORTを最優先で取得
-    port = int(os.environ.get("PORT", 10000))
+    import socket
+
+    # 1. ポート設定: RenderのPORT環境変数を最優先（デフォルト10000）
+    port_env = os.environ.get("PORT")
+    port = int(port_env) if port_env else 10000
     
-    # host="0.0.0.0" は 502 Bad Gateway 回避のために必須
-    # debug=False はデプロイ時のタイムアウトを防ぐために必須
-    app.run(host="0.0.0.0", port=port, debug=False)
+    if port_env:
+        # --- Render本番環境 ---
+        target_host = "0.0.0.0" # 502エラー回避のため必須
+        is_debug = False        # 本番はデバッグOFF
+    else:
+        # --- ローカル開発環境 ---
+        is_debug = True
+        try:
+            # McAfee VPN等がONでも、物理的なWi-Fi側(192.168.x.x)のIPを自動特定する
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            target_host = s.getsockname()[0]
+            s.close()
+        except Exception:
+            # 特定できない場合は 0.0.0.0 で待機
+            target_host = "0.0.0.0"
 
-
-
-
-
-
+    # 起動時にスマホで入力すべきURLを表示（これを見れば迷いません）
+    print(f"\n[スマホ確認用URL] http://{target_host}:{port}\n")
+    
+    app.run(host=target_host, port=port, debug=is_debug)
 
 
 
