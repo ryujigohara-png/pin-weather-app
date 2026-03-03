@@ -698,11 +698,14 @@ def get_x_axis_formatter():
     def formatter(x, p):
         dt = mdates.num2date(x)
         if dt.hour == 0:
-            day_str = dt.strftime('%m/%d')
+            # 日付の0埋め解除: 03/04 -> 3/4
+            day_str = f"{dt.month}/{dt.day}"
             week_str = f"({weeks[dt.weekday()]})"
             return f"{day_str}\n{week_str}"
         else:
-            return dt.strftime('%H') + '\n '
+            # 時刻の0埋め解除: 09 -> 9
+            # dt.hour は整数なのでそのまま文字列に変換
+            return f"{dt.hour}\n "
             
     return formatter
 
@@ -2158,35 +2161,33 @@ def restore_settings():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ======================================================================================
-# 100. アプリケーション起動サブルーチン (全環境・VPN共存対応 完全版)
+# 100. アプリケーション起動サブルーチン (環境自動判別・ポート5000復帰版)
 # ======================================================================================
 if __name__ == "__main__":
     import os
     import socket
 
-    # 1. ポート設定: RenderのPORT環境変数を最優先（デフォルト10000）
+    # Render環境(PORTあり)ならその値を、ローカルなら 5000 を使用
     port_env = os.environ.get("PORT")
-    port = int(port_env) if port_env else 10000
-    
     if port_env:
-        # --- Render本番環境 ---
-        target_host = "0.0.0.0" # 502エラー回避のため必須
-        is_debug = False        # 本番はデバッグOFF
+        # Render本番環境
+        port = int(port_env)
+        target_host = "0.0.0.0"
+        is_debug = False
     else:
-        # --- ローカル開発環境 ---
+        # ローカル開発環境 (PCで開きやすい5000番に固定)
+        port = 5000 
         is_debug = True
         try:
-            # McAfee VPN等がONでも、物理的なWi-Fi側(192.168.x.x)のIPを自動特定する
+            # VPN等の影響を避け、物理Wi-FiのIPを取得
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.connect(("8.8.8.8", 80))
             target_host = s.getsockname()[0]
             s.close()
         except Exception:
-            # 特定できない場合は 0.0.0.0 で待機
-            target_host = "0.0.0.0"
+            target_host = "127.0.0.1"
 
-    # 起動時にスマホで入力すべきURLを表示（これを見れば迷いません）
-    print(f"\n[スマホ確認用URL] http://{target_host}:{port}\n")
+    print(f"\n[確認用URL] http://{target_host}:{port}\n")
     
     app.run(host=target_host, port=port, debug=is_debug)
 
