@@ -176,8 +176,8 @@
             </form>
 
             <div class="sidebar-header">TOOLS</div>
-            <button onclick="openModal()">{{ lang_dict['⚙ 詳細設定'] }}</button>
             <button onclick="showLoading(); location.href='/edit_spots'">{{ lang_dict['📍 My Spots 編集'] }}</button>
+            <button onclick="openModal()">{{ lang_dict['⚙ 詳細設定'] }}</button>
             <button onclick="if(confirm('Switch language?\n言語を切り替えますか？')) { showLoading(); location.href='/change_lang'; }">🌐 Language / 言語</button>
             <button onclick="confirmReset()" style="color: #ff6b6b; margin-top: 20px;">🔄 {{ lang_dict['リセット'] }}</button>
             <button onclick="showShareQR()">📲 {{ lang_dict['SHARE_APP'] or 'アプリを共有' }}</button>
