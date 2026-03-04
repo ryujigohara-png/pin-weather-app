@@ -203,6 +203,10 @@ def get_language_dict():
             "標準": "標準 (OSM)",
             "シンプル": "シンプル (白)",
             "ダーク": "ダーク (黒)",
+            "SHARE_APP": "アプリを共有",
+            "LOADING_MSG": "グラフを作成中...",
+            "CONFIRM_RESET": "表示設定をリセットしますか？",
+            "標準地図": "標準地図",
             "道路図": "道路図",
             "衛星写真": "衛星写真",
             "地名取得中...": "地名取得中...",
@@ -345,6 +349,10 @@ def get_language_dict():
             "標準": "Standard (OSM)",
             "シンプル": "Simple (White)",
             "ダーク": "Dark (Black)",
+            "SHARE_APP": "Share App",
+            "LOADING_MSG": "Generating graph...",
+            "CONFIRM_RESET": "Reset display settings?",
+            "標準地図": "Standard Map",
             "道路図": "Streets",
             "衛星写真": "Satellite",
             "地名取得中...": "Fetching name...",
@@ -409,6 +417,14 @@ def initialize_app_settings():
         config["icon_path"] = None 
 
     return config
+
+# ======================================================================================
+# 13_2. ヘルスチェック用サブルーチン (Renderのデプロイ成功率向上のため)
+# ======================================================================================
+@app.route('/healthz')
+def health_check():
+    """Renderの生存確認用。軽量な応答を返すことでタイムアウトを防止する。"""
+    return "OK", 200
 
 # ======================================================================================
 # 13. 日本語フォントセットアップサブルーチン (Render/Linux 強化版)
