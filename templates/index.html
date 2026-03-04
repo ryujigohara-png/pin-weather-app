@@ -33,19 +33,27 @@
         .sidebar .closebtn { position: absolute; top: 10px; right: 20px; font-size: 24px; color: #31333f; border: none; background: none; }
         .sidebar-header { color: #555; padding: 10px 25px; font-size: 12px; font-weight: bold; }
 
-        /* サイドバー最上部アイコンエリア */
+        /* サイドバー最上部アイコンエリア（案1: 横並び） */
         .sidebar-brand-area {
-            text-align: center;
-            padding: 0 10px 20px 10px;
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
             margin-bottom: 10px;
             border-bottom: 1px solid #eee;
+            gap: 12px; /* アイコンと文字の間隔 */
         }
         .sidebar-brand-icon {
-            width: 90px;
-            height: 90px;
-            border-radius: 20%;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            width: 45px;
+            height: 45px;
+            border-radius: 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             object-fit: cover;
+        }
+        .sidebar-brand-name {
+            font-size: 18px;
+            font-weight: 800;
+            color: #0078ff; /* アプリのテーマカラー */
+            letter-spacing: 0.5px;
         }
 
         /* 風向選択エリア */
@@ -149,15 +157,15 @@
         </div>
     </div>
 
-    <div id="mySidebar" class="sidebar">
+<div id="mySidebar" class="sidebar">
         <div class="sidebar-content">
             <button class="closebtn" onclick="closeNav()">×</button>
             
             <div class="sidebar-brand-area">
-                <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="Pin_Weather!" class="sidebar-brand-icon">
+                <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="Icon" class="sidebar-brand-icon">
+                <span class="sidebar-brand-name">Pin_Weather!</span>
             </div>
 
-            <button onclick="showLoading(); location.href='/edit_spots'">{{ lang_dict['📍 My Spots 編集'] }}</button>
             <div class="sidebar-header" style="margin-top: 10px;">{{ lang_dict['色付風向選択'] }}</div>
             <form action="/update_display_toggle?redirect_to_home=1" method="POST" style="padding: 0 20px;" onsubmit="showLoading()">
                 <div class="wind-dir-container" style="padding: 0; margin-bottom: 10px;">
