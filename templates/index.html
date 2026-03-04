@@ -88,14 +88,31 @@
 
         /* モーダル設定 */
         .modal { display: none; position: fixed; z-index: 400; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
-        .modal-content { background: white; margin: 5% auto; padding: 25px; width: 90%; max-width: 450px; border-radius: 12px; }
+        .modal-content { 
+            background: white; margin: 5% auto; padding: 25px; width: 90%; max-width: 450px; 
+            border-radius: 12px; max-height: 85vh; overflow-y: auto; position: relative;
+        }
+        
+        /* モーダル内ボタンエリア (最上部に固定) */
+        .modal-sticky-header {
+            position: sticky; top: -25px; background: white; z-index: 10;
+            padding-bottom: 15px; border-bottom: 1px solid #eee; margin-bottom: 20px;
+        }
+        .modal-footer-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; }
+        .modal-footer-top button { 
+            padding: 10px 5px; border-radius: 6px; font-weight: bold; cursor: pointer; 
+            border: 1px solid #dcdcdc; background: #f0f2f6; font-size: 12px; height: 44px; 
+            display: flex; align-items: center; justify-content: center;
+        }
+        .btn-reset-st { flex: 1.4; } 
+        .btn-close-st { flex: 1; }
+        .btn-update-st { flex: 1; background: #0078ff !important; color: white !important; border: none !important; }
+        
         .st-slider-row { margin-bottom: 18px; }
         .st-slider-label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
         .st-slider-value { font-weight: bold; color: #0078ff; }
         input[type=range] { width: 100%; height: 6px; border-radius: 3px; background: #dfe1e6; }
-        .modal-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 30px; gap: 10px; }
-        .btn-update-st { background: #0078ff; color: white; border: none; padding: 10px 25px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        .modal-title { font-weight: bold; font-size: 1.1rem; margin-bottom: 20px; }
+        .modal-title { font-weight: bold; font-size: 1.1rem; margin-bottom: 10px; text-align: center; }
 
         /* フッター情報表示 */
         .footer-info-container { margin-top: 20px; padding: 15px; border-top: 1px solid #e6e9ef; background-color: #fff; border-radius: 0 0 10px 10px; }
@@ -103,11 +120,9 @@
         .api-links-row { text-align: right; font-size: 11px; color: gray; margin-bottom: 15px; }
         .api-link-item { color: gray; text-decoration: none; border: 1px solid #ddd; padding: 2px 6px; border-radius: 4px; }
 
-        /* -------------------------------------------------------------------------------------- */
-        /* 100. ローディング表示用CSS */
-        /* -------------------------------------------------------------------------------------- */
+        /* ローディング表示 (初期値を flex にして即時表示させる) */
         #loading-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(255, 255, 255, 0.85); z-index: 9999;
             flex-direction: column; align-items: center; justify-content: center;
         }
@@ -132,25 +147,12 @@
     <div id="mySidebar" class="sidebar">
         <div class="sidebar-content">
             <button class="closebtn" onclick="closeNav()">×</button>
-            <div class="sidebar-header">{{ lang_dict['表示設定'] }}</div>
-            <form action="/update_display_toggle?redirect_to_home=1" method="POST" style="padding: 0 20px;" onsubmit="showLoading()">
-                <div style="background: white; border: 1px solid #dcdcdc; border-radius: 8px; padding: 10px; margin-bottom: 10px;">
-                    {% for key, label in [
-                        ('show_wind','風向・風速グラフ表示'),
-                        ('show_temp','気温グラフ表示'),
-                        ('show_wave','波高グラフ表示'),
-                        ('show_ocean_temp','海面水温グラフ表示'),
-                        ('show_tide','潮位グラフ表示'),
-                        ('show_w_text','天気文字表示')
-                    ] %}
-                    <label style="display: block; font-size: 13px; margin-bottom: 5px; cursor: pointer;">
-                        <input type="checkbox" name="{{ key }}" {% if design_params[key] %}checked{% endif %}> {{ lang_dict[label] }}
-                    </label>
-                    {% endfor %}
-                </div>
+            
+            <button onclick="showLoading(); location.href='/edit_spots'">{{ lang_dict['📍 My Spots 編集'] }}</button>
 
-                <div class="sidebar-header" style="padding-left:0;">{{ lang_dict['色付風向選択'] }}</div>
-                <div class="wind-dir-container">
+            <div class="sidebar-header" style="margin-top: 10px;">{{ lang_dict['色付風向選択'] }}</div>
+            <form action="/update_display_toggle?redirect_to_home=1" method="POST" style="padding: 0 20px;" onsubmit="showLoading()">
+                <div class="wind-dir-container" style="padding: 0; margin-bottom: 10px;">
                     <div class="wind-dir-box">
                         <label class="wind-dir-item">
                             <input type="checkbox" name="wind_dirs" value="{{ lang_dict['ALL_DIRECTIONS'][0] }}" {% if sel_dirs[0] %}checked{% endif %}>{{ lang_dict['ALL_DIRECTIONS'][0] }}
@@ -172,14 +174,15 @@
                     <div style="font-size: 10px; color: #888; margin-top: 5px; text-align: left; padding-left: 5px;">{{ lang_dict['LEGEND_NOTE'] }}</div>
                 </div>
 
-                <button type="submit" style="background: #ff4b4b; color: white; border: none; text-align: center; width: 100%; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold;">{{ lang_dict['BTN_UPDATE'] or lang_dict['更新'] }}</button>
+                <button type="submit" style="background: #ff4b4b; color: white; border: none; text-align: center; width: 100%; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; margin: 0 auto 10px auto;">{{ lang_dict['BTN_UPDATE'] or lang_dict['更新'] }}</button>
             </form>
 
-            <div class="sidebar-header">TOOLS</div>
-            <button onclick="openModal()">{{ lang_dict['⚙ 詳細設定'] }}</button>
-            <button onclick="showLoading(); location.href='/edit_spots'">{{ lang_dict['📍 My Spots 編集'] }}</button>
+            <button onclick="openModal()">⚙ {{ lang_dict['詳細設定'] or '詳細設定' }}</button>
+
             <button onclick="if(confirm('Switch language?\n言語を切り替えますか？')) { showLoading(); location.href='/change_lang'; }">🌐 Language / 言語</button>
-            <button onclick="confirmReset()" style="color: #ff6b6b; margin-top: 20px;">🔄 {{ lang_dict['リセット'] }}</button>
+
+            <button onclick="confirmReset()" style="color: #ff6b6b;">🔄 {{ lang_dict['リセット'] }}</button>
+
             <button onclick="showShareQR()">📲 {{ lang_dict['SHARE_APP'] or 'アプリを共有' }}</button>
         </div>
     </div>
@@ -206,7 +209,7 @@
                     </div>
                 </div>
                 <button onclick="showLoading(); location.href='/?refresh=1&t=' + new Date().getTime()" class="btn-refresh">
-                    🔄 {{ now_jst.strftime('%H:%M') }}
+                    🔄 {{ now_jst.hour }}:{{ now_jst.strftime('%M') }}
                 </button>
             </div>
 
@@ -263,8 +266,32 @@
 
     <div id="configModal" class="modal">
         <div class="modal-content">
-            <div class="modal-title">{{ lang_dict['デザイン微調整'] }}</div>
             <form action="/update_settings" method="post" onsubmit="showLoading()">
+                <div class="modal-sticky-header">
+                    <div class="modal-title">{{ lang_dict['詳細設定'] or '詳細設定' }}</div>
+                    <div class="modal-footer-top">
+                        <button type="button" class="btn-reset-st" onclick="showLoading(); location.href='/reset_settings'">{{ lang_dict['デフォルトに戻す'] }}</button>
+                        <button type="button" class="btn-close-st" onclick="closeModal()">{{ lang_dict['閉じる'] }}</button>
+                        <button type="submit" class="btn-update-st">{{ lang_dict['更新'] }}</button>
+                    </div>
+                </div>
+                
+                <div style="background: #f8f9fb; border: 1px solid #dcdcdc; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                    <div style="font-size: 12px; font-weight: bold; margin-bottom: 10px; color: #555;">{{ lang_dict['表示設定'] }}</div>
+                    {% for key, label in [
+                        ('show_wind','風向・風速グラフ表示'),
+                        ('show_temp','気温グラフ表示'),
+                        ('show_wave','波高グラフ表示'),
+                        ('show_ocean_temp','海面水温グラフ表示'),
+                        ('show_tide','潮位グラフ表示'),
+                        ('show_w_text','天気文字表示')
+                    ] %}
+                    <label style="display: block; font-size: 14px; margin-bottom: 8px; cursor: pointer;">
+                        <input type="checkbox" name="{{ key }}" {% if design_params[key] %}checked{% endif %}> {{ lang_dict[label] }}
+                    </label>
+                    {% endfor %}
+                </div>
+
                 {% for field, label, unit in [('height_inch','グラフ縦幅','inch'),('top_margin_inch','上余白','inch'),('hspace_inch','上下間隔',''),('width_inch','グラフ横幅','inch'),('margin_left_inch','左余白','inch'),('font_size','フォントサイズ','')] %}
                 <div class="st-slider-row">
                     <div class="st-slider-label-row">
@@ -278,19 +305,11 @@
                            oninput="document.getElementById('val_{{ field }}').innerText=this.value">
                 </div>
                 {% endfor %}
-                <div class="modal-footer">
-                    <button type="button" onclick="showLoading(); location.href='/reset_settings'">{{ lang_dict['デフォルトに戻す'] }}</button>
-                    <div>
-                        <button type="button" onclick="closeModal()">{{ lang_dict['閉じる'] }}</button>
-                        <button type="submit" class="btn-update-st">{{ lang_dict['更新'] }}</button>
-                    </div>
-                </div>
             </form>
         </div>
     </div>
 
     <script>
-        // ローディング表示用関数
         function showLoading() {
             document.getElementById('loading-overlay').style.display = 'flex';
             document.getElementById('main').classList.add('pointer-none');
@@ -314,15 +333,8 @@
             location.href = "/map_select?search_mode=1";
         }
 
-        // ======================================================================================
-        // 95. 現在地取得・サーバー同期サブルーチン (リロード方式)
-        // ======================================================================================
         function sync_current_location() {
-            if (!navigator.geolocation) {
-                alert("お使いのブラウザは位置情報に対応していません.");
-                return;
-            }
-
+            if (!navigator.geolocation) { alert("お使いのブラウザは位置情報に対応していません."); return; }
             navigator.geolocation.getCurrentPosition(
                 function(position) {
                     showLoading();
@@ -343,9 +355,6 @@
             );
         }
 
-        // ======================================================================================
-        // 96. ブラウザ戻る操作時のローディング解除サブルーチン (案A)
-        // ======================================================================================
         (function() {
             const hideLoading = function() {
                 const overlay = document.getElementById('loading-overlay');
@@ -353,15 +362,9 @@
                 if (overlay) overlay.style.display = 'none';
                 if (main) main.classList.remove('pointer-none');
             };
-
-            // ページが表示された時(キャッシュからの戻り含む)に実行
             window.addEventListener('pageshow', function(event) {
-                if (event.persisted) {
-                    hideLoading();
-                }
+                if (event.persisted) hideLoading();
             });
-
-            // 念のためロード完了時にも安全策
             window.addEventListener('load', hideLoading);
         })();
 
@@ -370,16 +373,11 @@
             const lat = {{ design_params.lat }};
             const lon = {{ design_params.lon }};
             const btn = document.getElementById('btn-star');
-            if (btn.innerText.trim() === "🌟") {
-                alert("{{ lang_dict['登録済'] }}");
-                return;
-            }
+            if (btn.innerText.trim() === "🌟") { alert("{{ lang_dict['登録済'] }}"); return; }
             const promptMsg = "{{ lang_dict['この地点を My Spots に保存します。'] }}";
             const newName = prompt(promptMsg, currentName);
             if (newName === null) return;
-
             showLoading(); 
-
             try {
                 const response = await fetch('/add_to_myspots', {
                     method: 'POST',
@@ -439,9 +437,7 @@
         }
         
         window.addEventListener('load', () => {
-            setTimeout(() => {
-                checkAndRestore();
-            }, 1000); 
+            setTimeout(checkAndRestore, 1000); 
         });
     </script>
 </body>
