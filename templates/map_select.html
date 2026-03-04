@@ -12,7 +12,8 @@
         /* 検索ボックス */
         .search-box {
             position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
-            z-index: 1000; width: 90%; max-width: 400px;
+            z-index: 1100; /* レイヤーコントロールより少し上げる */
+            width: 90%; max-width: 400px;
             display: flex; gap: 5px; background: white; padding: 8px;
             border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);
         }
@@ -20,9 +21,15 @@
         .search-highlight { border: 2px solid #0078ff !important; background-color: #f0f7ff; }
         .btn-search { background: #0078ff; color: white; border: none; padding: 0 15px; border-radius: 4px; cursor: pointer; }
 
+        /* レイヤーコントロールの重なり順と位置調整 */
+        .leaflet-top.leaflet-right {
+            top: 70px !important; /* 検索ボックスに被らないように下げる */
+            z-index: 1000 !important;
+        }
+
         .map-controls {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 1000; background: white; padding: 15px; border-radius: 12px;
+            z-index: 1100; background: white; padding: 15px; border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: 90%; max-width: 400px;
         }
         .btn-group { display: flex; gap: 8px; margin-top: 8px; }
@@ -80,12 +87,40 @@
         var searchMode = "{{ search_mode }}"; 
         var currentLang = "{{ session.get('lang', 'ja') }}";
 
-        var map = L.map('map', { zoomControl: false }).setView([initialLat, initialLon], 13);
-        L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // 地図レイヤーの定義
+        var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
+        });
+
+        // 道路図（Esri World Street Map）
+        var streets = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012'
+        });
+
+        var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri'
+        });
+
+        // 地図の初期化
+        var map = L.map('map', { 
+            zoomControl: false,
+            layers: [osm]
+        }).setView([initialLat, initialLon], 13);
+
+        // レイヤーコントロールの追加
+        var baseMaps = {
+            "{{ lang_dict.get('標準地図', '標準地図') }}": osm,
+            "{{ lang_dict.get('道路図', '道路図') }}": streets,
+            "{{ lang_dict.get('衛星写真', '衛星写真') }}": satellite
+        };
+        
+        // collapsed: false にして最初から選択肢が見えるようにする
+        L.control.layers(baseMaps, null, { 
+            position: 'topright',
+            collapsed: false 
         }).addTo(map);
+
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
 
         var marker = L.marker([initialLat, initialLon], { draggable: true }).addTo(map);
 
