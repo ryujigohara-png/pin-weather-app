@@ -1295,76 +1295,65 @@ def show_settings_dialog():
 
 
 # ======================================================================================
-# 31. 設定更新系サブルーチン (表示切替)
+# 31. 設定更新系サブルーチン (サイドバー：風向選択専用)
 # ======================================================================================
 @app.route('/update_display_toggle', methods=['POST'])
 def update_display_toggle_handler():
     """
-    サイドバーの表示ON/OFFおよび色付風向選択を更新するサブルーチン。
-    更新後は refresh=1 を付与してグラフを再生成します。
+    サイドバーからの呼び出し。色付風向選択のみを更新。
+    グラフ表示フラグ(show_wind等)は詳細設定モーダル側で管理するため、ここでは触れない。
     """
     import time
     from flask import session, request, redirect, url_for
 
-    # デザイン設定の取得
+    # 1. 色付風向選択の更新 (16方位)
+    selected_dirs = request.form.getlist('wind_dirs')
+    # get_language_dict は既存の共通関数を使用
+    all_dirs = get_language_dict()['ja']['ALL_DIRECTIONS']
+    
+    # 選択状態を bool リストに変換して保存
+    sel_dirs_bool = [d in selected_dirs for d in all_dirs]
+    session['sel_dirs'] = sel_dirs_bool
+    session.modified = True
+
+    return redirect(url_for('index', refresh='1', t=int(time.time())))
+
+
+# ======================================================================================
+# 31_1. 設定更新系サブルーチン (詳細設定モーダル：表示フラグ + 数値)
+# ======================================================================================
+@app.route('/update_settings', methods=['POST'])
+def update_settings_handler():
+    """
+    詳細設定モーダルからの呼び出し。
+    グラフ表示のON/OFFフラグと、スライダー数値を一括で更新。
+    """
+    import time
+    from flask import session, request, redirect, url_for
+
     user_settings = session.get('design_params', {})
 
-    # 1. グラフ表示ON/OFF項目の更新 (HTMLの並び順に合わせる)
+    # A. グラフ表示ON/OFFフラグの更新 (31からこちらへ移植)
     display_keys = [
         'show_wind', 'show_temp', 'show_wave', 
         'show_ocean_temp', 'show_tide', 'show_w_text'
     ]
     for key in display_keys:
-        # チェックボックスは存在すればTrue、なければFalse
         user_settings[key] = True if request.form.get(key) else False
 
-    session['design_params'] = user_settings
-
-    # 2. 色付風向選択の更新 (16方位)
-    selected_dirs = request.form.getlist('wind_dirs')
-    all_dirs = get_language_dict()['ja']['ALL_DIRECTIONS']
-    
-    # render_graph_html_flask で使用する bool リストを作成
-    sel_dirs_bool = [d in selected_dirs for d in all_dirs]
-    session['sel_dirs'] = sel_dirs_bool
-
-    session.modified = True
-
-    # 確実にグラフを更新させるため refresh=1 とタイムスタンプを付与
-    return redirect(url_for('index', refresh='1', t=int(time.time())))
-
-
-# ======================================================================================
-# 31_1. 設定更新系サブルーチン (詳細設定)
-# ======================================================================================
-@app.route('/update_settings', methods=['POST'])
-def update_settings_handler():
-    """
-    詳細設定モーダルのスライダー数値(6項目)を更新するサブルーチン。
-    更新後は refresh=1 を付与してグラフを再生成します。
-    """
-    import time
-    from flask import session, request, redirect, url_for
-
-    user_settings = session.get('design_params', {})
-
-    # 更新対象のフィールド定義
+    # B. スライダー数値の更新
     fields = [
         'height_inch', 'top_margin_inch', 'hspace_inch', 
         'width_inch', 'margin_left_inch', 'font_size'
     ]
-    
     for f in fields:
         val = request.form.get(f)
         if val is not None:
-            # 数値型に変換して保存 (font_sizeのみ整数)
-            # top_margin_inch 等でマイナスの値が渡ってきても float(val) で保持可能
             user_settings[f] = int(val) if f == 'font_size' else float(val)
 
     session['design_params'] = user_settings
     session.modified = True
     
-    # 確実にグラフを更新させるため refresh=1 とタイムスタンプを付与
     return redirect(url_for('index', refresh='1', t=int(time.time())))
 
 
@@ -1928,6 +1917,7 @@ render_cache = {}
 # ======================================================================================
 @app.route('/')
 def index():
+    print("★いまインデックスを表示しました★") # これを追加
     import pytz, datetime, traceback
     from flask import session, render_template, request
 
@@ -2218,6 +2208,7 @@ if __name__ == "__main__":
     
     # アプリケーションの起動
     app.run(host=target_host, port=port, debug=is_debug)
+
 
 
 

@@ -9,15 +9,14 @@
     <meta name="theme-color" content="#0078ff">
 
     <style>
+        /* 基本スタイル定義 */
         body { 
             font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0; 
             background-color: #f0f2f5; color: #31333f;
-            /* プルリフレッシュをJSで制御するため、標準の挙動（オーバースワイプ）を抑止する場合もありますが、
-               今回は自然な操作感を優先し、標準挙動にフックします */
             overscroll-behavior-y: contain; 
         }
         
-        /* サイドバー設定 */
+        /* サイドバー設定サブルーチン用CSS */
         .sidebar {
             height: 100%; width: 0; position: fixed; z-index: 300; top: 0; left: 0;
             background-color: #f8f9fb; overflow-x: hidden; overflow-y: auto; 
@@ -28,44 +27,31 @@
             padding: 10px 20px; text-decoration: none; font-size: 14px; color: #31333f;
             display: block; border: 1px solid #dcdcdc; background: white; width: calc(100% - 40px); 
             margin: 10px auto; text-align: left; cursor: pointer; border-radius: 8px;
+            transition: all 0.2s;
         }
-        .sidebar button:hover { border-color: #ff4b4b; color: #ff4b4b; }
+        .sidebar button:hover { border-color: #ff4b4b; color: #ff4b4b; background-color: #fffafa; }
         .sidebar .closebtn { position: absolute; top: 10px; right: 20px; font-size: 24px; color: #31333f; border: none; background: none; }
-        .sidebar-header { color: #555; padding: 10px 25px; font-size: 12px; font-weight: bold; }
+        .sidebar-header { color: #555; padding: 10px 25px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
 
-        /* サイドバー最上部アイコンエリア（案1: 横並び） */
+        /* サイドバー最上部ロゴエリア */
         .sidebar-brand-area {
-            display: flex;
-            align-items: center;
-            padding: 15px 20px;
-            margin-bottom: 10px;
-            border-bottom: 1px solid #eee;
-            gap: 12px; /* アイコンと文字の間隔 */
+            display: flex; align-items: center; padding: 15px 20px; margin-bottom: 10px;
+            border-bottom: 1px solid #eee; gap: 12px;
         }
-        .sidebar-brand-icon {
-            width: 45px;
-            height: 45px;
-            border-radius: 12px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            object-fit: cover;
-        }
-        .sidebar-brand-name {
-            font-size: 18px;
-            font-weight: 800;
-            color: #0078ff; /* アプリのテーマカラー */
-            letter-spacing: 0.5px;
-        }
+        .sidebar-brand-icon { width: 45px; height: 45px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); object-fit: cover; }
+        .sidebar-brand-name { font-size: 18px; font-weight: 800; color: #0078ff; letter-spacing: 0.5px; }
 
-        /* 風向選択エリア */
+        /* 風向選択グリッド定義 */
         .wind-dir-container { padding: 0 20px; margin-bottom: 20px; }
         .wind-dir-box {
             background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #dcdcdc;
             border-left: 4px solid #ff4b4b; display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
         }
         .wind-dir-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; width: 100%; }
-        .wind-dir-item { font-size: 11px; color: #555; cursor: pointer; display: flex; align-items: center; justify-content: flex-start; gap: 4px; }
+        .wind-dir-item { font-size: 11px; color: #555; cursor: pointer; display: flex; align-items: center; justify-content: flex-start; gap: 6px; }
+        .wind-dir-item input[type="checkbox"] { cursor: pointer; width: 14px; height: 14px; }
 
-        /* メインコンテンツエリア */
+        /* メインコンテンツ・ヘッダーエリア */
         #main { padding: 10px; transition: margin-left .3s; }
         .location-header {
             background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px;
@@ -73,45 +59,46 @@
         }
         .loc-top-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
         .loc-name-area { display: flex; align-items: center; gap: 10px; flex: 1; }
-        .loc-info { display: flex; flex-direction: column; flex: 1; }
-        .loc-name-row { display: flex; align-items: center; gap: 8px; }
-        .loc-name { font-size: 1.1rem; font-weight: 600; color: #31333f; }
-        .loc-coords { font-size: 0.85rem; color: #666; margin-top: 2px; }
+        .loc-info { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+        .loc-name-row { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+        .loc-name { font-size: 1.1rem; font-weight: 600; color: #31333f; text-overflow: ellipsis; overflow: hidden; }
+        .loc-coords { font-size: 0.85rem; color: #666; margin-top: 2px; font-family: monospace; }
         
-        /* ボタン配置の最適化 */
+        /* アクションバーと各種ボタン */
         .action-bar { display: flex; flex-wrap: wrap; gap: 8px; }
         .spot-selector {
-            flex: 1 1 100%; min-width: 200px;
-            padding: 10px; border-radius: 8px; border: 1px solid #dcdcdc;
+            flex: 1 1 100%; min-width: 200px; padding: 10px; border-radius: 8px; border: 1px solid #dcdcdc;
             font-size: 14px; background-color: white; color: #31333f; cursor: pointer;
+            appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 10px center; background-size: 16px;
         }
         .btn-action-group { display: flex; flex: 1 1 auto; gap: 8px; width: 100%; }
         .btn-action {
             flex: 1; padding: 10px 5px; border-radius: 8px; border: 1px solid #dcdcdc;
             font-size: 13px; font-weight: 500; cursor: pointer; display: flex;
             align-items: center; justify-content: center; gap: 4px;
-            text-decoration: none; background-color: #f0f2f6; color: #31333f;
-            white-space: nowrap;
+            text-decoration: none; background-color: #f0f2f6; color: #31333f; white-space: nowrap;
+            transition: background 0.2s;
         }
+        .btn-action:active { background-color: #e0e2e6; }
 
-        @media (min-width: 600px) {
-            .spot-selector { flex: 2; }
-            .btn-action-group { flex: 3; }
-        }
+        @media (min-width: 600px) { .spot-selector { flex: 2; } .btn-action-group { flex: 3; } }
 
-        .openbtn { background: #f0f2f6; border: 1px solid #dcdcdc; border-radius: 6px; padding: 8px 12px; cursor: pointer; }
+        .openbtn { background: #f0f2f6; border: 1px solid #dcdcdc; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 18px; }
         .btn-refresh {
             background: #f0f2f6; border: 1px solid #dcdcdc; border-radius: 6px;
             padding: 6px 10px; font-size: 13px; font-weight: 500; color: #31333f;
             cursor: pointer; display: flex; align-items: center; gap: 4px;
         }
-        .btn-star { background: none; border: none; font-size: 1.3rem; cursor: pointer; padding: 0; line-height: 1; }
+        .btn-star { background: none; border: none; font-size: 1.3rem; cursor: pointer; padding: 0; line-height: 1; transition: transform 0.1s; }
+        .btn-star:active { transform: scale(1.2); }
 
-        /* モーダル設定 */
-        .modal { display: none; position: fixed; z-index: 400; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+        /* 詳細設定モーダルスタイル */
+        .modal { display: none; position: fixed; z-index: 400; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); }
         .modal-content { 
             background: white; margin: 5% auto; padding: 25px; width: 90%; max-width: 450px; 
             border-radius: 12px; max-height: 85vh; overflow-y: auto; position: relative;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
         .modal-sticky-header {
             position: sticky; top: -25px; background: white; z-index: 10;
@@ -121,22 +108,24 @@
         .modal-footer-top button { 
             padding: 10px 5px; border-radius: 6px; font-weight: bold; cursor: pointer; 
             border: 1px solid #dcdcdc; background: #f0f2f6; font-size: 12px; height: 44px; 
-            display: flex; align-items: center; justify-content: center;
+            display: flex; align-items: center; justify-content: center; transition: opacity 0.2s;
         }
-        .btn-reset-st { flex: 1.4; } 
+        .modal-footer-top button:active { opacity: 0.7; }
+        .btn-reset-st { flex: 1.4; color: #666; } 
         .btn-close-st { flex: 1; }
         .btn-update-st { flex: 1; background: #0078ff !important; color: white !important; border: none !important; }
         
         .st-slider-row { margin-bottom: 18px; }
         .st-slider-label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-        .st-slider-value { font-weight: bold; color: #0078ff; }
-        input[type=range] { width: 100%; height: 6px; border-radius: 3px; background: #dfe1e6; }
-        .modal-title { font-weight: bold; font-size: 1.1rem; margin-bottom: 10px; text-align: center; }
+        .st-slider-label { font-size: 13px; color: #555; }
+        .st-slider-value { font-weight: bold; color: #0078ff; font-family: monospace; }
+        input[type=range] { width: 100%; height: 6px; border-radius: 3px; background: #dfe1e6; appearance: none; outline: none; }
+        input[type=range]::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #0078ff; cursor: pointer; }
 
-        /* ローディング表示 */
+        /* ローディングオーバーレイ */
         #loading-overlay {
             display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255, 255, 255, 0.6); z-index: 9999;
+            background: rgba(255, 255, 255, 0.8); z-index: 9999;
             flex-direction: column; align-items: center; justify-content: center;
         }
         .spinner {
@@ -146,6 +135,9 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .pointer-none { pointer-events: none; opacity: 0.6; }
+
+        /* グラフコンテナ */
+        .graph-outer-container { background: white; border-radius: 10px; padding: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e6e9ef; min-height: 300px; }
     </style>
 </head>
 <body>
@@ -157,7 +149,7 @@
         </div>
     </div>
 
-<div id="mySidebar" class="sidebar">
+    <div id="mySidebar" class="sidebar">
         <div class="sidebar-content">
             <button class="closebtn" onclick="closeNav()">×</button>
             
@@ -166,8 +158,10 @@
                 <span class="sidebar-brand-name">Pin_Weather!</span>
             </div>
 
+            <button onclick="showLoading(); location.href='/edit_spots'" style="background-color: #fff9e6; border-color: #ffd966; font-weight: bold;">📍 {{ lang_dict['EDIT_MYSPOTS'] or 'My Spots 編集' }}</button>
+
             <div class="sidebar-header" style="margin-top: 10px;">{{ lang_dict['色付風向選択'] }}</div>
-            <form action="/update_display_toggle?redirect_to_home=1" method="POST" style="padding: 0 20px;" onsubmit="showLoading()">
+            <form action="/update_display_toggle" method="POST" style="padding: 0 20px;" onsubmit="showLoading()">
                 <div class="wind-dir-container" style="padding: 0; margin-bottom: 10px;">
                     <div class="wind-dir-box">
                         <label class="wind-dir-item"><input type="checkbox" name="wind_dirs" value="{{ lang_dict['ALL_DIRECTIONS'][0] }}" {% if sel_dirs[0] %}checked{% endif %}>{{ lang_dict['ALL_DIRECTIONS'][0] }}</label>
@@ -180,8 +174,9 @@
                         <label class="wind-dir-item"><input type="checkbox" name="wind_dirs" value="{{ lang_dict['ALL_DIRECTIONS'][8] }}" {% if sel_dirs[8] %}checked{% endif %}>{{ lang_dict['ALL_DIRECTIONS'][8] }}</label>
                     </div>
                 </div>
-                <button type="submit" style="background: #ff4b4b; color: white; border: none; text-align: center; width: 100%; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; margin: 0 auto 10px auto;">{{ lang_dict['BTN_UPDATE'] or lang_dict['更新'] }}</button>
+                <button type="submit" style="background: #ff4b4b; color: white; border: none; text-align: center; width: 100%; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin: 0 auto 15px auto;">{{ lang_dict['BTN_UPDATE'] or lang_dict['更新'] }}</button>
             </form>
+
             <button onclick="openModal()">⚙ {{ lang_dict['詳細設定'] or '詳細設定' }}</button>
             <button onclick="if(confirm('Switch language?\n言語を切り替えますか？')) { showLoading(); location.href='/change_lang'; }">🌐 Language / 言語</button>
             <button onclick="confirmReset()" style="color: #ff6b6b;">🔄 {{ lang_dict['リセット'] }}</button>
@@ -216,7 +211,7 @@
             </div>
 
             <div class="action-bar">
-                <select class="spot-selector" onchange="if(this.value) { showLoading(); location.href='/select_spot/' + this.value; }">
+                <select class="spot-selector" id="spot-selector" onchange="if(this.value) { showLoading(); location.href='/select_spot/' + this.value; }">
                     <option value="">{{ lang_dict['SELECT_PLACE'] }}</option>
                     {% for spot in session.get('user_locations', []) %}
                     <option value="{{ loop.index0 }}">{{ spot.name }}</option>
@@ -248,20 +243,20 @@
                 </div>
             </div>
 
-            <div class="api-links-row" style="margin-bottom: 20px;">
+            <div class="api-links-row" style="margin-bottom: 20px; font-size: 12px;">
                 <span style="display: block; margin-bottom: 8px; color: gray;">
-                    Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" style="color: gray;">Open-Meteo.com</a> (CC BY 4.0)
+                    Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" style="color: #0078ff; text-decoration: none;">Open-Meteo.com</a> (CC BY 4.0)
                 </span>
-                <a href="{{ w_url }}" target="_blank" class="api-link-item">[ {{ lang_dict['LINK_WEATHER'] }} ]</a> 
+                <a href="{{ w_url }}" target="_blank" class="api-link-item" style="color: #666;">[ {{ lang_dict['LINK_WEATHER'] }} ]</a> 
                 &nbsp;&nbsp;
-                <a href="{{ m_url }}" target="_blank" class="api-link-item">[ {{ lang_dict['LINK_MARINE'] }} ]</a>
+                <a href="{{ m_url }}" target="_blank" class="api-link-item" style="color: #666;">[ {{ lang_dict['LINK_MARINE'] }} ]</a>
             </div>
 
             <div style="border-top: 1px solid #e6e9ef; padding-top: 15px; text-align: left;">
                 <p style="font-size: 11px; color: #888; line-height: 1.6; margin-bottom: 15px;">
                     {{ lang_dict.get("DISCLAIMER", "※本データは予測値であり、実際の天候と異なる場合があります。航海や活動の際は、必ず最新の気象情報を確認し、自己責任でご利用ください。") }}
                 </p>
-                <p style="text-align: center; font-size: 10px; color: #ccc;">- Beta Version -</p>
+                <p style="text-align: center; font-size: 10px; color: #ccc; letter-spacing: 2px;">- PIN_WEATHER BETA VERSION -</p>
             </div>
         </div>
     </div> 
@@ -280,8 +275,8 @@
                 
                 <div style="background: #f8f9fb; border: 1px solid #dcdcdc; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
                     {% for key, label in [('show_wind','風向・風速グラフ表示'),('show_temp','気温グラフ表示'),('show_wave','波高グラフ表示'),('show_ocean_temp','海面水温グラフ表示'),('show_tide','潮位グラフ表示'),('show_w_text','天気文字表示')] %}
-                    <label style="display: block; font-size: 14px; margin-bottom: 8px; cursor: pointer;">
-                        <input type="checkbox" name="{{ key }}" {% if design_params[key] %}checked{% endif %}> {{ lang_dict[label] }}
+                    <label style="display: block; font-size: 14px; margin-bottom: 10px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" name="{{ key }}" {% if design_params[key] %}checked{% endif %} style="width: 16px; height: 16px;"> {{ lang_dict[label] }}
                     </label>
                     {% endfor %}
                 </div>
@@ -292,7 +287,7 @@
                         <span class="st-slider-label">{{ lang_dict[label] or label }}{% if unit %}({{ unit }}){% endif %}:</span>
                         <span class="st-slider-value" id="val_{{ field }}">{{ design_params[field] }}</span>
                     </div>
-                    <input type="range" name="{{ field }}" min="{{ -3.0 if field == 'top_margin_inch' else 0 }}" max="{{ 30 if 'width' in field else 20 if 'font' in field else 2.0 }}" step="0.1" value="{{ design_params[field] }}" oninput="document.getElementById('val_{{ field }}').innerText=this.value">
+                    <input type="range" name="{{ field }}" min="{{ -3.0 if field == 'top_margin_inch' else 0 }}" max="{{ 30 if 'width' in field else 20 if 'font' in field else 2.5 }}" step="0.1" value="{{ design_params[field] }}" oninput="document.getElementById('val_{{ field }}').innerText=this.value">
                 </div>
                 {% endfor %}
             </form>
@@ -300,11 +295,63 @@
     </div>
 
     <script>
-        function showLoading() {
-            document.getElementById('loading-overlay').style.display = 'flex';
-            document.getElementById('main').classList.add('pointer-none');
+        /**
+         * サブルーチン：バックアップデータの保存
+         */
+        function saveBackupToLocal() {
+            const backupData = {
+                user_locations: {{ session.get('user_locations', [])|tojson }},
+                design_params: {{ design_params|tojson }},
+                sel_dirs: {{ sel_dirs|tojson }},
+                lang: "{{ session.get('lang', 'ja') }}",
+                last_basho: "{{ basho }}"
+            };
+            localStorage.setItem('pin_weather_backup_v1', JSON.stringify(backupData));
+            console.log("Backup saved to local storage.");
         }
 
+        /**
+         * サブルーチン：バックアップデータからの復元
+         */
+        async function restoreFromLocalBackup() {
+            const stored = localStorage.getItem('pin_weather_backup_v1');
+            if (!stored) return;
+            
+            const data = JSON.parse(stored);
+            const userLocsCount = {{ session.get('user_locations', [])|length }};
+            const currentBasho = "{{ basho }}";
+
+            if (userLocsCount === 0 || currentBasho === "Error" || currentBasho === "") {
+                console.log("Initiating restore from backup...");
+                showLoading();
+                try {
+                    const response = await fetch('/restore_backup', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(data)
+                    });
+                    if (response.ok) {
+                        window.location.href = '/?refresh=1';
+                    } else {
+                        console.error("Restore failed on server side.");
+                        hideLoading();
+                    }
+                } catch (e) {
+                    console.error("Restore connection error:", e);
+                    hideLoading();
+                }
+            }
+        }
+
+        /* UI操作サブルーチン */
+        function showLoading() { 
+            document.getElementById('loading-overlay').style.display = 'flex'; 
+            document.getElementById('main').classList.add('pointer-none'); 
+        }
+        function hideLoading() { 
+            document.getElementById('loading-overlay').style.display = 'none'; 
+            document.getElementById('main').classList.remove('pointer-none'); 
+        }
         function openNav() { document.getElementById("mySidebar").style.width = "280px"; }
         function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
         function openModal() { document.getElementById("configModal").style.display = "block"; closeNav(); }
@@ -325,31 +372,27 @@
                     showLoading();
                     window.location.href = `/set_location?lat=${position.coords.latitude}&lon=${position.coords.longitude}&name=現在地`;
                 },
-                function(error) { alert("取得失敗しました."); },
+                function(error) { 
+                    alert("位置情報の取得に失敗しました。設定を確認してください。"); 
+                },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         }
 
         (function() {
-            const hideLoading = function() {
-                document.getElementById('loading-overlay').style.display = 'none';
-                document.getElementById('main').classList.remove('pointer-none');
-            };
             window.addEventListener('pageshow', function(event) { if (event.persisted) hideLoading(); });
-            window.addEventListener('load', hideLoading);
+            window.addEventListener('load', () => {
+                saveBackupToLocal();
+                restoreFromLocalBackup();
+                hideLoading();
+            });
 
-            // プルリフレッシュ検知ロジック
             let startY = 0;
-            window.addEventListener('touchstart', (e) => {
-                startY = e.touches[0].pageY;
-            }, {passive: true});
-
+            window.addEventListener('touchstart', (e) => { startY = e.touches[0].pageY; }, {passive: true});
             window.addEventListener('touchmove', (e) => {
                 const moveY = e.touches[0].pageY;
                 const diffY = moveY - startY;
-                // 画面の最上部で、一定距離(例えば100px)以上下にスワイプした場合
-                if (window.scrollY === 0 && diffY > 100) {
-                    // ぐるぐるを出してリロード（右上ボタンと同じ挙動）
+                if (window.scrollY === 0 && diffY > 120) {
                     if (document.getElementById('loading-overlay').style.display !== 'flex') {
                         showLoading();
                         location.href = '/?refresh=1&t=' + new Date().getTime();
@@ -362,34 +405,45 @@
             const currentName = "{{ basho }}";
             const btn = document.getElementById('btn-star');
             if (btn.innerText.trim() === "🌟") return;
+            
             const newName = prompt("{{ lang_dict['この地点を My Spots に保存します。'] }}", currentName);
             if (!newName) return;
+            
             showLoading(); 
             try {
                 const response = await fetch('/add_to_myspots', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ name: newName, lat: {{ design_params.lat }}, lon: {{ design_params.lon }} })
+                    body: JSON.stringify({ 
+                        name: newName, 
+                        lat: {{ design_params.lat }}, 
+                        lon: {{ design_params.lon }} 
+                    })
                 });
                 const result = await response.json();
-                if (result.status === "success") location.reload();
-                else { 
-                    document.getElementById('loading-overlay').style.display = 'none';
-                    document.getElementById('main').classList.remove('pointer-none');
+                if (result.status === "success") {
+                    saveBackupToLocal();
+                    location.reload();
+                } else { 
+                    hideLoading(); 
                     alert(result.message); 
                 }
             } catch (error) { 
-                document.getElementById('loading-overlay').style.display = 'none';
-                document.getElementById('main').classList.remove('pointer-none');
-                alert("エラーが発生しました."); 
+                hideLoading(); 
+                alert("登録エラーが発生しました。"); 
             }
         }
 
         function showShareQR() {
             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.origin)}`;
             const shareModal = document.createElement('div');
-            shareModal.style = "position:fixed; z-index:500; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; flex-direction:column; color:white;";
-            shareModal.innerHTML = `<div style="background:white; padding:20px; border-radius:15px; text-align:center;"><img src="${qrUrl}" alt="QR"><div style="color:#333; font-weight:bold; margin-top:10px;">Scan to Open</div><button onclick="this.parentElement.parentElement.remove()" style="margin-top:15px; padding:8px 20px; border-radius:5px; border:none; background:#0078ff; color:white; cursor:pointer;">Close</button></div>`;
+            shareModal.style = "position:fixed; z-index:500; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; flex-direction:column; color:white; backdrop-filter:blur(5px);";
+            shareModal.innerHTML = `
+                <div style="background:white; padding:25px; border-radius:15px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+                    <img src="${qrUrl}" alt="QR" style="width:200px; height:200px;">
+                    <div style="color:#333; font-weight:bold; margin-top:15px; font-size:16px;">Scan to Open App</div>
+                    <button onclick="this.parentElement.parentElement.remove()" style="margin-top:20px; padding:10px 25px; border-radius:8px; border:none; background:#0078ff; color:white; cursor:pointer; font-weight:bold; width:100%;">Close</button>
+                </div>`;
             document.body.appendChild(shareModal);
         }
     </script>
