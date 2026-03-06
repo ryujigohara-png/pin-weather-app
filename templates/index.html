@@ -7,136 +7,60 @@
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/icon-192.png') }}">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <meta name="theme-color" content="#0078ff">
-
     <style>
-        /* 基本スタイル定義 */
-        body { 
-            font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0; 
-            background-color: #f0f2f5; color: #31333f;
-            overscroll-behavior-y: contain; 
-        }
-        
-        /* サイドバー設定サブルーチン用CSS */
-        .sidebar {
-            height: 100%; width: 0; position: fixed; z-index: 300; top: 0; left: 0;
-            background-color: #f8f9fb; overflow-x: hidden; overflow-y: auto; 
-            transition: 0.3s; padding-top: 60px; border-right: 1px solid #e6e9ef;
-        }
+        /* スタイル定義（省略せず維持） */
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0; background-color: #f0f2f5; color: #31333f; overscroll-behavior-y: contain; }
+        .sidebar { height: 100%; width: 0; position: fixed; z-index: 300; top: 0; left: 0; background-color: #f8f9fb; overflow-x: hidden; overflow-y: auto; transition: 0.3s; padding-top: 60px; border-right: 1px solid #e6e9ef; }
         .sidebar-content { padding-bottom: 80px; }
-        .sidebar button, .sidebar a {
-            padding: 10px 20px; text-decoration: none; font-size: 14px; color: #31333f;
-            display: block; border: 1px solid #dcdcdc; background: white; width: calc(100% - 40px); 
-            margin: 10px auto; text-align: left; cursor: pointer; border-radius: 8px;
-            transition: all 0.2s;
-        }
+        .sidebar button, .sidebar a { padding: 10px 20px; text-decoration: none; font-size: 14px; color: #31333f; display: block; border: 1px solid #dcdcdc; background: white; width: calc(100% - 40px); margin: 10px auto; text-align: left; cursor: pointer; border-radius: 8px; transition: all 0.2s; }
         .sidebar button:hover { border-color: #ff4b4b; color: #ff4b4b; background-color: #fffafa; }
         .sidebar .closebtn { position: absolute; top: 10px; right: 20px; font-size: 24px; color: #31333f; border: none; background: none; }
         .sidebar-header { color: #555; padding: 10px 25px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
-
-        /* サイドバー最上部ロゴエリア */
-        .sidebar-brand-area {
-            display: flex; align-items: center; padding: 15px 20px; margin-bottom: 10px;
-            border-bottom: 1px solid #eee; gap: 12px;
-        }
+        .sidebar-brand-area { display: flex; align-items: center; padding: 15px 20px; margin-bottom: 10px; border-bottom: 1px solid #eee; gap: 12px; }
         .sidebar-brand-icon { width: 45px; height: 45px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); object-fit: cover; }
         .sidebar-brand-name { font-size: 18px; font-weight: 800; color: #0078ff; letter-spacing: 0.5px; }
-
-        /* 風向選択グリッド定義 */
         .wind-dir-container { padding: 0 20px; margin-bottom: 20px; }
-        .wind-dir-box {
-            background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #dcdcdc;
-            border-left: 4px solid #ff4b4b; display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
-        }
+        .wind-dir-box { background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #dcdcdc; border-left: 4px solid #ff4b4b; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
         .wind-dir-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; width: 100%; }
         .wind-dir-item { font-size: 11px; color: #555; cursor: pointer; display: flex; align-items: center; justify-content: flex-start; gap: 6px; }
         .wind-dir-item input[type="checkbox"] { cursor: pointer; width: 14px; height: 14px; }
-
-        /* メインコンテンツ・ヘッダーエリア */
         #main { padding: 10px; transition: margin-left .3s; }
-        .location-header {
-            background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e6e9ef;
-        }
+        .location-header { background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e6e9ef; }
         .loc-top-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
         .loc-name-area { display: flex; align-items: center; gap: 10px; flex: 1; }
         .loc-info { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
         .loc-name-row { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
         .loc-name { font-size: 1.1rem; font-weight: 600; color: #31333f; text-overflow: ellipsis; overflow: hidden; }
         .loc-coords { font-size: 0.85rem; color: #666; margin-top: 2px; font-family: monospace; }
-        
-        /* アクションバーと各種ボタン */
         .action-bar { display: flex; flex-wrap: wrap; gap: 8px; }
-        .spot-selector {
-            flex: 1 1 100%; min-width: 200px; padding: 10px; border-radius: 8px; border: 1px solid #dcdcdc;
-            font-size: 14px; background-color: white; color: #31333f; cursor: pointer;
-            appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-            background-repeat: no-repeat; background-position: right 10px center; background-size: 16px;
-        }
+        .spot-selector { flex: 1 1 100%; min-width: 200px; padding: 10px; border-radius: 8px; border: 1px solid #dcdcdc; font-size: 14px; background-color: white; color: #31333f; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 16px; }
         .btn-action-group { display: flex; flex: 1 1 auto; gap: 8px; width: 100%; }
-        .btn-action {
-            flex: 1; padding: 10px 5px; border-radius: 8px; border: 1px solid #dcdcdc;
-            font-size: 13px; font-weight: 500; cursor: pointer; display: flex;
-            align-items: center; justify-content: center; gap: 4px;
-            text-decoration: none; background-color: #f0f2f6; color: #31333f; white-space: nowrap;
-            transition: background 0.2s;
-        }
+        .btn-action { flex: 1; padding: 10px 5px; border-radius: 8px; border: 1px solid #dcdcdc; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; text-decoration: none; background-color: #f0f2f6; color: #31333f; white-space: nowrap; transition: background 0.2s; }
         .btn-action:active { background-color: #e0e2e6; }
-
         @media (min-width: 600px) { .spot-selector { flex: 2; } .btn-action-group { flex: 3; } }
-
         .openbtn { background: #f0f2f6; border: 1px solid #dcdcdc; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 18px; }
-        .btn-refresh {
-            background: #f0f2f6; border: 1px solid #dcdcdc; border-radius: 6px;
-            padding: 6px 10px; font-size: 13px; font-weight: 500; color: #31333f;
-            cursor: pointer; display: flex; align-items: center; gap: 4px;
-        }
+        .btn-refresh { background: #f0f2f6; border: 1px solid #dcdcdc; border-radius: 6px; padding: 6px 10px; font-size: 13px; font-weight: 500; color: #31333f; cursor: pointer; display: flex; align-items: center; gap: 4px; }
         .btn-star { background: none; border: none; font-size: 1.3rem; cursor: pointer; padding: 0; line-height: 1; transition: transform 0.1s; }
         .btn-star:active { transform: scale(1.2); }
-
-        /* 詳細設定モーダルスタイル */
         .modal { display: none; position: fixed; z-index: 400; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); }
-        .modal-content { 
-            background: white; margin: 5% auto; padding: 25px; width: 90%; max-width: 450px; 
-            border-radius: 12px; max-height: 85vh; overflow-y: auto; position: relative;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-        }
-        .modal-sticky-header {
-            position: sticky; top: -25px; background: white; z-index: 10;
-            padding-bottom: 15px; border-bottom: 1px solid #eee; margin-bottom: 20px;
-        }
+        .modal-content { background: white; margin: 5% auto; padding: 25px; width: 90%; max-width: 450px; border-radius: 12px; max-height: 85vh; overflow-y: auto; position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal-sticky-header { position: sticky; top: -25px; background: white; z-index: 10; padding-bottom: 15px; border-bottom: 1px solid #eee; margin-bottom: 20px; }
         .modal-footer-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; }
-        .modal-footer-top button { 
-            padding: 10px 5px; border-radius: 6px; font-weight: bold; cursor: pointer; 
-            border: 1px solid #dcdcdc; background: #f0f2f6; font-size: 12px; height: 44px; 
-            display: flex; align-items: center; justify-content: center; transition: opacity 0.2s;
-        }
+        .modal-footer-top button { padding: 10px 5px; border-radius: 6px; font-weight: bold; cursor: pointer; border: 1px solid #dcdcdc; background: #f0f2f6; font-size: 12px; height: 44px; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s; }
         .modal-footer-top button:active { opacity: 0.7; }
         .btn-reset-st { flex: 1.4; color: #666; } 
         .btn-close-st { flex: 1; }
         .btn-update-st { flex: 1; background: #0078ff !important; color: white !important; border: none !important; }
-        
         .st-slider-row { margin-bottom: 18px; }
         .st-slider-label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
         .st-slider-label { font-size: 13px; color: #555; }
         .st-slider-value { font-weight: bold; color: #0078ff; font-family: monospace; }
         input[type=range] { width: 100%; height: 6px; border-radius: 3px; background: #dfe1e6; appearance: none; outline: none; }
         input[type=range]::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #0078ff; cursor: pointer; }
-
-        /* ローディングオーバーレイ */
-        #loading-overlay {
-            display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255, 255, 255, 0.8); z-index: 9999;
-            flex-direction: column; align-items: center; justify-content: center;
-        }
-        .spinner {
-            width: 50px; height: 50px; border: 5px solid rgba(0, 120, 255, 0.1);
-            border-top: 5px solid #0078ff; border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
+        #loading-overlay { display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.8); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; }
+        .spinner { width: 50px; height: 50px; border: 5px solid rgba(0, 120, 255, 0.1); border-top: 5px solid #0078ff; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .pointer-none { pointer-events: none; opacity: 0.6; }
-
-        /* グラフコンテナ */
         .graph-outer-container { background: white; border-radius: 10px; padding: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e6e9ef; min-height: 300px; }
     </style>
 </head>
@@ -152,12 +76,10 @@
     <div id="mySidebar" class="sidebar">
         <div class="sidebar-content">
             <button class="closebtn" onclick="closeNav()">×</button>
-            
             <div class="sidebar-brand-area">
                 <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="Icon" class="sidebar-brand-icon">
                 <span class="sidebar-brand-name">Pin_Weather!</span>
             </div>
-
             <button onclick="showLoading(); location.href='/edit_spots'" style="background-color: #fff9e6; border-color: #ffd966; font-weight: bold;">📍 {{ lang_dict['EDIT_MYSPOTS'] or 'My Spots 編集' }}</button>
 
             <div class="sidebar-header" style="margin-top: 10px;">{{ lang_dict['色付風向選択'] }}</div>
@@ -242,7 +164,6 @@
                     <span style="color: #333;">{{ lang_dict['LEGEND_DANGER_LINE'].replace('{v}', design_params.danger_v|string) }}</span>
                 </div>
             </div>
-
             <div class="api-links-row" style="margin-bottom: 20px; font-size: 12px;">
                 <span style="display: block; margin-bottom: 8px; color: gray;">
                     Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" style="color: #0078ff; text-decoration: none;">Open-Meteo.com</a> (CC BY 4.0)
@@ -251,7 +172,6 @@
                 &nbsp;&nbsp;
                 <a href="{{ m_url }}" target="_blank" class="api-link-item" style="color: #666;">[ {{ lang_dict['LINK_MARINE'] }} ]</a>
             </div>
-
             <div style="border-top: 1px solid #e6e9ef; padding-top: 15px; text-align: left;">
                 <p style="font-size: 11px; color: #888; line-height: 1.6; margin-bottom: 15px;">
                     {{ lang_dict.get("DISCLAIMER", "※本データは予測値であり、実際の天候と異なる場合があります。航海や活動の際は、必ず最新の気象情報を確認し、自己責任でご利用ください。") }}
@@ -272,7 +192,6 @@
                         <button type="submit" class="btn-update-st">{{ lang_dict['更新'] }}</button>
                     </div>
                 </div>
-                
                 <div style="background: #f8f9fb; border: 1px solid #dcdcdc; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
                     {% for key, label in [('show_wind','風向・風速グラフ表示'),('show_temp','気温グラフ表示'),('show_wave','波高グラフ表示'),('show_ocean_temp','海面水温グラフ表示'),('show_tide','潮位グラフ表示'),('show_w_text','天気文字表示')] %}
                     <label style="display: block; font-size: 14px; margin-bottom: 10px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
@@ -280,7 +199,6 @@
                     </label>
                     {% endfor %}
                 </div>
-
                 {% for field, label, unit in [('height_inch','グラフ縦幅','inch'),('top_margin_inch','上余白','inch'),('hspace_inch','上下間隔',''),('width_inch','グラフ横幅','inch'),('margin_left_inch','左余白','inch'),('font_size','フォントサイズ','')] %}
                 <div class="st-slider-row">
                     <div class="st-slider-label-row">
@@ -297,17 +215,26 @@
     <script>
         /**
          * サブルーチン：バックアップデータの保存
+         * 【修正点】地点リストが空、かつ地点名が異常な場合は保存をスキップし、既存のバックアップを保護します。
          */
         function saveBackupToLocal() {
-            const backupData = {
-                user_locations: {{ session.get('user_locations', [])|tojson }},
-                design_params: {{ design_params|tojson }},
-                sel_dirs: {{ sel_dirs|tojson }},
-                lang: "{{ session.get('lang', 'ja') }}",
-                last_basho: "{{ basho }}"
-            };
-            localStorage.setItem('pin_weather_backup_v1', JSON.stringify(backupData));
-            console.log("Backup saved to local storage.");
+            const userLocs = {{ session.get('user_locations', [])|tojson }};
+            const currentBasho = "{{ basho }}";
+
+            // 保存の安全性チェック：地点データが存在し、かつエラー表示でない場合のみ実行
+            if (userLocs && userLocs.length > 0 && currentBasho !== "Error" && currentBasho !== "") {
+                const backupData = {
+                    user_locations: userLocs,
+                    design_params: {{ design_params|tojson }},
+                    sel_dirs: {{ sel_dirs|tojson }},
+                    lang: "{{ session.get('lang', 'ja') }}",
+                    last_basho: currentBasho
+                };
+                localStorage.setItem('pin_weather_backup_v1', JSON.stringify(backupData));
+                console.log("Backup updated securely.");
+            } else {
+                console.log("Save skipped: Session data is empty or invalid. Protecting existing backup.");
+            }
         }
 
         /**
@@ -321,6 +248,7 @@
             const userLocsCount = {{ session.get('user_locations', [])|length }};
             const currentBasho = "{{ basho }}";
 
+            // サーバー側データが空、またはエラー時の場合のみ復元を試みる
             if (userLocsCount === 0 || currentBasho === "Error" || currentBasho === "") {
                 console.log("Initiating restore from backup...");
                 showLoading();
@@ -343,26 +271,14 @@
             }
         }
 
-        /* UI操作サブルーチン */
-        function showLoading() { 
-            document.getElementById('loading-overlay').style.display = 'flex'; 
-            document.getElementById('main').classList.add('pointer-none'); 
-        }
-        function hideLoading() { 
-            document.getElementById('loading-overlay').style.display = 'none'; 
-            document.getElementById('main').classList.remove('pointer-none'); 
-        }
+        /* UI操作サブルーチン（変更なし） */
+        function showLoading() { document.getElementById('loading-overlay').style.display = 'flex'; document.getElementById('main').classList.add('pointer-none'); }
+        function hideLoading() { document.getElementById('loading-overlay').style.display = 'none'; document.getElementById('main').classList.remove('pointer-none'); }
         function openNav() { document.getElementById("mySidebar").style.width = "280px"; }
         function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
         function openModal() { document.getElementById("configModal").style.display = "block"; closeNav(); }
         function closeModal() { document.getElementById("configModal").style.display = "none"; }
-        
-        function confirmReset() { 
-            if (confirm("{{ lang_dict['CONFIRM_RESET'] or '表示設定をリセットしますか？' }}")) { 
-                showLoading(); window.location.href = '/reset_settings'; 
-            } 
-        }
-
+        function confirmReset() { if (confirm("{{ lang_dict['CONFIRM_RESET'] or '表示設定をリセットしますか？' }}")) { showLoading(); window.location.href = '/reset_settings'; } }
         function showSearchPrompt() { showLoading(); location.href = "/map_select?search_mode=1"; }
 
         function sync_current_location() {
@@ -372,9 +288,7 @@
                     showLoading();
                     window.location.href = `/set_location?lat=${position.coords.latitude}&lon=${position.coords.longitude}&name=現在地`;
                 },
-                function(error) { 
-                    alert("位置情報の取得に失敗しました。設定を確認してください。"); 
-                },
+                function(error) { alert("位置情報の取得に失敗しました。設定を確認してください。"); },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         }
@@ -382,9 +296,11 @@
         (function() {
             window.addEventListener('pageshow', function(event) { if (event.persisted) hideLoading(); });
             window.addEventListener('load', () => {
-                saveBackupToLocal();
-                restoreFromLocalBackup();
-                hideLoading();
+                // ロード順序を整理：まず復元を試み、その結果に基づき保存（または保護）を判断
+                restoreFromLocalBackup().then(() => {
+                    saveBackupToLocal();
+                    hideLoading();
+                });
             });
 
             let startY = 0;
@@ -405,45 +321,28 @@
             const currentName = "{{ basho }}";
             const btn = document.getElementById('btn-star');
             if (btn.innerText.trim() === "🌟") return;
-            
             const newName = prompt("{{ lang_dict['この地点を My Spots に保存します。'] }}", currentName);
             if (!newName) return;
-            
             showLoading(); 
             try {
                 const response = await fetch('/add_to_myspots', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        name: newName, 
-                        lat: {{ design_params.lat }}, 
-                        lon: {{ design_params.lon }} 
-                    })
+                    body: JSON.stringify({ name: newName, lat: {{ design_params.lat }}, lon: {{ design_params.lon }} })
                 });
                 const result = await response.json();
                 if (result.status === "success") {
                     saveBackupToLocal();
                     location.reload();
-                } else { 
-                    hideLoading(); 
-                    alert(result.message); 
-                }
-            } catch (error) { 
-                hideLoading(); 
-                alert("登録エラーが発生しました。"); 
-            }
+                } else { hideLoading(); alert(result.message); }
+            } catch (error) { hideLoading(); alert("登録エラーが発生しました。"); }
         }
 
         function showShareQR() {
             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.origin)}`;
             const shareModal = document.createElement('div');
             shareModal.style = "position:fixed; z-index:500; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; flex-direction:column; color:white; backdrop-filter:blur(5px);";
-            shareModal.innerHTML = `
-                <div style="background:white; padding:25px; border-radius:15px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
-                    <img src="${qrUrl}" alt="QR" style="width:200px; height:200px;">
-                    <div style="color:#333; font-weight:bold; margin-top:15px; font-size:16px;">Scan to Open App</div>
-                    <button onclick="this.parentElement.parentElement.remove()" style="margin-top:20px; padding:10px 25px; border-radius:8px; border:none; background:#0078ff; color:white; cursor:pointer; font-weight:bold; width:100%;">Close</button>
-                </div>`;
+            shareModal.innerHTML = `<div style="background:white; padding:25px; border-radius:15px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,0.5);"><img src="${qrUrl}" alt="QR" style="width:200px; height:200px;"><div style="color:#333; font-weight:bold; margin-top:15px; font-size:16px;">Scan to Open App</div><button onclick="this.parentElement.parentElement.remove()" style="margin-top:20px; padding:10px 25px; border-radius:8px; border:none; background:#0078ff; color:white; cursor:pointer; font-weight:bold; width:100%;">Close</button></div>`;
             document.body.appendChild(shareModal);
         }
     </script>
