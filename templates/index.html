@@ -128,7 +128,7 @@
                     </div>
                 </div>
                 <button onclick="showLoading(); location.href='/?refresh=1&t=' + new Date().getTime()" class="btn-refresh">
-                    🔄 {{ now_jst.hour }}:{{ now_jst.strftime('%M') }}
+                    🔄 {{ draw_time_str }}
                 </button>
             </div>
 
@@ -151,6 +151,12 @@
             {{ graph_html|safe }}
         </div>
 
+        {% if debug_info %}
+        <div style="font-size: 10px; color: #888; text-align: center; margin-top: 20px;">
+            DEBUG: {{ debug_info }}
+        </div>
+        {% endif %}
+        
         <div class="footer-info-container" style="margin-top: 20px; padding: 15px; border-top: 1px solid #e6e9ef; background-color: #fff; border-radius: 0 0 10px 10px;">
             <div class="legend-box" style="padding: 12px; border-radius: 8px; background-color: #f0f2f6; margin-bottom: 15px; line-height: 1.6; border: 1px solid #dcdcdc;">
                 <span style="font-weight: bold; font-size: 14px;">{{ lang_dict['LEGEND_TITLE'] }}</span><br>
@@ -162,6 +168,11 @@
                 <div style="margin-top: 5px; font-size: 13px;">
                     <span style="color: #d62728; font-weight: bold;">---</span> 
                     <span style="color: #333;">{{ lang_dict['LEGEND_DANGER_LINE'].replace('{v}', design_params.danger_v|string) }}</span>
+                </div>
+
+                <div style="margin-top: 5px; font-size: 13px;">
+                    <span style="color: blue; font-weight: bold;"> |</span> 
+                    <span style="color: #333;">{{ lang_dict['LEGEND_NOW_LINE'] }}</span>
                 </div>
             </div>
             <div class="api-links-row" style="margin-bottom: 20px; font-size: 12px;">

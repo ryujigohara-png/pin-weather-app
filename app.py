@@ -225,6 +225,7 @@ def get_language_dict():
             "LEGEND_ORANGE": "5-10m/s (橙)",
             "LEGEND_RED": "10m/s以上 (赤)",
             "LEGEND_DANGER_LINE": "[赤点線: 危険風速ライン {v}m/s]",
+            "LEGEND_NOW_LINE": " [青縦線: 現地予報基準時刻]",
             "LEGEND_NOTE": "※青・橙は、詳細設定で選択した色付風向のみ表示",
             "DISCLAIMER": "※本データは予測値であり、実際の天候と異なる場合があります。航海や活動の際は、必ず最新の気象情報を確認し、自己責任でご利用ください。",
             "LINK_WEATHER": "天気予報APIデータ",
@@ -371,6 +372,7 @@ def get_language_dict():
             "LEGEND_ORANGE": "5-10m/s (Orange)",
             "LEGEND_RED": "Over 10m/s (Red)",
             "LEGEND_DANGER_LINE": "[Red Dash: Danger Line {v}m/s]",
+            "LEGEND_NOW_LINE": " [Blue VLine: Reference Time]",
             "LEGEND_NOTE": "*Blue/Orange bars are shown only for directions selected in Advanced Settings.",
             "DISCLAIMER": "*Data are forecasts. Check official reports and use at your own risk.",
             "LINK_WEATHER": "Weather Forecast API Data",
@@ -495,7 +497,7 @@ def fetch_weather_data(lat, lon, days):
     meta_file = os.path.join(CACHE_DIR, f"spot_{file_id}.meta")
     
     if os.path.exists(cache_file) and os.path.exists(meta_file):
-        if (time.time() - os.path.getmtime(cache_file)) < 3600:
+        if (time.time() - os.path.getmtime(cache_file)) < 86400:
             try:
                 df_cache = pd.read_csv(cache_file, parse_dates=['time'])
                 with open(meta_file, "r") as f:
@@ -1514,12 +1516,12 @@ def update_by_map_handler():
     return redirect(url_for('index'))
     
 # ======================================================================================
-# 35. 座標から住所ラベルを取得するサブルーチン (Reverse Geocoding)
+# 35. 座標から住所ラベルを取得するサブルーチン (Reverse Geocoding 完全版)
 # ======================================================================================
 def get_address_from_coords(lat, lon):
     """
     Nominatim APIを使用して緯度経度から地名を取得する。
-    33番の set_location_handler から呼び出される不足関数。
+    「市町村名 + 地区名」の形式で返し、場所を特定しやすくする。
     """
     import requests
     try:
@@ -1531,11 +1533,26 @@ def get_address_from_coords(lat, lon):
         if res.status_code == 200:
             data = res.json()
             addr = data.get('address', {})
-            # 市町村より下のレベル（丁目・字・区）を優先して返す設定を維持
-            label = (addr.get('quarter') or addr.get('suburb') or 
-                     addr.get('neighbourhood') or addr.get('city_district') or 
-                     addr.get('village') or addr.get('town') or 
-                     addr.get('city') or f"{lat:.4f}, {lon:.4f}")
+            
+            # 1. 市町村レベルの取得
+            city_part = (addr.get('city') or addr.get('town') or addr.get('village') or addr.get('county') or "")
+            
+            # 2. 地区・町名レベルの取得 (既存の優先順位を維持)
+            sub_part = (addr.get('quarter') or addr.get('suburb') or 
+                        addr.get('neighbourhood') or addr.get('city_district') or "")
+            
+            # 3. ラベルの構築
+            if city_part and sub_part:
+                # 市町村名と地区名が両方あれば連結（例：鹿屋市古里町）
+                if sub_part in city_part: # 重複回避用
+                    label = city_part
+                else:
+                    label = f"{city_part}{sub_part}"
+            elif city_part or sub_part:
+                label = city_part or sub_part
+            else:
+                label = f"{lat:.4f}, {lon:.4f}"
+                
             return label
     except Exception as e:
         print(f"Geocoding Error: {e}")
@@ -1543,7 +1560,7 @@ def get_address_from_coords(lat, lon):
     return f"{lat:.4f}, {lon:.4f}"
 
 # ======================================================================================
-# 34. 地名検索・地図連携サブルーチン (Search to Map Jump 改良版)
+# 34. 地名検索・地図連携サブルーチン (Search to Map Jump 改良版 完全版)
 # ======================================================================================
 @app.route('/search_address')
 def search_address_handler():
@@ -1575,7 +1592,7 @@ def search_address_handler():
             session['design_params'] = user_settings
             session.modified = True
             
-            # 【ポイント】検索結果を表示した地図画面へ遷移
+            # 検索結果を表示した地図画面へ遷移
             return redirect(url_for('map_select_view'))
             
     except Exception as e:
@@ -1674,7 +1691,7 @@ def delete_spot(idx):
     return redirect(url_for('edit_spots'))
 
 # ======================================================================================
-# 43. 地点選択ハンドラ (修正版)
+# 43. 地点選択ハンドラ (キャッシュを壊さない完全版)
 # ======================================================================================
 @app.route('/select_spot/<int:spot_id>')
 def select_spot_handler(spot_id):
@@ -1689,12 +1706,10 @@ def select_spot_handler(spot_id):
         session['design_params'] = user_settings
         session['last_basho'] = target['name']
         
-        # --- フラグ管理：地点が変わったので再描画を強制する ---
-        session['needs_refresh'] = True 
+        # フラグ管理：地点選択時はキャッシュがあればそれを使うため
+        # session['needs_refresh'] = True はあえて行わない。
+        # clear_weather_cache_files() も呼び出さない。
         
-        if 'clear_weather_cache_files' in globals():
-            clear_weather_cache_files()
-            
         session.modified = True
     return redirect(url_for('index'))
 
@@ -1913,12 +1928,11 @@ def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
 render_cache = {}
 
 # ======================================================================================
-# 98. Flask メインルート: インデックス表示 (キャッシュ・フラグ制御完全版)
+# 98. Flask メインルート: インデックス表示 (描画時刻固定キャッシュ対応 完全版)
 # ======================================================================================
 @app.route('/')
 def index():
-    print("★いまインデックスを表示しました★") # これを追加
-    import pytz, datetime, traceback
+    import pytz, datetime, traceback, os, time, json
     from flask import session, render_template, request
 
     # --- 1. 初期設定と言語準備 ---
@@ -1933,20 +1947,18 @@ def index():
     # --- 3. 座標とフラグの取得 ---
     user_settings = session.get('design_params', {})
     
-    # GPSや地図選択からの遷移（URLパラメータ）があれば更新し、再描画フラグを立てる
     req_lat = request.args.get('lat')
     req_lon = request.args.get('lon')
     if req_lat and req_lon:
         user_settings['lat'] = float(req_lat)
         user_settings['lon'] = float(req_lon)
         session['design_params'] = user_settings
-        session['needs_refresh'] = True
         session.modified = True
 
     lat = float(user_settings.get('lat', CONFIG.get("DEFAULT_LAT", 35.6812)))
     lon = float(user_settings.get('lon', CONFIG.get("DEFAULT_LON", 139.7671)))
 
-    # --- 4. デザインパラメータの構築 ---
+    # --- 4. デザインパラメータの構築 (既存の仕様を完全維持) ---
     design_params = {
         "width_inch": float(user_settings.get('width_inch', 15.0)),
         "height_inch": float(user_settings.get('height_inch', 0.6)),
@@ -1969,41 +1981,83 @@ def index():
     danger_v = design_params["danger_v"]
     sel_dirs = session.get('sel_dirs', [True]*16)
 
-    # --- 5. 描画判定ロジック ---
+    # --- 5. 描画判定ロジック (時刻情報の読み出し) ---
+    CACHE_DIR = "weather_cache"
+    if not os.path.exists(CACHE_DIR):
+        try: os.makedirs(CACHE_DIR)
+        except: pass
+
     cache_key = f"{lat:.4f}_{lon:.4f}_{selected_lang}"
-    force_refresh = (request.args.get('refresh') == '1') or session.get('needs_refresh', False)
+    graph_cache_path = os.path.join(CACHE_DIR, f"graph_data_{cache_key}.json")
+    
+    # 更新ボタン（refresh=1）が押された場合のみ強制再描画
+    force_refresh = (request.args.get('refresh') == '1')
     
     should_render = False
+    graph_html = None
+    draw_time_str = "" # グラフ描画時の時刻
+    debug_msg = ""
+
     if force_refresh:
         should_render = True
-    elif cache_key not in render_cache:
-        should_render = True
-    else:
-        # キャッシュ済みの場合、時刻を確認（30分 = 1800秒）
+        debug_msg = "強制再描画 (更新ボタン)"
+    elif cache_key in render_cache:
+        # メモリキャッシュ確認 (86400秒 = 1日)
         cached_item = render_cache[cache_key]
-        last_draw_time = cached_item.get('timestamp')
-        if (now_jst - last_draw_time).total_seconds() > 1800:
+        if (now_jst - cached_item.get('timestamp')).total_seconds() < 86400:
+            graph_html = cached_item['html']
+            draw_time_str = cached_item.get('draw_time_str', "")
+            debug_msg = f"メモリ使用 ({int((now_jst - cached_item['timestamp']).total_seconds())}s前)"
+        else:
             should_render = True
+    elif os.path.exists(graph_cache_path):
+        # 物理キャッシュ確認 (86400秒 = 1日)
+        age = time.time() - os.path.getmtime(graph_cache_path)
+        if age < 86400:
+            try:
+                with open(graph_cache_path, "r", encoding="utf-8") as f:
+                    c_data = json.load(f)
+                    graph_html = c_data['html']
+                    draw_time_str = c_data.get('draw_time_str', "")
+                # 次回のためにメモリに書き戻す
+                render_cache[cache_key] = {
+                    'html': graph_html, 
+                    'timestamp': datetime.datetime.fromtimestamp(os.path.getmtime(graph_cache_path), tz=jst),
+                    'draw_time_str': draw_time_str
+                }
+                debug_msg = f"物理使用 ({int(age)}s前)"
+            except:
+                should_render = True
+        else:
+            should_render = True
+            debug_msg = "物理期限切れ"
+    else:
+        should_render = True
+        debug_msg = "新規地点"
 
     try:
         # --- 6. グラフ生成またはキャッシュ取得 ---
-        if should_render:
-            # 30番のエンジンを呼び出し（重い処理）
+        if should_render or graph_html is None:
+            # 描画時刻を「今」に確定
+            draw_time_str = now_jst.strftime('%H:%M')
             graph_html = render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst)
             
-            # サーバー側メモリに時刻と共に保存
+            # メモリ保存
             render_cache[cache_key] = {
-                'html': graph_html,
-                'timestamp': now_jst
+                'html': graph_html, 
+                'timestamp': now_jst, 
+                'draw_time_str': draw_time_str
             }
-            # 再描画が完了したのでフラグを下ろす
+            # 物理保存 (時刻情報を含めてJSON化)
+            try:
+                with open(graph_cache_path, "w", encoding="utf-8") as f:
+                    json.dump({'html': graph_html, 'draw_time_str': draw_time_str}, f)
+            except: pass
+
             session['needs_refresh'] = False
             session.modified = True
-        else:
-            # キャッシュから高速取得
-            graph_html = render_cache[cache_key]['html']
 
-        # --- 7. 付随情報の準備 ---
+        # --- 7. 付随情報の準備 (既存のまま) ---
         display_basho = session.get('last_basho') or session.get('basho') or CONFIG.get("DEFAULT_BASHO", "東京")
         user_spots = session.get('user_locations', [])
         for spot in user_spots:
@@ -2019,6 +2073,7 @@ def index():
             'index.html',
             lang_dict=lang_dict,
             now_jst=now_jst,
+            draw_time_str=draw_time_str,
             graph_html=graph_html,
             location_buttons=location_buttons,
             gps_script=get_gps_script_js(),
@@ -2029,6 +2084,7 @@ def index():
             m_url=m_url,
             basho=display_basho,
             error_msg=None,
+            debug_info=debug_msg,
             app_config={"icon_path": "static/pin_weather_01.png"}
         )
 
@@ -2046,7 +2102,7 @@ def index():
             location_buttons="",
             basho="Error"
         )
-
+    
 
 # ======================================================================================
 # 96. グラフ描画エリア生成サブルーチン (座標不整合修正版)
