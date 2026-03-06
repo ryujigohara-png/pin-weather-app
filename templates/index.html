@@ -215,13 +215,12 @@
     <script>
         /**
          * サブルーチン：バックアップデータの保存
-         * 【修正点】地点リストが空、かつ地点名が異常な場合は保存をスキップし、既存のバックアップを保護します。
+         * 地点データが存在し、かつ有効な地点名の時のみ保存します。
          */
         function saveBackupToLocal() {
             const userLocs = {{ session.get('user_locations', [])|tojson }};
             const currentBasho = "{{ basho }}";
 
-            // 保存の安全性チェック：地点データが存在し、かつエラー表示でない場合のみ実行
             if (userLocs && userLocs.length > 0 && currentBasho !== "Error" && currentBasho !== "") {
                 const backupData = {
                     user_locations: userLocs,
@@ -231,26 +230,27 @@
                     last_basho: currentBasho
                 };
                 localStorage.setItem('pin_weather_backup_v1', JSON.stringify(backupData));
-                console.log("Backup updated securely.");
+                console.log("LocalStorage: Backup saved.");
             } else {
-                console.log("Save skipped: Session data is empty or invalid. Protecting existing backup.");
+                console.log("LocalStorage: Save skipped (Protecting backup).");
             }
         }
 
         /**
          * サブルーチン：バックアップデータからの復元
+         * 戻り値: 復元処理（リダイレクト）が発生した場合は true を返します。
          */
         async function restoreFromLocalBackup() {
             const stored = localStorage.getItem('pin_weather_backup_v1');
-            if (!stored) return;
+            if (!stored) return false;
             
             const data = JSON.parse(stored);
             const userLocsCount = {{ session.get('user_locations', [])|length }};
             const currentBasho = "{{ basho }}";
 
-            // サーバー側データが空、またはエラー時の場合のみ復元を試みる
+            // サーバー側データが空の場合のみ復元を実行
             if (userLocsCount === 0 || currentBasho === "Error" || currentBasho === "") {
-                console.log("Initiating restore from backup...");
+                console.log("LocalStorage: Attempting restore...");
                 showLoading();
                 try {
                     const response = await fetch('/restore_backup', {
@@ -260,15 +260,13 @@
                     });
                     if (response.ok) {
                         window.location.href = '/?refresh=1';
-                    } else {
-                        console.error("Restore failed on server side.");
-                        hideLoading();
+                        return true; 
                     }
                 } catch (e) {
-                    console.error("Restore connection error:", e);
-                    hideLoading();
+                    console.error("Restore failed:", e);
                 }
             }
+            return false;
         }
 
         /* UI操作サブルーチン（変更なし） */
@@ -293,14 +291,20 @@
             );
         }
 
+        // 初期化ロジックの修正（競合排除版）
         (function() {
             window.addEventListener('pageshow', function(event) { if (event.persisted) hideLoading(); });
-            window.addEventListener('load', () => {
-                // ロード順序を整理：まず復元を試み、その結果に基づき保存（または保護）を判断
-                restoreFromLocalBackup().then(() => {
+            
+            window.addEventListener('load', async () => {
+                // 1. まず復元を試みる（awaitで通信完了を確実に待つ）
+                const isRestoring = await restoreFromLocalBackup();
+                
+                // 2. 復元が不要（既にデータがある）な場合のみ保存を許可する
+                if (!isRestoring) {
                     saveBackupToLocal();
                     hideLoading();
-                });
+                }
+                // 復元中の場合はリダイレクトされるため、ここでは何もしない
             });
 
             let startY = 0;
