@@ -1442,77 +1442,33 @@ def map_select_view():
                            search_mode=search_mode)
 
 # ======================================================================================
-# 33_2. 地図・位置情報連携サブルーチン (地点更新・強制再描画フラグ付与版)
+# 33_2. 地図からの座標更新ハンドラ (地名ラベル取得統合 完全版)
 # ======================================================================================
 @app.route('/update_by_map')
 def update_by_map_handler():
     """
-    地図確定時に日本の「町名・字名」を優先的に抽出してセッションを更新する。
-    決定ボタン押下後は無条件に次回のグラフ描画を強制するフラグを付与する。
+    地図で指定された座標を受け取り、地名を逆引きして保存してから
+    メイン画面(index)へ戻る。
     """
-    from flask import request, session, redirect, url_for
-    import requests
-
-    lat_raw = request.args.get('lat')
-    lon_raw = request.args.get('lon')
+    from flask import request, redirect, url_for, session
     
-    if lat_raw and lon_raw:
-        try:
-            lat, lon = float(lat_raw), float(lon_raw)
-            
-            # 1. 座標情報をセッションに一貫性を持って保存
-            user_settings = session.get('design_params', {})
-            user_settings['lat'] = lat
-            user_settings['lon'] = lon
-            session['design_params'] = user_settings
-            
-            # 重複管理を避けるため、個別キーも更新
-            session['lat'] = lat
-            session['lon'] = lon
-            
-            # 2. 地名（住所ラベル）の取得ロジック
-            address_label = ""
-            try:
-                # 日本語の地名を優先取得
-                url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18"
-                headers = {'User-Agent': 'PinWeatherApp/1.0', 'Accept-Language': 'ja'}
-                res = requests.get(url, headers=headers, timeout=5)
-                data = res.json()
-                addr = data.get('address', {})
-
-                # 日本の住所体系に適した階層順でラベルを決定
-                address_label = (
-                    addr.get('quarter') or           # 丁目・字
-                    addr.get('suburb') or            # 区・町
-                    addr.get('neighbourhood') or     # 近隣住区
-                    addr.get('city_district') or     # 行政区
-                    addr.get('village') or           # 村
-                    addr.get('town') or              # 町
-                    addr.get('city') or              # 市
-                    f"{lat:.4f}, {lon:.4f}"          # 最終手段
-                )
-            except Exception:
-                # APIエラー時は座標を表示
-                address_label = f"{lat:.4f}, {lon:.4f}"
-            
-            # 3. 表示用の地名を更新
-            session['last_basho'] = address_label
-            session['basho'] = address_label
-            
-            # 4. 重要：強制再描画フラグをセット
-            # これにより index 側のキャッシュ判定をパスして、必ず最新のグラフを描画させる
-            session['needs_refresh'] = True
-            
-            # 5. 外部データキャッシュのクリア（もし存在すれば）
-            if 'clear_weather_cache_files' in globals():
-                clear_weather_cache_files()
-                
-            session.modified = True
-            
-        except (ValueError, TypeError) as e:
-            # 座標が不正な値だった場合の安全策
-            print(f"Error updating location from map: {e}")
-            
+    lat = request.args.get('lat', type=float)
+    lon = request.args.get('lon', type=float)
+    
+    if lat is not None and lon is not None:
+        # 【修正】座標から「市町村名+地区名」を取得
+        basho_name = get_address_from_coords(lat, lon)
+        
+        user_settings = session.get('design_params', {})
+        user_settings['lat'], user_settings['lon'] = lat, lon
+        session['design_params'] = user_settings
+        
+        # 緯度経度ではなく、取得した「市町村名+地区名」を保存
+        session['last_basho'] = basho_name
+        
+        # 地図からの更新時はキャッシュ判定に任せる
+        session.modified = True
+        
     return redirect(url_for('index'))
     
 # ======================================================================================
@@ -1560,12 +1516,13 @@ def get_address_from_coords(lat, lon):
     return f"{lat:.4f}, {lon:.4f}"
 
 # ======================================================================================
-# 34. 地名検索・地図連携サブルーチン (Search to Map Jump 改良版 完全版)
+# 34. 地名検索・地図連携サブルーチン (地名ラベル取得統合 完全版)
 # ======================================================================================
 @app.route('/search_address')
 def search_address_handler():
     """
-    入力された地名を座標に変換し、その座標を初期値として地図画面へ戻る。
+    入力された地名を座標に変換し、その座標から市町村名+地区名を取得して
+    セッションに保存した後、地図画面へ遷移する。
     """
     from flask import request, redirect, url_for, session
     import requests
@@ -1586,13 +1543,17 @@ def search_address_handler():
             lat = float(data[0]['lat'])
             lon = float(data[0]['lon'])
             
-            # セッションを更新して、地図画面をその座標で開かせる
+            # 【修正】座標から「市町村名+地区名」を取得（サブルーチン35を呼び出し）
+            basho_name = get_address_from_coords(lat, lon)
+            
             user_settings = session.get('design_params', {})
             user_settings['lat'], user_settings['lon'] = lat, lon
             session['design_params'] = user_settings
+            
+            # 緯度経度ではなく、取得した「市町村名+地区名」を保存
+            session['last_basho'] = basho_name 
             session.modified = True
             
-            # 検索結果を表示した地図画面へ遷移
             return redirect(url_for('map_select_view'))
             
     except Exception as e:
@@ -1928,7 +1889,7 @@ def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
 render_cache = {}
 
 # ======================================================================================
-# 98. Flask メインルート: インデックス表示 (描画時刻固定キャッシュ対応 完全版)
+# 98. Flask メインルート: インデックス表示 (セッションサイズ監視デバッグ版)
 # ======================================================================================
 @app.route('/')
 def index():
@@ -1990,19 +1951,17 @@ def index():
     cache_key = f"{lat:.4f}_{lon:.4f}_{selected_lang}"
     graph_cache_path = os.path.join(CACHE_DIR, f"graph_data_{cache_key}.json")
     
-    # 更新ボタン（refresh=1）が押された場合のみ強制再描画
     force_refresh = (request.args.get('refresh') == '1')
     
     should_render = False
     graph_html = None
-    draw_time_str = "" # グラフ描画時の時刻
+    draw_time_str = ""
     debug_msg = ""
 
     if force_refresh:
         should_render = True
         debug_msg = "強制再描画 (更新ボタン)"
     elif cache_key in render_cache:
-        # メモリキャッシュ確認 (86400秒 = 1日)
         cached_item = render_cache[cache_key]
         if (now_jst - cached_item.get('timestamp')).total_seconds() < 86400:
             graph_html = cached_item['html']
@@ -2011,7 +1970,6 @@ def index():
         else:
             should_render = True
     elif os.path.exists(graph_cache_path):
-        # 物理キャッシュ確認 (86400秒 = 1日)
         age = time.time() - os.path.getmtime(graph_cache_path)
         if age < 86400:
             try:
@@ -2019,7 +1977,6 @@ def index():
                     c_data = json.load(f)
                     graph_html = c_data['html']
                     draw_time_str = c_data.get('draw_time_str', "")
-                # 次回のためにメモリに書き戻す
                 render_cache[cache_key] = {
                     'html': graph_html, 
                     'timestamp': datetime.datetime.fromtimestamp(os.path.getmtime(graph_cache_path), tz=jst),
@@ -2038,17 +1995,14 @@ def index():
     try:
         # --- 6. グラフ生成またはキャッシュ取得 ---
         if should_render or graph_html is None:
-            # 描画時刻を「今」に確定
             draw_time_str = now_jst.strftime('%H:%M')
             graph_html = render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst)
             
-            # メモリ保存
             render_cache[cache_key] = {
                 'html': graph_html, 
                 'timestamp': now_jst, 
                 'draw_time_str': draw_time_str
             }
-            # 物理保存 (時刻情報を含めてJSON化)
             try:
                 with open(graph_cache_path, "w", encoding="utf-8") as f:
                     json.dump({'html': graph_html, 'draw_time_str': draw_time_str}, f)
@@ -2057,13 +2011,21 @@ def index():
             session['needs_refresh'] = False
             session.modified = True
 
-        # --- 7. 付随情報の準備 (既存のまま) ---
+        # --- 7. 付随情報の準備 ---
         display_basho = session.get('last_basho') or session.get('basho') or CONFIG.get("DEFAULT_BASHO", "東京")
         user_spots = session.get('user_locations', [])
         for spot in user_spots:
             if abs(float(spot['lat']) - lat) < 0.0001 and abs(float(spot['lon']) - lon) < 0.0001:
                 display_basho = spot['name']
                 break
+
+        # 【デバッグ強化】セッションの合計サイズを計測 (4KB = 4096bytes 上限)
+        try:
+            session_json = json.dumps(dict(session))
+            session_size = len(session_json.encode('utf-8'))
+            debug_msg += f" | Session: {session_size} bytes"
+        except:
+            pass
 
         location_buttons = get_location_buttons_html()
         w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,windspeed_10m,winddirection_10m,precipitation&timezone=auto"
