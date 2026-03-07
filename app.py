@@ -1562,7 +1562,7 @@ def search_address_handler():
     return redirect(url_for('map_select_view'))
 
 # ======================================================================================
-# 41. My Spots 追加ハンドラ (API形式: JavaScriptから呼び出し)
+# 41. My Spots 追加ハンドラ (API形式: JavaScriptから呼び出し・完全版)
 # ======================================================================================
 @app.route('/add_to_myspots', methods=['POST'])
 def add_to_myspots():
@@ -1573,9 +1573,10 @@ def add_to_myspots():
     lat = float(data.get('lat'))
     lon = float(data.get('lon'))
     
+    # セッションから現在のリストを取得
     spots = session.get('user_locations', [])
     
-    # 1. 重複チェック (座標がほぼ同じなら上書きまたは無視)
+    # 1. 重複チェック (座標がほぼ同じなら登録済みとする)
     for spot in spots:
         if abs(spot['lat'] - lat) < 0.0001 and abs(spot['lon'] - lon) < 0.0001:
             return jsonify({"status": "exists", "message": "登録済みです"})
@@ -1584,8 +1585,8 @@ def add_to_myspots():
     if len(spots) >= 10:
         return jsonify({"status": "error", "message": "10件制限に達しています"})
         
-    # 3. 追加
-    # Streamlit版に倣い、名称の先頭に 📍 がなければ付与する処理
+    # 3. 追加処理
+    # 名称の先頭に 📍 がなければ付与する仕様を維持
     display_name = name if name.startswith("📍") else f"📍 {name}"
     
     spots.append({
@@ -1594,28 +1595,27 @@ def add_to_myspots():
         "lon": lon
     })
     
+    # セッションに保存を確定
     session['user_locations'] = spots
     session.modified = True
     
     return jsonify({"status": "success", "name": display_name})
 
 # ======================================================================================
-# 42. My Spots 管理ハンドラ (完全版: 並び替え・編集・削除・多言語対応)
+# 42. My Spots 管理画面 (編集・並び替え・削除・完全版)
 # ======================================================================================
 @app.route('/edit_spots')
 def edit_spots():
     from flask import render_template, session
     
     # --- 多言語辞書の生成 ---
-    # get_language_dict() から現在の言語設定に応じた辞書を取得して lang_dict として定義
     translations = get_language_dict()
     lang = session.get('lang', 'ja')
     lang_dict = translations.get(lang, translations['ja'])
     
-    # ユーザー登録地点のみを取得（プリセットは除外）
+    # ユーザー登録地点を取得
     spots = session.get('user_locations', [])
     
-    # HTML側が必要としている spots と lang_dict を確実に渡してレンダリング
     return render_template('edit_spots.html', spots=spots, lang_dict=lang_dict)
 
 @app.route('/update_spot_name', methods=['POST'])
@@ -1652,26 +1652,60 @@ def delete_spot(idx):
     return redirect(url_for('edit_spots'))
 
 # ======================================================================================
-# 43. 地点選択ハンドラ (キャッシュを壊さない完全版)
+# 43. 地点選択ハンドラ (ID指定・index/座標パラメータ指定 全対応完全版)
 # ======================================================================================
+@app.route('/select_spot')
 @app.route('/select_spot/<int:spot_id>')
-def select_spot_handler(spot_id):
-    from flask import session, redirect, url_for
-    spots = session.get('user_locations', [])
+def select_spot_handler(spot_id=None):
+    """
+    サブルーチン：地点選択処理
+    HTMLのセレクトボックス(indexパラメータ)や、直接のID指定、座標指定のすべてに対応し、
+    セッションに地点情報をセットしてメイン画面に戻ります。
+    """
+    from flask import session, redirect, url_for, request
     
-    if 0 <= spot_id < len(spots):
-        target = spots[spot_id]
+    # 1. セッションから登録地点リストを取得
+    spots = session.get('user_locations', [])
+    lat, lon, name = None, None, None
+
+    # 2. パターンA: spot_id (パス形式) がある場合
+    if spot_id is not None:
+        if 0 <= spot_id < len(spots):
+            target = spots[spot_id]
+            lat, lon, name = target['lat'], target['lon'], target['name']
+
+    # 3. パターンB: クエリパラメータがある場合
+    else:
+        # indexパラメータ（HTMLのセレクトボックスからの送信）を確認
+        idx_param = request.args.get('index', type=int)
+        
+        if idx_param is not None:
+            # indexから地点情報を特定
+            if 0 <= idx_param < len(spots):
+                target = spots[idx_param]
+                lat, lon, name = target['lat'], target['lon'], target['name']
+        else:
+            # lat/lon/name が直接指定されている場合（地図選択など）
+            lat = request.args.get('lat', type=float)
+            lon = request.args.get('lon', type=float)
+            name = request.args.get('name')
+
+    # 4. セッションへの保存処理
+    if lat is not None and lon is not None:
+        # デザインパラメータ（座標）を更新
         user_settings = session.get('design_params', {})
-        user_settings['lat'] = float(target['lat'])
-        user_settings['lon'] = float(target['lon'])
+        user_settings['lat'] = float(lat)
+        user_settings['lon'] = float(lon)
         session['design_params'] = user_settings
-        session['last_basho'] = target['name']
         
-        # フラグ管理：地点選択時はキャッシュがあればそれを使うため
-        # session['needs_refresh'] = True はあえて行わない。
-        # clear_weather_cache_files() も呼び出さない。
+        # 表示用の場所名 (basho) を更新
+        # nameがない場合は座標から生成
+        session['last_basho'] = name if name else f"({lat:.2f}, {lon:.2f})"
         
+        # セッションの変更を反映
         session.modified = True
+        
+    # メイン画面（index）へ戻る
     return redirect(url_for('index'))
 
 # ======================================================================================
@@ -1889,23 +1923,20 @@ def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
 render_cache = {}
 
 # ======================================================================================
-# 98. Flask メインルート: インデックス表示 (セッションサイズ監視デバッグ版)
+# 98. Flask メインルート: インデックス表示 (LocalStorage 連携版)
 # ======================================================================================
 @app.route('/')
 def index():
     import pytz, datetime, traceback, os, time, json
     from flask import session, render_template, request
 
-    # --- 1. 初期設定と言語準備 ---
     all_langs = get_language_dict()
     selected_lang = session.get('lang', 'ja')
     lang_dict = all_langs.get(selected_lang, all_langs['ja'])
 
-    # --- 2. 時間設定 ---
     jst = pytz.timezone('Asia/Tokyo')
     now_jst = datetime.datetime.now(jst)
     
-    # --- 3. 座標とフラグの取得 ---
     user_settings = session.get('design_params', {})
     
     req_lat = request.args.get('lat')
@@ -1919,7 +1950,6 @@ def index():
     lat = float(user_settings.get('lat', CONFIG.get("DEFAULT_LAT", 35.6812)))
     lon = float(user_settings.get('lon', CONFIG.get("DEFAULT_LON", 139.7671)))
 
-    # --- 4. デザインパラメータの構築 (既存の仕様を完全維持) ---
     design_params = {
         "width_inch": float(user_settings.get('width_inch', 15.0)),
         "height_inch": float(user_settings.get('height_inch', 0.6)),
@@ -1942,7 +1972,6 @@ def index():
     danger_v = design_params["danger_v"]
     sel_dirs = session.get('sel_dirs', [True]*16)
 
-    # --- 5. 描画判定ロジック (時刻情報の読み出し) ---
     CACHE_DIR = "weather_cache"
     if not os.path.exists(CACHE_DIR):
         try: os.makedirs(CACHE_DIR)
@@ -1952,7 +1981,6 @@ def index():
     graph_cache_path = os.path.join(CACHE_DIR, f"graph_data_{cache_key}.json")
     
     force_refresh = (request.args.get('refresh') == '1')
-    
     should_render = False
     graph_html = None
     draw_time_str = ""
@@ -1960,7 +1988,7 @@ def index():
 
     if force_refresh:
         should_render = True
-        debug_msg = "強制再描画 (更新ボタン)"
+        debug_msg = "強制再描画"
     elif cache_key in render_cache:
         cached_item = render_cache[cache_key]
         if (now_jst - cached_item.get('timestamp')).total_seconds() < 86400:
@@ -1987,47 +2015,29 @@ def index():
                 should_render = True
         else:
             should_render = True
-            debug_msg = "物理期限切れ"
     else:
         should_render = True
-        debug_msg = "新規地点"
 
     try:
-        # --- 6. グラフ生成またはキャッシュ取得 ---
         if should_render or graph_html is None:
             draw_time_str = now_jst.strftime('%H:%M')
             graph_html = render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst)
-            
-            render_cache[cache_key] = {
-                'html': graph_html, 
-                'timestamp': now_jst, 
-                'draw_time_str': draw_time_str
-            }
+            render_cache[cache_key] = {'html': graph_html, 'timestamp': now_jst, 'draw_time_str': draw_time_str}
             try:
                 with open(graph_cache_path, "w", encoding="utf-8") as f:
                     json.dump({'html': graph_html, 'draw_time_str': draw_time_str}, f)
             except: pass
-
             session['needs_refresh'] = False
             session.modified = True
 
-        # --- 7. 付随情報の準備 ---
         display_basho = session.get('last_basho') or session.get('basho') or CONFIG.get("DEFAULT_BASHO", "東京")
-        user_spots = session.get('user_locations', [])
-        for spot in user_spots:
-            if abs(float(spot['lat']) - lat) < 0.0001 and abs(float(spot['lon']) - lon) < 0.0001:
-                display_basho = spot['name']
-                break
 
-        # 【デバッグ強化】セッションの合計サイズを計測 (4KB = 4096bytes 上限)
+        # セッションサイズの計測
         try:
-            session_json = json.dumps(dict(session))
-            session_size = len(session_json.encode('utf-8'))
+            session_size = len(json.dumps(dict(session)).encode('utf-8'))
             debug_msg += f" | Session: {session_size} bytes"
-        except:
-            pass
+        except: pass
 
-        location_buttons = get_location_buttons_html()
         w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,windspeed_10m,winddirection_10m,precipitation&timezone=auto"
         m_url = f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto"
 
@@ -2037,33 +2047,17 @@ def index():
             now_jst=now_jst,
             draw_time_str=draw_time_str,
             graph_html=graph_html,
-            location_buttons=location_buttons,
-            gps_script=get_gps_script_js(),
             design_params=design_params,
             sel_dirs=sel_dirs,
             danger_v=danger_v,
             w_url=w_url,
             m_url=m_url,
             basho=display_basho,
-            error_msg=None,
             debug_info=debug_msg,
             app_config={"icon_path": "static/pin_weather_01.png"}
         )
-
     except Exception:
-        return render_template(
-            'index.html',
-            lang_dict=lang_dict,
-            error_msg=traceback.format_exc(),
-            design_params=design_params,
-            sel_dirs=sel_dirs,
-            danger_v=danger_v,
-            w_url="",
-            m_url="",
-            now_jst=now_jst,
-            location_buttons="",
-            basho="Error"
-        )
+        return render_template('index.html', lang_dict=lang_dict, error_msg=traceback.format_exc(), basho="Error")
     
 
 # ======================================================================================

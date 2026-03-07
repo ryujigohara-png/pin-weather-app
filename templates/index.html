@@ -133,7 +133,7 @@
             </div>
 
             <div class="action-bar">
-                <select class="spot-selector" id="spot-selector" onchange="if(this.value) { showLoading(); location.href='/select_spot/' + this.value; }">
+                <select class="spot-selector" id="spot-selector" onchange="if(this.value) { showLoading(); location.href='/select_spot?index=' + this.value; }">
                     <option value="">{{ lang_dict['SELECT_PLACE'] }}</option>
                     {% for spot in session.get('user_locations', []) %}
                     <option value="{{ loop.index0 }}">{{ spot.name }}</option>
@@ -185,7 +185,7 @@
             </div>
             <div style="border-top: 1px solid #e6e9ef; padding-top: 15px; text-align: left;">
                 <p style="font-size: 11px; color: #888; line-height: 1.6; margin-bottom: 15px;">
-                    {{ lang_dict.get("DISCLAIMER", "※本データは予測値であり、実際の天候と異なる場合があります。航海や活動の際は、必ず最新の気象情報を確認し、自己責任でご利用ください。") }}
+                    {{ lang_dict.get("DISCLAIMER", "※本データは予測値であり、実際の天候と異なる場合があります。航海や活動の際は、必ず最新気象情報を確認し、自己責任でご利用ください。") }}
                 </p>
                 <p id="host-indicator" style="text-align: center; font-size: 10px; color: #ccc; letter-spacing: 2px;">- PIN_WEATHER BETA VERSION -</p>
             </div>            
@@ -226,7 +226,6 @@
     <script>
         /**
          * サブルーチン：ホスト判別と表示更新
-         * 現在のドメインを確認し、フッターの表示を書き換えます。
          */
         function updateHostIndicator() {
             const hostname = window.location.hostname;
@@ -247,7 +246,6 @@
 
         /**
          * サブルーチン：エラーメッセージの表示と自動リロード
-         * サーバーが反応しない（502等）場合にユーザーに通知します。
          */
         function handleServerError(customMessage) {
             const loadingMsg = document.getElementById('loading-message');
@@ -257,9 +255,7 @@
                 loadingMsg.style.color = "#ff4b4b";
                 loadingMsg.innerText = customMessage || defaultMsg;
             }
-            
             showLoading(); 
-            
             setTimeout(() => {
                 window.location.href = '/?refresh=1&t=' + new Date().getTime();
             }, 15000);
@@ -283,14 +279,11 @@
                 };
                 localStorage.setItem('pin_weather_backup_v1', JSON.stringify(backupData));
                 console.log("LocalStorage: Backup saved.");
-            } else {
-                console.log("LocalStorage: Save skipped (Protecting backup).");
             }
         }
 
         /**
          * サブルーチン：バックアップデータからの復元
-         * 戻り値: 復元処理（リダイレクト）が発生した場合は true を返します。
          */
         async function restoreFromLocalBackup() {
             const stored = localStorage.getItem('pin_weather_backup_v1');
@@ -300,8 +293,8 @@
             const userLocsCount = {{ session.get('user_locations', [])|length }};
             const currentBasho = "{{ basho }}";
 
-            // サーバー側データが空の場合のみ復元を実行
-            if (userLocsCount === 0 || currentBasho === "Error" || currentBasho === "") {
+            // サーバー側の地点データが消えている、またはエラーの場合に復元
+            if (userLocsCount === 0 || currentBasho === "Error" || currentBasho === "未設定" || currentBasho === "") {
                 console.log("LocalStorage: Attempting restore...");
                 showLoading();
                 try {
@@ -313,15 +306,21 @@
                     if (response.ok) {
                         window.location.href = '/?refresh=1';
                         return true; 
-                    } else if (response.status >= 500) {
-                        handleServerError();
-                        return true;
                     }
                 } catch (e) {
                     console.error("Restore failed:", e);
-                    handleServerError();
-                    return true;
                 }
+            }
+            
+            // UI上のセレクトボックスが空なら、バックアップから項目を補充
+            const selector = document.getElementById('spot-selector');
+            if (selector && selector.options.length <= 1 && data.user_locations.length > 0) {
+                data.user_locations.forEach((spot, index) => {
+                    const opt = document.createElement('option');
+                    opt.value = index;
+                    opt.text = spot.name;
+                    selector.add(opt);
+                });
             }
             return false;
         }
@@ -395,17 +394,25 @@
                 if (response.ok) {
                     const result = await response.json();
                     if (result.status === "success") {
-                        saveBackupToLocal();
+                        // 成功したら即座にバックアップを更新し、リロード
+                        const currentLocs = {{ session.get('user_locations', [])|tojson }};
+                        currentLocs.push({name: result.name, lat: {{ design_params.lat }}, lon: {{ design_params.lon }}});
+                        localStorage.setItem('pin_weather_backup_v1', JSON.stringify({
+                            user_locations: currentLocs,
+                            design_params: {{ design_params|tojson }},
+                            sel_dirs: {{ sel_dirs|tojson }},
+                            lang: "{{ session.get('lang', 'ja') }}",
+                            last_basho: result.name
+                        }));
                         location.reload();
                     } else { 
                         hideLoading(); 
                         alert(result.message); 
                     }
-                } else if (response.status >= 500) {
+                } else {
                     handleServerError();
                 }
             } catch (error) { 
-                console.error("Fetch error:", error);
                 handleServerError();
             }
         }
