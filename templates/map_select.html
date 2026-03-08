@@ -27,6 +27,12 @@
             z-index: 1000 !important;
         }
 
+        /* ズームボタンが下のパネルに隠れないように位置を調整 */
+        .leaflet-bottom.leaflet-right {
+            bottom: 180px !important; /* 下部パネル(約150px)より上に配置 */
+            z-index: 1000 !important;
+        }
+
         .map-controls {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
             z-index: 1100; background: white; padding: 15px; border-radius: 12px;
