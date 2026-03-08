@@ -2146,6 +2146,29 @@ def reset_settings():
         raise RuntimeError(traceback.format_exc())
 
 # ======================================================================================
+# 99_3. バックアップからのデータ復元用 (PWA同期用)
+# ======================================================================================
+@app.route('/restore_backup', methods=['POST'])
+def restore_backup():
+    from flask import request, session, jsonify
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"status": "error", "message": "No data"}), 400
+        
+        # スマホ側のデータをセッションに復元
+        session['user_locations'] = data.get('user_locations', [])
+        session['design_params'] = data.get('design_params', {})
+        session['sel_dirs'] = data.get('sel_dirs', [False]*16)
+        session['lang'] = data.get('lang', 'ja')
+        session['last_basho'] = data.get('last_basho', '')
+        
+        session.modified = True
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# ======================================================================================
 # 80. 言語切り替えエンドポイント (確実な登録版)
 # ======================================================================================
 @app.route('/change_lang')

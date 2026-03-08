@@ -263,13 +263,14 @@
 
         /**
          * サブルーチン：バックアップデータの保存
-         * 地点データが存在し、かつ有効な地点名の時のみ保存します。
+         * 【保護ロック】地点データが空の場合は、スマホ内の既存データを上書きしないようにガードします。
          */
         function saveBackupToLocal() {
             const userLocs = {{ session.get('user_locations', [])|tojson }};
             const currentBasho = "{{ basho }}";
 
-            if (userLocs && userLocs.length > 0 && currentBasho !== "Error" && currentBasho !== "") {
+            // ガード条件: サーバー側(Flask)に有効な地点データがある時のみ上書き保存を許可
+            if (userLocs && userLocs.length > 0 && currentBasho !== "Error" && currentBasho !== "未設定" && currentBasho !== "") {
                 const backupData = {
                     user_locations: userLocs,
                     design_params: {{ design_params|tojson }},
@@ -279,11 +280,14 @@
                 };
                 localStorage.setItem('pin_weather_backup_v1', JSON.stringify(backupData));
                 console.log("LocalStorage: Backup saved.");
+            } else {
+                console.log("LocalStorage: Save skipped (Server session might be empty).");
             }
         }
 
         /**
          * サブルーチン：バックアップデータからの復元
+         * スマホ側のデータを優先し、サーバー側(Flask)に同期させます。
          */
         async function restoreFromLocalBackup() {
             const stored = localStorage.getItem('pin_weather_backup_v1');
@@ -293,9 +297,9 @@
             const userLocsCount = {{ session.get('user_locations', [])|length }};
             const currentBasho = "{{ basho }}";
 
-            // サーバー側の地点データが消えている、またはエラーの場合に復元
+            // サーバー側のセッションが空（初期化された）状態を検知
             if (userLocsCount === 0 || currentBasho === "Error" || currentBasho === "未設定" || currentBasho === "") {
-                console.log("LocalStorage: Attempting restore...");
+                console.log("LocalStorage: Detecting empty server session. Attempting restore...");
                 showLoading();
                 try {
                     const response = await fetch('/restore_backup', {
@@ -304,15 +308,16 @@
                         body: JSON.stringify(data)
                     });
                     if (response.ok) {
+                        // 同期に成功したらリロードしてサーバー側の最新状態を反映
                         window.location.href = '/?refresh=1';
                         return true; 
                     }
                 } catch (e) {
-                    console.error("Restore failed:", e);
+                    console.error("Restore sync failed:", e);
                 }
             }
             
-            // UI上のセレクトボックスが空なら、バックアップから項目を補充
+            // UI上のセレクトボックスが空なら、バックアップから項目を一時的に補充（リロードまでの繋ぎ）
             const selector = document.getElementById('spot-selector');
             if (selector && selector.options.length <= 1 && data.user_locations.length > 0) {
                 data.user_locations.forEach((spot, index) => {
@@ -353,7 +358,9 @@
             
             window.addEventListener('load', async () => {
                 updateHostIndicator();
+                // 1. まず復元が必要かチェック
                 const isRestoring = await restoreFromLocalBackup();
+                // 2. 復元中でなければ、現在の健全な状態を保存し、ローディングを消す
                 if (!isRestoring) {
                     saveBackupToLocal();
                     hideLoading();
