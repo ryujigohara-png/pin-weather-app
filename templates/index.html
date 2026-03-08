@@ -381,29 +381,46 @@
             }, {passive: true});
         })();
 
-        /**
+/**
          * サブルーチン：お気に入り登録
+         * 確実に動く完全版：セッションと表示名を同期してリロードします
          */
         async function registerMySpot() {
             const currentName = "{{ basho }}";
             const btn = document.getElementById('btn-star');
+            
+            // 既に登録済み（星マーク）なら何もしない
             if (btn.innerText.trim() === "🌟") return;
+
+            // ユーザーに名称を確認
             const newName = prompt("{{ lang_dict['この地点を My Spots に保存します。'] }}", currentName);
             if (!newName) return;
+
             showLoading(); 
             try {
+                // 1. サーバーへ地点を追加
                 const response = await fetch('/add_to_myspots', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ name: newName, lat: {{ design_params.lat }}, lon: {{ design_params.lon }} })
+                    body: JSON.stringify({ 
+                        name: newName, 
+                        lat: {{ design_params.lat }}, 
+                        lon: {{ design_params.lon }} 
+                    })
                 });
                 
                 if (response.ok) {
                     const result = await response.json();
                     if (result.status === "success") {
-                        // 成功したら即座にバックアップを更新し、リロード
+                        // 2. ローカルのバックアップ用リストを更新
                         const currentLocs = {{ session.get('user_locations', [])|tojson }};
-                        currentLocs.push({name: result.name, lat: {{ design_params.lat }}, lon: {{ design_params.lon }}});
+                        currentLocs.push({
+                            name: result.name, 
+                            lat: {{ design_params.lat }}, 
+                            lon: {{ design_params.lon }}
+                        });
+
+                        // 3. localStorage（保護ロック付き復元用）を更新
                         localStorage.setItem('pin_weather_backup_v1', JSON.stringify({
                             user_locations: currentLocs,
                             design_params: {{ design_params|tojson }},
@@ -411,7 +428,16 @@
                             lang: "{{ session.get('lang', 'ja') }}",
                             last_basho: result.name
                         }));
-                        location.reload();
+
+                        // 4. 【重要】サーバーのセッション(last_basho)を更新するため、
+                        // select_spot 経由でリロードして画面表示名を確定させる
+                        const params = new URLSearchParams({
+                            lat: {{ design_params.lat }},
+                            lon: {{ design_params.lon }},
+                            name: result.name
+                        });
+                        window.location.href = `/select_spot?${params.toString()}`;
+
                     } else { 
                         hideLoading(); 
                         alert(result.message); 
@@ -423,7 +449,6 @@
                 handleServerError();
             }
         }
-
         function showShareQR() {
             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.origin)}`;
             const shareModal = document.createElement('div');
