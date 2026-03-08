@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>{{ lang_dict['⛵Pin_Weather!'] }}</title>
+    <title>{{ lang_dict['⛵Pin_Weather!'] }}{{ config.title_suffix }}</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/icon-192.png') }}">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    <meta name="theme-color" content="#0078ff">
+    <meta name="theme-color" content="{{ config.header_color or '#0078ff' }}">
     <style>
         /* スタイル定義（維持） */
         body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0; background-color: #f0f2f5; color: #31333f; overscroll-behavior-y: contain; }
@@ -187,7 +187,9 @@
                 <p style="font-size: 11px; color: #888; line-height: 1.6; margin-bottom: 15px;">
                     {{ lang_dict.get("DISCLAIMER", "※本データは予測値であり、実際の天候と異なる場合があります。航海や活動の際は、必ず最新気象情報を確認し、自己責任でご利用ください。") }}
                 </p>
-                <p id="host-indicator" style="text-align: center; font-size: 10px; color: #ccc; letter-spacing: 2px;">- PIN_WEATHER BETA VERSION -</p>
+                <p id="host-indicator" style="text-align: center; font-size: 10px; color: {{ config.header_color or '#ccc' }}; letter-spacing: 2px; font-weight: bold;">
+                    - PIN_WEATHER {{ config.env_name or 'BETA VERSION' }} -
+                </p>
             </div>            
         </div>
     </div> 
@@ -226,22 +228,11 @@
     <script>
         /**
          * サブルーチン：ホスト判別と表示更新
+         * サーバー側の判定結果を優先して表示します
          */
         function updateHostIndicator() {
-            const hostname = window.location.hostname;
-            const indicator = document.getElementById('host-indicator');
-            if (!indicator) return;
-
-            if (hostname === "localhost" || hostname === "127.0.0.1") {
-                indicator.innerText = "- LOCALHOST DEVELOPMENT MODE -";
-                indicator.style.color = "#4CAF50"; 
-                indicator.style.fontWeight = "bold";
-            } else if (hostname.includes("onrender.com")) {
-                indicator.innerText = "- PIN_WEATHER RENDER BETA -";
-                indicator.style.color = "#ff4b4b"; 
-            } else {
-                indicator.innerText = "- PIN_WEATHER " + hostname.toUpperCase() + " -";
-            }
+            // サーバー側 config がある場合は JS 側での上書きは最小限にする
+            console.log("Environment: {{ config.env_name }}");
         }
 
         /**
@@ -381,7 +372,7 @@
             }, {passive: true});
         })();
 
-/**
+        /**
          * サブルーチン：お気に入り登録
          * 確実に動く完全版：セッションと表示名を同期してリロードします
          */

@@ -25,6 +25,35 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'pin_weather_secret_key_2026')
 
 # ======================================================================================
+# 10_1. 環境判定サブルーチン (Local / Beta / Main)
+# ======================================================================================
+def get_env_config():
+    # Renderが割り当てるホスト名を取得
+    hostname = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '')
+    
+    if not hostname:
+        # 1. PCローカル環境 (ホスト名がない場合)
+        return {
+            "title_suffix": " [Local]",
+            "header_color": "#27ae60",  # 安心の「緑」
+            "env_name": "LOCAL"
+        }
+    elif "beta" in hostname:
+        # 2. Render ベータ環境 (URLに beta が含まれる場合)
+        return {
+            "title_suffix": " (B)",
+            "header_color": "#d35400",  # 注意の「オレンジ」
+            "env_name": "BETA"
+        }
+    else:
+        # 3. Render 本番環境 (それ以外)
+        return {
+            "title_suffix": "",
+            "header_color": "#2c3e50",  # 信頼の「ネイビー」
+            "env_name": "MAIN"
+        }
+
+# ======================================================================================
 # 11. 定数・基本設定 (CONFIG)
 # ======================================================================================
 CONFIG = {
@@ -1929,7 +1958,10 @@ render_cache = {}
 def index():
     import pytz, datetime, traceback, os, time, json
     from flask import session, render_template, request
-
+    
+    # 環境判定の実行
+    config = get_env_config()
+    
     all_langs = get_language_dict()
     selected_lang = session.get('lang', 'ja')
     lang_dict = all_langs.get(selected_lang, all_langs['ja'])
@@ -1947,8 +1979,8 @@ def index():
         session['design_params'] = user_settings
         session.modified = True
 
-    lat = float(user_settings.get('lat', CONFIG.get("DEFAULT_LAT", 35.6812)))
-    lon = float(user_settings.get('lon', CONFIG.get("DEFAULT_LON", 139.7671)))
+    lat = float(user_settings.get('lat', CONFIG.get("DEFAULT_LAT", 31.337)))
+    lon = float(user_settings.get('lon', CONFIG.get("DEFAULT_LON", 130.795)))
 
     design_params = {
         "width_inch": float(user_settings.get('width_inch', 15.0)),
@@ -2043,6 +2075,7 @@ def index():
 
         return render_template(
             'index.html',
+            config=config,   # ← ここ：追加しました
             lang_dict=lang_dict,
             now_jst=now_jst,
             draw_time_str=draw_time_str,
@@ -2057,7 +2090,7 @@ def index():
             app_config={"icon_path": "static/pin_weather_01.png"}
         )
     except Exception:
-        return render_template('index.html', lang_dict=lang_dict, error_msg=traceback.format_exc(), basho="Error")
+        return render_template('index.html', config=config, lang_dict=lang_dict, error_msg=traceback.format_exc(), basho="Error")
     
 
 # ======================================================================================
