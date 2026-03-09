@@ -2075,7 +2075,7 @@ def index():
 
         return render_template(
             'index.html',
-            config=config,
+            config=config,   # ← ここ：追加しました
             lang_dict=lang_dict,
             now_jst=now_jst,
             draw_time_str=draw_time_str,
@@ -2090,17 +2090,8 @@ def index():
             app_config={"icon_path": "static/pin_weather_01.png"}
         )
     except Exception:
-        # APIエラー等の発生時、index.htmlの描画崩れを防ぐため不足変数を補完して返す
-        return render_template(
-            'index.html', 
-            config=config, 
-            lang_dict=lang_dict, 
-            error_msg=traceback.format_exc(), 
-            basho="Error",
-            sel_dirs=sel_dirs,       # 追加：Jinja2でのUndefinedError回避
-            design_params=design_params, # 追加：テンプレート側の参照不備回避
-            danger_v=danger_v       # 追加：一貫性保持
-        )    
+        return render_template('index.html', config=config, lang_dict=lang_dict, error_msg=traceback.format_exc(), basho="Error")
+    
 
 # ======================================================================================
 # 96. グラフ描画エリア生成サブルーチン (座標不整合修正版)
@@ -2285,7 +2276,6 @@ if __name__ == "__main__":
     
     # アプリケーションの起動
     app.run(host=target_host, port=port, debug=is_debug)
-
 
 
 
