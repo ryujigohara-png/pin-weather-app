@@ -2090,17 +2090,12 @@ def index():
             app_config={"icon_path": "static/pin_weather_01.png"}
         )
     except Exception:
-        # APIエラー等の発生時、index.htmlの描画崩れを防ぐため不足変数を補完して返す
+        # 案2: 依存関係を排除したシンプルな専用エラー画面を表示
         return render_template(
-            'index.html', 
-            config=config, 
-            lang_dict=lang_dict, 
-            error_msg=traceback.format_exc(), 
-            basho="Error",
-            sel_dirs=sel_dirs,       # 追加：Jinja2でのUndefinedError回避
-            design_params=design_params, # 追加：テンプレート側の参照不備回避
-            danger_v=danger_v       # 追加：一貫性保持
-        )    
+            'error.html',
+            error_msg=traceback.format_exc(),
+            lang_dict=lang_dict
+        )
 
 # ======================================================================================
 # 96. グラフ描画エリア生成サブルーチン (座標不整合修正版)
