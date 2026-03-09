@@ -84,17 +84,26 @@
 
             <div class="sidebar-header" style="margin-top: 10px;">{{ lang_dict['色付風向選択'] }}</div>
             <form action="/update_display_toggle" method="POST" style="padding: 0 20px;" onsubmit="showLoading()">
-                <div class="wind-dir-container" style="padding: 0; margin-bottom: 10px;">
-                    <div class="wind-dir-box">
-                        <label class="wind-dir-item"><input type="checkbox" name="wind_dirs" value="{{ lang_dict['ALL_DIRECTIONS'][0] }}" {% if sel_dirs[0] %}checked{% endif %}>{{ lang_dict['ALL_DIRECTIONS'][0] }}</label>
-                        <div class="wind-dir-grid">
-                            {% set dir_indices = [15, 1, 14, 2, 13, 3, 12, 4, 11, 5, 10, 6, 9, 7] %}
-                            {% for idx in dir_indices %}
-                            <label class="wind-dir-item"><input type="checkbox" name="wind_dirs" value="{{ lang_dict['ALL_DIRECTIONS'][idx] }}" {% if sel_dirs[idx] %}checked{% endif %}>{{ lang_dict['ALL_DIRECTIONS'][idx] }}</label>
-                            {% endfor %}
-                        </div>
-                        <label class="wind-dir-item"><input type="checkbox" name="wind_dirs" value="{{ lang_dict['ALL_DIRECTIONS'][8] }}" {% if sel_dirs[8] %}checked{% endif %}>{{ lang_dict['ALL_DIRECTIONS'][8] }}</label>
+                <div class="wind-dir-box">
+                    <label class="wind-dir-item">
+                        <input type="checkbox" name="wind_dirs" value="{{ lang_dict['DIRECTIONS_16JA'][0] }}" {% if sel_dirs[0] %}checked{% endif %}>
+                        {{ lang_dict['ALL_DIRECTIONS'][0] }}
+                    </label>
+                    
+                    <div class="wind-dir-grid">
+                        {% set dir_indices = [15, 1, 14, 2, 13, 3, 12, 4, 11, 5, 10, 6, 9, 7] %}
+                        {% for idx in dir_indices %}
+                        <label class="wind-dir-item">
+                            <input type="checkbox" name="wind_dirs" value="{{ lang_dict['DIRECTIONS_16JA'][idx] }}" {% if sel_dirs[idx] %}checked{% endif %}>
+                            {{ lang_dict['ALL_DIRECTIONS'][idx] }}
+                        </label>
+                        {% endfor %}
                     </div>
+                    
+                    <label class="wind-dir-item">
+                        <input type="checkbox" name="wind_dirs" value="{{ lang_dict['DIRECTIONS_16JA'][8] }}" {% if sel_dirs[8] %}checked{% endif %}>
+                        {{ lang_dict['ALL_DIRECTIONS'][8] }}
+                    </label>
                 </div>
                 <button type="submit" style="background: #ff4b4b; color: white; border: none; text-align: center; width: 100%; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin: 0 auto 15px auto;">{{ lang_dict['BTN_UPDATE'] or lang_dict['更新'] }}</button>
             </form>

@@ -409,6 +409,7 @@ def get_language_dict():
             "WEEKS": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
             "WEATHER_TEXT": {"晴": "Sunny", "霧": "Fog", "雨": "Rain", "雪": "Snow", "雷": "T-Storm", "？": "?"},
             "ALL_DIRECTIONS": ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"],
+            "DIRECTIONS_16JA": ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"],
             "DIRECTIONS_8": ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
             "NORTH":"N",
             "LOCATIONS": {
@@ -2075,7 +2076,7 @@ def index():
 
         return render_template(
             'index.html',
-            config=config,
+            config=config,   # ← ここ：追加しました
             lang_dict=lang_dict,
             now_jst=now_jst,
             draw_time_str=draw_time_str,
@@ -2090,12 +2091,8 @@ def index():
             app_config={"icon_path": "static/pin_weather_01.png"}
         )
     except Exception:
-        # 案2: 依存関係を排除したシンプルな専用エラー画面を表示
-        return render_template(
-            'error.html',
-            error_msg=traceback.format_exc(),
-            lang_dict=lang_dict
-        )
+        return render_template('index.html', config=config, lang_dict=lang_dict, error_msg=traceback.format_exc(), basho="Error")
+    
 
 # ======================================================================================
 # 96. グラフ描画エリア生成サブルーチン (座標不整合修正版)
@@ -2280,7 +2277,6 @@ if __name__ == "__main__":
     
     # アプリケーションの起動
     app.run(host=target_host, port=port, debug=is_debug)
-
 
 
 
