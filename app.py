@@ -409,6 +409,7 @@ def get_language_dict():
             "WEEKS": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
             "WEATHER_TEXT": {"晴": "Sunny", "霧": "Fog", "雨": "Rain", "雪": "Snow", "雷": "T-Storm", "？": "?"},
             "ALL_DIRECTIONS": ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"],
+            "DIRECTIONS_16JA": ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"],
             "DIRECTIONS_8": ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
             "NORTH":"N",
             "LOCATIONS": {
@@ -1959,29 +1960,16 @@ def index():
     import pytz, datetime, traceback, os, time, json
     from flask import session, render_template, request
     
-    # 環境判定の実行
+    # --- (config, lang_dict, now_jst, design_params, sel_dirs の定義) ---
     config = get_env_config()
-    
     all_langs = get_language_dict()
     selected_lang = session.get('lang', 'ja')
     lang_dict = all_langs.get(selected_lang, all_langs['ja'])
-
     jst = pytz.timezone('Asia/Tokyo')
     now_jst = datetime.datetime.now(jst)
-    
     user_settings = session.get('design_params', {})
-    
-    req_lat = request.args.get('lat')
-    req_lon = request.args.get('lon')
-    if req_lat and req_lon:
-        user_settings['lat'] = float(req_lat)
-        user_settings['lon'] = float(req_lon)
-        session['design_params'] = user_settings
-        session.modified = True
-
     lat = float(user_settings.get('lat', CONFIG.get("DEFAULT_LAT", 31.337)))
     lon = float(user_settings.get('lon', CONFIG.get("DEFAULT_LON", 130.795)))
-
     design_params = {
         "width_inch": float(user_settings.get('width_inch', 15.0)),
         "height_inch": float(user_settings.get('height_inch', 0.6)),
@@ -2000,7 +1988,6 @@ def index():
         "lon": lon,
         "danger_v": float(session.get('danger_v', 10.0))
     }
-
     danger_v = design_params["danger_v"]
     sel_dirs = session.get('sel_dirs', [True]*16)
 
@@ -2018,63 +2005,71 @@ def index():
     draw_time_str = ""
     debug_msg = ""
 
+    # キャッシュチェック処理
     if force_refresh:
         should_render = True
-        debug_msg = "強制再描画"
     elif cache_key in render_cache:
         cached_item = render_cache[cache_key]
         if (now_jst - cached_item.get('timestamp')).total_seconds() < 86400:
             graph_html = cached_item['html']
             draw_time_str = cached_item.get('draw_time_str', "")
-            debug_msg = f"メモリ使用 ({int((now_jst - cached_item['timestamp']).total_seconds())}s前)"
-        else:
-            should_render = True
+            debug_msg = "メモリ使用"
+        else: should_render = True
     elif os.path.exists(graph_cache_path):
-        age = time.time() - os.path.getmtime(graph_cache_path)
-        if age < 86400:
-            try:
-                with open(graph_cache_path, "r", encoding="utf-8") as f:
-                    c_data = json.load(f)
-                    graph_html = c_data['html']
-                    draw_time_str = c_data.get('draw_time_str', "")
-                render_cache[cache_key] = {
-                    'html': graph_html, 
-                    'timestamp': datetime.datetime.fromtimestamp(os.path.getmtime(graph_cache_path), tz=jst),
-                    'draw_time_str': draw_time_str
-                }
-                debug_msg = f"物理使用 ({int(age)}s前)"
-            except:
-                should_render = True
-        else:
-            should_render = True
-    else:
-        should_render = True
+        try:
+            with open(graph_cache_path, "r", encoding="utf-8") as f:
+                c_data = json.load(f)
+                graph_html = c_data['html']
+                draw_time_str = c_data.get('draw_time_str', "")
+            render_cache[cache_key] = {'html': graph_html, 'timestamp': datetime.datetime.fromtimestamp(os.path.getmtime(graph_cache_path), tz=jst), 'draw_time_str': draw_time_str}
+            debug_msg = "物理使用"
+        except: should_render = True
+    else: should_render = True
 
     try:
+        # 描画が必要な場合
         if should_render or graph_html is None:
             draw_time_str = now_jst.strftime('%H:%M')
+            # ここで内部のAPI取得がタイムアウトや429エラーになるとExceptionへ飛びます
             graph_html = render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst)
+            
             render_cache[cache_key] = {'html': graph_html, 'timestamp': now_jst, 'draw_time_str': draw_time_str}
             try:
                 with open(graph_cache_path, "w", encoding="utf-8") as f:
                     json.dump({'html': graph_html, 'draw_time_str': draw_time_str}, f)
             except: pass
-            session['needs_refresh'] = False
-            session.modified = True
 
         display_basho = session.get('last_basho') or session.get('basho') or CONFIG.get("DEFAULT_BASHO", "東京")
-
-        # セッションサイズの計測
-        try:
-            session_size = len(json.dumps(dict(session)).encode('utf-8'))
-            debug_msg += f" | Session: {session_size} bytes"
-        except: pass
 
         w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,windspeed_10m,winddirection_10m,precipitation&timezone=auto"
         m_url = f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto"
 
         return render_template(
             'index.html',
+<<<<<<< HEAD
+            config=config, lang_dict=lang_dict, now_jst=now_jst,
+            draw_time_str=draw_time_str, graph_html=graph_html,
+            design_params=design_params, sel_dirs=sel_dirs,
+            danger_v=danger_v, w_url=w_url, m_url=m_url,
+            basho=display_basho, 
+            current_lat=lat,      # JSでの「戻るボタン不一致」解消用に追加
+            current_lon=lon,      # JSでの「戻るボタン不一致」解消用に追加
+            debug_info=debug_msg,
+            app_config={"icon_path": "static/pin_weather_01.png"}
+        )
+
+    except Exception as e:
+        # 「グラフ生成中」のまま固まるのを防ぐため、エラー時は即座にerror.htmlへ
+        error_txt = str(e)
+        # API制限(429)の場合はユーザーに分かりやすいメッセージを添える
+        friendly_msg = "現在、気象データサーバー(Open-Meteo)へのアクセスが集中しており、一時的に制限がかかっています。" if "429" in error_txt else "データの取得またはグラフの生成中にエラーが発生しました。"
+        
+        return render_template(
+            'error.html',
+            error_msg=f"{friendly_msg}\n\n詳細ログ:\n{traceback.format_exc()}",
+            lang_dict=lang_dict
+        )
+=======
             config=config,   # ← ここ：追加しました
             lang_dict=lang_dict,
             now_jst=now_jst,
@@ -2091,6 +2086,7 @@ def index():
         )
     except Exception:
         return render_template('index.html', config=config, lang_dict=lang_dict, error_msg=traceback.format_exc(), basho="Error")
+>>>>>>> c329aade3c93e3ce8d493c366f1b585a0aa3446f
     
 
 # ======================================================================================
