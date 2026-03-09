@@ -84,17 +84,26 @@
 
             <div class="sidebar-header" style="margin-top: 10px;">{{ lang_dict['色付風向選択'] }}</div>
             <form action="/update_display_toggle" method="POST" style="padding: 0 20px;" onsubmit="showLoading()">
-                <div class="wind-dir-container" style="padding: 0; margin-bottom: 10px;">
-                    <div class="wind-dir-box">
-                        <label class="wind-dir-item"><input type="checkbox" name="wind_dirs" value="{{ lang_dict['ALL_DIRECTIONS'][0] }}" {% if sel_dirs[0] %}checked{% endif %}>{{ lang_dict['ALL_DIRECTIONS'][0] }}</label>
-                        <div class="wind-dir-grid">
-                            {% set dir_indices = [15, 1, 14, 2, 13, 3, 12, 4, 11, 5, 10, 6, 9, 7] %}
-                            {% for idx in dir_indices %}
-                            <label class="wind-dir-item"><input type="checkbox" name="wind_dirs" value="{{ lang_dict['ALL_DIRECTIONS'][idx] }}" {% if sel_dirs[idx] %}checked{% endif %}>{{ lang_dict['ALL_DIRECTIONS'][idx] }}</label>
-                            {% endfor %}
-                        </div>
-                        <label class="wind-dir-item"><input type="checkbox" name="wind_dirs" value="{{ lang_dict['ALL_DIRECTIONS'][8] }}" {% if sel_dirs[8] %}checked{% endif %}>{{ lang_dict['ALL_DIRECTIONS'][8] }}</label>
+                <div class="wind-dir-box">
+                    <label class="wind-dir-item">
+                        <input type="checkbox" name="wind_dirs" value="{{ lang_dict['DIRECTIONS_16JA'][0] }}" {% if sel_dirs[0] %}checked{% endif %}>
+                        {{ lang_dict['ALL_DIRECTIONS'][0] }}
+                    </label>
+                    
+                    <div class="wind-dir-grid">
+                        {% set dir_indices = [15, 1, 14, 2, 13, 3, 12, 4, 11, 5, 10, 6, 9, 7] %}
+                        {% for idx in dir_indices %}
+                        <label class="wind-dir-item">
+                            <input type="checkbox" name="wind_dirs" value="{{ lang_dict['DIRECTIONS_16JA'][idx] }}" {% if sel_dirs[idx] %}checked{% endif %}>
+                            {{ lang_dict['ALL_DIRECTIONS'][idx] }}
+                        </label>
+                        {% endfor %}
                     </div>
+                    
+                    <label class="wind-dir-item">
+                        <input type="checkbox" name="wind_dirs" value="{{ lang_dict['DIRECTIONS_16JA'][8] }}" {% if sel_dirs[8] %}checked{% endif %}>
+                        {{ lang_dict['ALL_DIRECTIONS'][8] }}
+                    </label>
                 </div>
                 <button type="submit" style="background: #ff4b4b; color: white; border: none; text-align: center; width: 100%; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin: 0 auto 15px auto;">{{ lang_dict['BTN_UPDATE'] or lang_dict['更新'] }}</button>
             </form>
@@ -113,7 +122,7 @@
                     <button class="openbtn" onclick="openNav()">☰</button>
                     <div class="loc-info">
                         <div class="loc-name-row">
-                            <span class="loc-name">{{ basho }}</span>
+                            <span class="loc-name" id="display-basho-text">{{ basho }}</span>
                             <button id="btn-star" class="btn-star" onclick="registerMySpot()">
                                 {% set is_saved = namespace(found=false) %}
                                 {% for s in session.get('user_locations', []) %}
@@ -343,9 +352,41 @@
             );
         }
 
+        /**
+         * サブルーチン：ブラウザの戻る・進む操作時の表示同期
+         * セッション上の正しい場所名とセレクトボックスの状態を一致させます
+         */
+        function syncDisplayOnPageShow() {
+            const correctBasho = "{{ basho }}";
+            const selector = document.getElementById('spot-selector');
+            const bashoTextEl = document.getElementById('display-basho-text');
+
+            // 1. 三本メニュー横の場所名テキストを強制同期
+            if (bashoTextEl) {
+                bashoTextEl.textContent = correctBasho;
+            }
+
+            // 2. セレクトボックスの選択状態を強制同期
+            if (selector) {
+                for (let i = 0; i < selector.options.length; i++) {
+                    if (selector.options[i].text === correctBasho) {
+                        selector.selectedIndex = i;
+                        break;
+                    } else if (i === 0) {
+                        // 一致するものがない場合は初期値
+                        selector.selectedIndex = 0;
+                    }
+                }
+            }
+        }
+
         // 初期化ロジック
         (function() {
-            window.addEventListener('pageshow', function(event) { if (event.persisted) hideLoading(); });
+            window.addEventListener('pageshow', function(event) { 
+                if (event.persisted) hideLoading(); 
+                // 戻るボタン操作等で表示が食い違うのを防ぐ
+                syncDisplayOnPageShow();
+            });
             
             window.addEventListener('load', async () => {
                 updateHostIndicator();
