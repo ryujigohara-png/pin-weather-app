@@ -1959,8 +1959,7 @@ render_cache = {}
 def index():
     import pytz, datetime, traceback, os, time, json
     from flask import session, render_template, request
-    
-    # --- (config, lang_dict, now_jst, design_params, sel_dirs の定義) ---
+
     # --- (config, lang_dict, now_jst, design_params, sel_dirs の定義) ---
     config = get_env_config()
     all_langs = get_language_dict()
@@ -1968,9 +1967,11 @@ def index():
     lang_dict = all_langs.get(selected_lang, all_langs['ja'])
     jst = pytz.timezone('Asia/Tokyo')
     now_jst = datetime.datetime.now(jst)
+    
     user_settings = session.get('design_params', {})
     lat = float(user_settings.get('lat', CONFIG.get("DEFAULT_LAT", 31.337)))
     lon = float(user_settings.get('lon', CONFIG.get("DEFAULT_LON", 130.795)))
+    
     design_params = {
         "width_inch": float(user_settings.get('width_inch', 15.0)),
         "height_inch": float(user_settings.get('height_inch', 0.6)),
@@ -2007,7 +2008,6 @@ def index():
     debug_msg = ""
 
     # キャッシュチェック処理
-    # キャッシュチェック処理
     if force_refresh:
         should_render = True
     elif cache_key in render_cache:
@@ -2016,52 +2016,44 @@ def index():
             graph_html = cached_item['html']
             draw_time_str = cached_item.get('draw_time_str', "")
             debug_msg = "メモリ使用"
-        else: should_render = True
-            debug_msg = "メモリ使用"
-        else: should_render = True
+        else:
+            should_render = True
     elif os.path.exists(graph_cache_path):
         try:
             with open(graph_cache_path, "r", encoding="utf-8") as f:
                 c_data = json.load(f)
                 graph_html = c_data['html']
                 draw_time_str = c_data.get('draw_time_str', "")
-            render_cache[cache_key] = {'html': graph_html, 'timestamp': datetime.datetime.fromtimestamp(os.path.getmtime(graph_cache_path), tz=jst), 'draw_time_str': draw_time_str}
+            render_cache[cache_key] = {
+                'html': graph_html, 
+                'timestamp': datetime.datetime.fromtimestamp(os.path.getmtime(graph_cache_path), tz=jst), 
+                'draw_time_str': draw_time_str
+            }
             debug_msg = "物理使用"
-        except: should_render = True
-    else: should_render = True
-
-    try:
-        # 描画が必要な場合
-        try:
-            with open(graph_cache_path, "r", encoding="utf-8") as f:
-                c_data = json.load(f)
-                graph_html = c_data['html']
-                draw_time_str = c_data.get('draw_time_str', "")
-            render_cache[cache_key] = {'html': graph_html, 'timestamp': datetime.datetime.fromtimestamp(os.path.getmtime(graph_cache_path), tz=jst), 'draw_time_str': draw_time_str}
-            debug_msg = "物理使用"
-        except: should_render = True
-    else: should_render = True
+        except:
+            should_render = True
+    else:
+        should_render = True
 
     try:
         # 描画が必要な場合
         if should_render or graph_html is None:
             draw_time_str = now_jst.strftime('%H:%M')
-            # ここで内部のAPI取得がタイムアウトや429エラーになるとExceptionへ飛びます
-            # ここで内部のAPI取得がタイムアウトや429エラーになるとExceptionへ飛びます
+            # 内部のAPI取得がタイムアウトや429エラーになるとExceptionへ
             graph_html = render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst)
-            
             
             render_cache[cache_key] = {'html': graph_html, 'timestamp': now_jst, 'draw_time_str': draw_time_str}
             try:
                 with open(graph_cache_path, "w", encoding="utf-8") as f:
                     json.dump({'html': graph_html, 'draw_time_str': draw_time_str}, f)
-            except: pass
+            except:
+                pass
 
         display_basho = session.get('last_basho') or session.get('basho') or CONFIG.get("DEFAULT_BASHO", "東京")
 
         w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,windspeed_10m,winddirection_10m,precipitation&timezone=auto"
         m_url = f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto"
-        ###
+
         return render_template(
             'index.html',
             config=config, lang_dict=lang_dict, now_jst=now_jst,
