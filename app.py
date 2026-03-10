@@ -1268,6 +1268,23 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
 
             apply_common_axis_settings(ax, df, formatter, now_jst, design_params)
             
+            # --- 【修正点】土日(赤)・日付(青)・時刻(黒) の色分け ---
+            fig.canvas.draw_idle()
+            labels = ax.get_xticklabels()
+            for label in labels:
+                txt = label.get_text()
+                # 改行 (\n) があるものは「日付・曜日」
+                if '\n' in txt:
+                    # 土曜日(Sat) または 日曜日(Sun) が含まれる場合は赤色
+                    if any(day in txt for day in ['Sat', 'Sun', '土', '日']):
+                        label.set_color('red')
+                        label.set_weight('bold')
+                    else:
+                        label.set_color('blue')   # 平日の日付は青
+                else:
+                    label.set_color('black')      # 時刻ラベルは黒を維持
+            # ------------------------------------------------
+
             for text in ax.get_xticklabels() + ax.get_yticklabels():
                 text.set_fontproperties(fp)
             ax.set_xlabel(ax.get_xlabel(), fontproperties=fp)
@@ -1313,7 +1330,6 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         import gc
         gc.collect()
         raise RuntimeError(str(e))
-
 
 # ======================================================================================
 # 32. グラフの個別高さ(inch)と表示設定を変更するダイアログ (Streamlit版)
