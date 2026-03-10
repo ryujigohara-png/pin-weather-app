@@ -2043,7 +2043,7 @@ def index():
 
         w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,windspeed_10m,winddirection_10m,precipitation&timezone=auto"
         m_url = f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto"
-
+        ###
         return render_template(
             'index.html',
             config=config, lang_dict=lang_dict, now_jst=now_jst,
