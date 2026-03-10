@@ -529,7 +529,8 @@ def fetch_weather_data(lat, lon, days):
         try:
             os.makedirs(CACHE_DIR)
         except Exception as e:
-            raise RuntimeError(f"【フォルダ作成失敗】キャッシュ用フォルダを作れません: {e}")
+            # フォルダ作成失敗時も、システムを止めず例外処理へ
+            pass
     
     file_id = f"{round(lat, 2)}_{round(lon, 2)}"
     cache_file = os.path.join(CACHE_DIR, f"spot_{file_id}.csv")
@@ -552,7 +553,7 @@ def fetch_weather_data(lat, lon, days):
     try:
         res_raw = requests.get(url, timeout=10)
         
-        # API制限(429)やエラー発生時、古いキャッシュがあればそれを返す(フォールバック)
+        # API制限(429)やエラー発生時
         if res_raw.status_code != 200:
             if os.path.exists(cache_file):
                 df_old = pd.read_csv(cache_file, parse_dates=['time'])
@@ -560,7 +561,8 @@ def fetch_weather_data(lat, lon, days):
                     with open(meta_file, "r") as f:
                         df_old.attrs['local_offset_seconds'] = int(f.read())
                 return df_old
-            raise RuntimeError(f"【API取得失敗】Open-Meteo APIがエラーを返しました (HTTP {res_raw.status_code})")
+            # キャッシュすらない場合は、空のDataFrameを返してシステムダウンを防ぐ
+            return pd.DataFrame()
 
         response = res_raw.json()
         df = pd.DataFrame(response["hourly"])
@@ -591,20 +593,25 @@ def fetch_weather_data(lat, lon, days):
         return df
 
     except Exception as e:
-        # 通信エラー時も古いキャッシュがあれば返す
+        # 通信エラーやタイムアウト時も、古いキャッシュがあれば返す
         if os.path.exists(cache_file):
-            df_old = pd.read_csv(cache_file, parse_dates=['time'])
-            if os.path.exists(meta_file):
-                with open(meta_file, "r") as f:
-                    df_old.attrs['local_offset_seconds'] = int(f.read())
-            return df_old
-        raise RuntimeError(f"【システムエラー】予期せぬエラーが発生しました: {e}")
+            try:
+                df_old = pd.read_csv(cache_file, parse_dates=['time'])
+                if os.path.exists(meta_file):
+                    with open(meta_file, "r") as f:
+                        df_old.attrs['local_offset_seconds'] = int(f.read())
+                return df_old
+            except:
+                pass
+        # 最悪の場合も空のDataFrameを返し、RuntimeErrorを投げない
+        return pd.DataFrame()
 
 # ======================================================================================
 # 18. 気象データキャッシュファイルを物理削除するサブルーチン
 # ======================================================================================
 def clear_weather_cache_files():
     import shutil
+    import os
     CACHE_DIR = "weather_cache"
     if os.path.exists(CACHE_DIR):
         try:
@@ -629,7 +636,10 @@ def get_marine_data(time_series, lat, lon):
 
     CACHE_DIR = "weather_cache"
     if not os.path.exists(CACHE_DIR):
-        os.makedirs(CACHE_DIR, exist_ok=True)
+        try:
+            os.makedirs(CACHE_DIR, exist_ok=True)
+        except:
+            pass
 
     file_id = f"{round(lat, 2)}_{round(lon, 2)}"
     cache_file = os.path.join(CACHE_DIR, f"marine_{file_id}.json")
@@ -640,7 +650,6 @@ def get_marine_data(time_series, lat, lon):
             try:
                 with open(cache_file, "r") as f:
                     cached_data = json.load(f)
-                # 取得座標を復元して返す
                 return cached_data["results"], cached_data["lat"], cached_data["lon"]
             except:
                 pass
@@ -661,9 +670,13 @@ def get_marine_data(time_series, lat, lon):
         # API制限等で失敗した場合のフォールバック
         if res_raw.status_code != 200:
             if os.path.exists(cache_file):
-                with open(cache_file, "r") as f:
-                    cached_data = json.load(f)
-                return cached_data["results"], cached_data["lat"], cached_data["lon"]
+                try:
+                    with open(cache_file, "r") as f:
+                        cached_data = json.load(f)
+                    return cached_data["results"], cached_data["lat"], cached_data["lon"]
+                except:
+                    pass
+            # 失敗時はNoneを返し、呼び出し元のエラーハンドリングに任せる(raiseはしない)
             return None, lat, lon
 
         res = res_raw.json()
