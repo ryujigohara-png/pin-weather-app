@@ -1185,7 +1185,7 @@ def generate_weather_icons_html(df, ratio_info, contena_min_w, start_idx, design
     return header_html, body_html
 
 # ======================================================================================
-# 31. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (フォント直接指定・完全版)
+# 31. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (安全なリターン対応・完全版)
 # ======================================================================================
 def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_params, now_jst):
     import pandas as pd
@@ -1207,23 +1207,23 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         fpath = os.path.join(base_dir, 'static', 'font.ttf')
         f_size = design_params.get("font_size", 10)
         
-        # フォントオブジェクトを生成 (各描画関数でこれを使います)
+        # フォントオブジェクトを生成
         if os.path.exists(fpath):
-            # fm.FontProperties を生成
             fp = fm.FontProperties(fname=fpath, size=f_size)
-            # 念のため全体設定も行うが、今回は個別指定を優先する
             fm.fontManager.addfont(fpath)
             plt.rcParams['font.family'] = fp.get_name()
         else:
-            # 異常系：ファイルがない場合は標準フォント
             fp = fm.FontProperties(family='sans-serif', size=f_size)
 
         plt.rcParams['axes.unicode_minus'] = False
 
         # --- 2. データ取得 ---
         df_raw = fetch_weather_data(lat, lon, 9)
+        
+        # --- 修正箇所：取得失敗時に raise せず、呼び出し元が処理を続行できる空値を返す ---
         if df_raw is None or df_raw.empty:
-            raise RuntimeError("気象データの取得に失敗しました。")
+            # 呼び出し元の期待する戻り値の型（タプル）に合わせて空値を返す
+            return "", "", (0.0, 0.0, 0.0), 0, pd.DataFrame(), 0
 
         # --- 3. 時差・切り出し ---
         local_offset_s = df_raw.attrs.get('local_offset_seconds', 0)
@@ -1262,7 +1262,7 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
 
         # --- 7. グラフ描画 ---
         fig, axes = plt.subplots(len(active_plots), 1, figsize=(fig_w_inch, fig_h_inch), dpi=dpi_value,
-                                    gridspec_kw={'height_ratios': height_ratios})
+                                   gridspec_kw={'height_ratios': height_ratios})
         axes_list = np.array([axes]).flatten()
 
         formatter = get_x_axis_formatter()
@@ -1270,7 +1270,6 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
             ax = axes_list[i]
             is_bottom = (i == len(active_plots) - 1)
             
-            # 各レンダリング関数を呼び出し
             if plot_type == "wind":
                 render_wind_bar_chart(ax, df, danger_v, start_idx, design_params)
             elif plot_type == "temp":
@@ -1282,10 +1281,8 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
             elif plot_type == "tide":
                 render_tide_curve_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom)
 
-            # 共通設定を適用
             apply_common_axis_settings(ax, df, formatter, now_jst, design_params)
             
-            # --- ここが豆腐対策の核心：生成した軸ラベルやタイトルに直接フォントを注入 ---
             for text in ax.get_xticklabels() + ax.get_yticklabels():
                 text.set_fontproperties(fp)
             ax.set_xlabel(ax.get_xlabel(), fontproperties=fp)
@@ -1317,7 +1314,8 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
 
     except Exception as e:
         if 'fig' in locals(): plt.close(fig)
-        raise RuntimeError(str(e))
+        # 異常系でも raise せず、空のデータを返してシステムを維持する
+        return "", "", (0.0, 0.0, 0.0), 0, pd.DataFrame(), 0
 
 # ======================================================================================
 # 32. グラフの個別高さ(inch)と表示設定を変更するダイアログ (Streamlit版)
