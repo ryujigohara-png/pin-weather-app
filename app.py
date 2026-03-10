@@ -762,7 +762,7 @@ def get_x_axis_formatter():
     return formatter
 
 # ======================================================================================
-# 23. グラフの共通軸設定を適用するサブルーチン
+# 23. グラフの共通軸設定を適用するサブルーチン (メモリ最適化版)
 # ======================================================================================
 def apply_common_axis_settings(ax, df, formatter, now_jst, design_params):
     import matplotlib.dates as mdates
@@ -795,16 +795,16 @@ def apply_common_axis_settings(ax, df, formatter, now_jst, design_params):
     ax.tick_params(axis='x', which='major', labelsize=l_size, pad=l_pad)
     ax.tick_params(axis='y', labelsize=l_size)
 
-    fig = ax.figure
-    fig.canvas.draw()
-    labels = ax.get_xticklabels()
-    for label in labels:
-        text = label.get_text()
-        if '(' in text:
-            if sat_label in text or sun_label in text:
-                label.set_color('red')
-            else:
-                label.set_color('blue')
+    # --- メモリ最適化：fig.canvas.draw() を使わずに土日の色を変える ---
+    # 軸が確定する前に、目盛り位置から曜日を判定して直接設定します
+    for tick in ax.xaxis.get_major_ticks():
+        # 目盛りの日付を取得 (mdates は num2date で変換可能)
+        tick_date = mdates.num2date(tick.get_loc())
+        # 曜日ラベルが含まれているか、または weekday() で判定 (5=土, 6=日)
+        if tick_date.weekday() >= 5:
+            tick.label1.set_color('red')
+        else:
+            tick.label1.set_color('blue')
 
 # ======================================================================================
 # 24. 風速棒グラフを描画するサブルーチン (降水量：0より大きい場合に小数点1位表示)
@@ -1126,7 +1126,7 @@ def generate_weather_icons_html(df, ratio_info, contena_min_w, start_idx, design
     return header_html, body_html
 
 # ======================================================================================
-# 31. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (フォント直接指定・完全版)
+# 31. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (メモリ管理強化版)
 # ======================================================================================
 def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_params, now_jst):
     import pandas as pd
@@ -1136,11 +1136,13 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
     import matplotlib.pyplot as plt
     from PIL import Image
     import matplotlib.font_manager as fm
+    import gc
 
     df = pd.DataFrame()
     start_idx = 0
     split_px = 0
     new_ratio_info = (0.0, 0.0, 0.0)
+    fig = None # 初期化
 
     try:
         # --- 1. フォントオブジェクトの絶対パス生成 ---
@@ -1148,15 +1150,11 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         fpath = os.path.join(base_dir, 'static', 'font.ttf')
         f_size = design_params.get("font_size", 10)
         
-        # フォントオブジェクトを生成 (各描画関数でこれを使います)
         if os.path.exists(fpath):
-            # fm.FontProperties を生成
             fp = fm.FontProperties(fname=fpath, size=f_size)
-            # 念のため全体設定も行うが、今回は個別指定を優先する
             fm.fontManager.addfont(fpath)
             plt.rcParams['font.family'] = fp.get_name()
         else:
-            # 異常系：ファイルがない場合は標準フォント
             fp = fm.FontProperties(family='sans-serif', size=f_size)
 
         plt.rcParams['axes.unicode_minus'] = False
@@ -1203,7 +1201,7 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
 
         # --- 7. グラフ描画 ---
         fig, axes = plt.subplots(len(active_plots), 1, figsize=(fig_w_inch, fig_h_inch), dpi=dpi_value,
-                                    gridspec_kw={'height_ratios': height_ratios})
+                                   gridspec_kw={'height_ratios': height_ratios})
         axes_list = np.array([axes]).flatten()
 
         formatter = get_x_axis_formatter()
@@ -1211,7 +1209,6 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
             ax = axes_list[i]
             is_bottom = (i == len(active_plots) - 1)
             
-            # 各レンダリング関数を呼び出し
             if plot_type == "wind":
                 render_wind_bar_chart(ax, df, danger_v, start_idx, design_params)
             elif plot_type == "temp":
@@ -1223,10 +1220,8 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
             elif plot_type == "tide":
                 render_tide_curve_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom)
 
-            # 共通設定を適用
             apply_common_axis_settings(ax, df, formatter, now_jst, design_params)
             
-            # --- ここが豆腐対策の核心：生成した軸ラベルやタイトルに直接フォントを注入 ---
             for text in ax.get_xticklabels() + ax.get_yticklabels():
                 text.set_fontproperties(fp)
             ax.set_xlabel(ax.get_xlabel(), fontproperties=fp)
@@ -1244,8 +1239,11 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         img_w, img_h = full_img.size
         split_px = int(img_w * axes_list[0].get_position().x0)
         new_ratio_info = (float(img_w - split_px), (axes_list[0].get_position().width * img_w) / (len(df) - 1), 0.0)
-        plt.close(fig)
         
+        # 画像処理が終わったら即座にメモリ解放
+        plt.close(fig)
+        fig = None 
+
         left_part = full_img.crop((0, 0, split_px, img_h))
         right_part = full_img.crop((split_px, 0, img_w, img_h))
         
@@ -1254,10 +1252,20 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
             img.save(b, format="PNG")
             return base64.b64encode(b.getvalue()).decode()
 
-        return img_to_b64(left_part), img_to_b64(right_part), new_ratio_info, start_idx, df, split_px
+        l_b64 = img_to_b64(left_part)
+        r_b64 = img_to_b64(right_part)
+        
+        # 不要なオブジェクトを明示的に削除
+        del full_img, left_part, right_part
+        gc.collect()
+
+        return l_b64, r_b64, new_ratio_info, start_idx, df, split_px
 
     except Exception as e:
-        if 'fig' in locals(): plt.close(fig)
+        if fig is not None: 
+            plt.close(fig)
+        import gc
+        gc.collect()
         raise RuntimeError(str(e))
 
 
