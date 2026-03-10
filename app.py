@@ -1961,6 +1961,7 @@ def index():
     from flask import session, render_template, request
     
     # --- (config, lang_dict, now_jst, design_params, sel_dirs の定義) ---
+    # --- (config, lang_dict, now_jst, design_params, sel_dirs の定義) ---
     config = get_env_config()
     all_langs = get_language_dict()
     selected_lang = session.get('lang', 'ja')
@@ -2006,6 +2007,7 @@ def index():
     debug_msg = ""
 
     # キャッシュチェック処理
+    # キャッシュチェック処理
     if force_refresh:
         should_render = True
     elif cache_key in render_cache:
@@ -2013,6 +2015,8 @@ def index():
         if (now_jst - cached_item.get('timestamp')).total_seconds() < 86400:
             graph_html = cached_item['html']
             draw_time_str = cached_item.get('draw_time_str', "")
+            debug_msg = "メモリ使用"
+        else: should_render = True
             debug_msg = "メモリ使用"
         else: should_render = True
     elif os.path.exists(graph_cache_path):
@@ -2028,10 +2032,24 @@ def index():
 
     try:
         # 描画が必要な場合
+        try:
+            with open(graph_cache_path, "r", encoding="utf-8") as f:
+                c_data = json.load(f)
+                graph_html = c_data['html']
+                draw_time_str = c_data.get('draw_time_str', "")
+            render_cache[cache_key] = {'html': graph_html, 'timestamp': datetime.datetime.fromtimestamp(os.path.getmtime(graph_cache_path), tz=jst), 'draw_time_str': draw_time_str}
+            debug_msg = "物理使用"
+        except: should_render = True
+    else: should_render = True
+
+    try:
+        # 描画が必要な場合
         if should_render or graph_html is None:
             draw_time_str = now_jst.strftime('%H:%M')
             # ここで内部のAPI取得がタイムアウトや429エラーになるとExceptionへ飛びます
+            # ここで内部のAPI取得がタイムアウトや429エラーになるとExceptionへ飛びます
             graph_html = render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst)
+            
             
             render_cache[cache_key] = {'html': graph_html, 'timestamp': now_jst, 'draw_time_str': draw_time_str}
             try:

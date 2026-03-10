@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -31,4 +32,39 @@
         </div>
     </div>
 </body>
+=======
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>通信エラー - Pin_Weather!</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; background: #fdf2f2; color: #333; text-align: center; }
+        .error-container { max-width: 600px; margin: 50px auto; background: #fff; padding: 30px; border-radius: 12px; border-top: 8px solid #dc3545; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { color: #dc3545; font-size: 1.5rem; }
+        p { font-weight: bold; }
+        pre { background: #f8f9fa; padding: 15px; overflow-x: auto; font-size: 0.75em; border-radius: 4px; text-align: left; border: 1px solid #ddd; white-space: pre-wrap; word-break: break-all; }
+        .btn-retry { display: inline-block; background: #007bff; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 30px; margin-top: 20px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .note { font-size: 0.85rem; color: #666; margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <h1>⚠️ データの取得に失敗しました</h1>
+        <p>「グラフ生成中」のまま進まない状態を回避するため、処理を中断しました。</p>
+        
+        <div style="text-align: left; margin: 20px 0;">
+            <pre>{{ error_msg }}</pre>
+        </div>
+
+        <a href="/?refresh=1" class="btn-retry">🔄 再試行する（強制リロード）</a>
+        
+        <div class="note">
+            ※ API制限（429）の場合、数分置いてからお試しください。<br>
+            ※ 通信環境が良い場所で再度操作してください。
+        </div>
+    </div>
+</body>
+>>>>>>> 88313db2c1cd5e54d29f42cdaf5b4ec8810d803f
 </html>
