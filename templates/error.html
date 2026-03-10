@@ -1,70 +1,96 @@
-<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>通信エラー - Pin_Weather!</title>
+    <title>⚠️ データの取得に失敗しました</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; padding: 20px; line-height: 1.6; background: #fdf2f2; color: #333; text-align: center; }
-        .error-container { max-width: 600px; margin: 50px auto; background: #fff; padding: 30px; border-radius: 12px; border-top: 8px solid #dc3545; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h1 { color: #dc3545; font-size: 1.5rem; }
-        p { font-weight: bold; }
-        pre { background: #f8f9fa; padding: 15px; overflow-x: auto; font-size: 0.75em; border-radius: 4px; text-align: left; border: 1px solid #ddd; white-space: pre-wrap; word-break: break-all; }
-        .btn-retry { display: inline-block; background: #007bff; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 30px; margin-top: 20px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .note { font-size: 0.85rem; color: #666; margin-top: 15px; }
+        body { background-color: #f8f9fa; font-family: sans-serif; }
+        .error-container { max-width: 700px; margin: 50px auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .log-area { background: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; overflow-x: auto; white-space: pre-wrap; max-height: 300px; }
+        .timer-badge { font-size: 2.5rem; font-weight: bold; color: #0d6efd; }
     </style>
 </head>
 <body>
-    <div class="error-container">
-        <h1>⚠️ データの取得に失敗しました</h1>
-        <p>「グラフ生成中」のまま進まない状態を回避するため、処理を中断しました。</p>
-        
-        <div style="text-align: left; margin: 20px 0;">
-            <pre>{{ error_msg }}</pre>
+<div class="container">
+    <div class="error-container text-center">
+        <h2 class="text-danger mb-4">⚠️ データの取得に失敗しました</h2>
+        <p class="lead text-start mb-4" style="white-space: pre-wrap;">{{ error_msg.split('\n\n詳細ログ:')[0] }}</p>
+
+        <div class="alert alert-warning py-4 mb-4">
+            <div class="row">
+                <div class="col-6 border-end">
+                    <small class="text-muted d-block">発生時刻</small>
+                    <strong id="error-time">--:--:--</strong>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted d-block">経過時間</small>
+                    <strong id="elapsed-time">0分0秒</strong>
+                </div>
+            </div>
+            <hr>
+            <p class="mb-1">API制限解除まであと（自動リロード）</p>
+            <div id="countdown" class="timer-badge">15:00</div>
         </div>
 
-        <a href="/?refresh=1" class="btn-retry">🔄 再試行する（強制リロード）</a>
-        
-        <div class="note">
-            ※ API制限（429）の場合、数分置いてからお試しください。<br>
-            ※ 通信環境が良い場所で再度操作してください。
-        </div>
-    </div>
-</body>
-=======
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>通信エラー - Pin_Weather!</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; line-height: 1.6; background: #fdf2f2; color: #333; text-align: center; }
-        .error-container { max-width: 600px; margin: 50px auto; background: #fff; padding: 30px; border-radius: 12px; border-top: 8px solid #dc3545; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h1 { color: #dc3545; font-size: 1.5rem; }
-        p { font-weight: bold; }
-        pre { background: #f8f9fa; padding: 15px; overflow-x: auto; font-size: 0.75em; border-radius: 4px; text-align: left; border: 1px solid #ddd; white-space: pre-wrap; word-break: break-all; }
-        .btn-retry { display: inline-block; background: #007bff; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 30px; margin-top: 20px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .note { font-size: 0.85rem; color: #666; margin-top: 15px; }
-    </style>
-</head>
-<body>
-    <div class="error-container">
-        <h1>⚠️ データの取得に失敗しました</h1>
-        <p>「グラフ生成中」のまま進まない状態を回避するため、処理を中断しました。</p>
-        
-        <div style="text-align: left; margin: 20px 0;">
-            <pre>{{ error_msg }}</pre>
+        <div class="d-grid gap-2 d-md-block mb-4">
+            <button onclick="location.reload();" class="btn btn-primary btn-lg px-5">🔄 今すぐ手動で再試行</button>
+            <a href="/" class="btn btn-outline-secondary btn-lg">🏠 TOPへ戻る</a>
         </div>
 
-        <a href="/?refresh=1" class="btn-retry">🔄 再試行する（強制リロード）</a>
-        
-        <div class="note">
-            ※ API制限（429）の場合、数分置いてからお試しください。<br>
-            ※ 通信環境が良い場所で再度操作してください。
+        <div class="text-start">
+            <button class="btn btn-sm btn-dark mb-2" type="button" data-bs-toggle="collapse" data-bs-target="#logCollapse">
+                詳細ログを表示
+            </button>
+            <div class="collapse" id="logCollapse">
+                <div class="log-area text-start">{{ error_msg }}</div>
+            </div>
         </div>
     </div>
+</div>
+
+<audio id="alarm-sound" src="https://actions.google.com/google_assistant/ambience/industrial/fume_hood_running_loop.ogg" preload="auto"></audio>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const startTime = new Date();
+    document.getElementById('error-time').innerText = startTime.toLocaleTimeString();
+
+    let waitSeconds = 900; // 15分 (15 * 60)
+    const countdownEl = document.getElementById('countdown');
+    const elapsedEl = document.getElementById('elapsed-time');
+    const alarm = document.getElementById('alarm-sound');
+
+    const timer = setInterval(() => {
+        const now = new Date();
+        const diff = Math.floor((now - startTime) / 1000);
+        
+        // 経過時間の表示
+        const eMin = Math.floor(diff / 60);
+        const eSec = diff % 60;
+        elapsedEl.innerText = `${eMin}分${eSec}秒`;
+
+        // カウントダウンの表示
+        waitSeconds--;
+        if (waitSeconds <= 0) {
+            clearInterval(timer);
+            countdownEl.innerText = "00:00";
+            countdownEl.classList.replace('text-primary', 'text-success');
+            
+            // アラームを鳴らす
+            alarm.play().catch(e => console.log("Audio play failed: ", e));
+            
+            // 3秒後にリロード
+            setTimeout(() => { location.reload(); }, 3000);
+            return;
+        }
+
+        const cMin = Math.floor(waitSeconds / 60);
+        const cSec = waitSeconds % 60;
+        countdownEl.innerText = `${String(cMin).padStart(2, '0')}:${String(cSec).padStart(2, '0')}`;
+        
+    }, 1000);
+</script>
 </body>
->>>>>>> 88313db2c1cd5e54d29f42cdaf5b4ec8810d803f
 </html>
