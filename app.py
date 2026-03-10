@@ -516,9 +516,14 @@ def setup_font(font_size=None):
 
 
 # ======================================================================================
-# 17. 気象データをAPIから取得するサブルーチン (キャッシュ対応)
+# 17. 気象データをAPIから取得するサブルーチン (キャッシュ対応・API制限フォールバック付)
 # ======================================================================================
 def fetch_weather_data(lat, lon, days):
+    import os
+    import time
+    import pandas as pd
+    import requests
+
     CACHE_DIR = "weather_cache"
     if not os.path.exists(CACHE_DIR): 
         try:
@@ -530,6 +535,7 @@ def fetch_weather_data(lat, lon, days):
     cache_file = os.path.join(CACHE_DIR, f"spot_{file_id}.csv")
     meta_file = os.path.join(CACHE_DIR, f"spot_{file_id}.meta")
     
+    # 1. 有効なキャッシュ（4時間以内）があれば即座に返す
     if os.path.exists(cache_file) and os.path.exists(meta_file):
         if (time.time() - os.path.getmtime(cache_file)) < 14400:
             try:
@@ -538,13 +544,22 @@ def fetch_weather_data(lat, lon, days):
                     offset = int(f.read())
                 df_cache.attrs['local_offset_seconds'] = offset
                 return df_cache
-            except: pass
+            except: 
+                pass
 
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&wind_speed_unit=ms&forecast_days={days}"
     
     try:
         res_raw = requests.get(url, timeout=10)
+        
+        # API制限(429)やエラー発生時、古いキャッシュがあればそれを返す(フォールバック)
         if res_raw.status_code != 200:
+            if os.path.exists(cache_file):
+                df_old = pd.read_csv(cache_file, parse_dates=['time'])
+                if os.path.exists(meta_file):
+                    with open(meta_file, "r") as f:
+                        df_old.attrs['local_offset_seconds'] = int(f.read())
+                return df_old
             raise RuntimeError(f"【API取得失敗】Open-Meteo APIがエラーを返しました (HTTP {res_raw.status_code})")
 
         response = res_raw.json()
@@ -568,16 +583,21 @@ def fetch_weather_data(lat, lon, days):
 
         try:
             df.to_csv(cache_file, index=False)
-            with open(meta_file, "w") as f: f.write(str(local_offset_s))
-        except PermissionError:
-            raise RuntimeError(f"【アクセス拒否】キャッシュファイル '{cache_file}' が開かれています。")
-        except Exception as e:
-            raise RuntimeError(f"【保存失敗】キャッシュデータの保存に失敗しました: {e}")
+            with open(meta_file, "w") as f: 
+                f.write(str(local_offset_s))
+        except Exception:
+            pass # 保存失敗は致命的エラーとせず進む
 
         return df
-    except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"【通信エラー】APIに接続できませんでした: {e}")
+
     except Exception as e:
+        # 通信エラー時も古いキャッシュがあれば返す
+        if os.path.exists(cache_file):
+            df_old = pd.read_csv(cache_file, parse_dates=['time'])
+            if os.path.exists(meta_file):
+                with open(meta_file, "r") as f:
+                    df_old.attrs['local_offset_seconds'] = int(f.read())
+            return df_old
         raise RuntimeError(f"【システムエラー】予期せぬエラーが発生しました: {e}")
 
 # ======================================================================================
@@ -597,65 +617,91 @@ def clear_weather_cache_files():
 
 
 # ======================================================================================
-# 19. 海洋データを取得するサブルーチン (9日分完全対応版)
+# 19. 海洋データを取得するサブルーチン (キャッシュ対応・9日分完全対応版)
 # ======================================================================================
 def get_marine_data(time_series, lat, lon):
     import requests
     import pandas as pd
     import numpy as np
+    import os
+    import time
+    import json
 
-    # 1. URLとパラメータの修正
-    # ご指摘の通り、正しいエンドポイントと明示的なパラメータ指定を行います
+    CACHE_DIR = "weather_cache"
+    if not os.path.exists(CACHE_DIR):
+        os.makedirs(CACHE_DIR, exist_ok=True)
+
+    file_id = f"{round(lat, 2)}_{round(lon, 2)}"
+    cache_file = os.path.join(CACHE_DIR, f"marine_{file_id}.json")
+
+    # 1. 有効なキャッシュ（4時間以内）があれば即座に返す
+    if os.path.exists(cache_file):
+        if (time.time() - os.path.getmtime(cache_file)) < 14400:
+            try:
+                with open(cache_file, "r") as f:
+                    cached_data = json.load(f)
+                # 取得座標を復元して返す
+                return cached_data["results"], cached_data["lat"], cached_data["lon"]
+            except:
+                pass
+
     url = "https://marine-api.open-meteo.com/v1/marine"
     params = {
         "latitude": round(float(lat), 4),
         "longitude": round(float(lon), 4),
         "hourly": "wave_height,sea_surface_temperature,sea_level_height_msl",
         "timezone": "auto",
-        "forecast_days": 9,  # 正しいURLであれば9日分(またはそれ以上)取得可能です
+        "forecast_days": 9,
         "cell_selection": "sea"
     }
 
     try:
-        # APIリクエスト
-        res = requests.get(url, params=params, timeout=15).json()
+        res_raw = requests.get(url, params=params, timeout=15)
         
+        # API制限等で失敗した場合のフォールバック
+        if res_raw.status_code != 200:
+            if os.path.exists(cache_file):
+                with open(cache_file, "r") as f:
+                    cached_data = json.load(f)
+                return cached_data["results"], cached_data["lat"], cached_data["lon"]
+            return None, lat, lon
+
+        res = res_raw.json()
         if "hourly" not in res:
             return None, lat, lon
         
-        # 2. API取得データをDataFrame化
         m_df = pd.DataFrame(res["hourly"])
-        # APIの時間を naive (タイムゾーンなし) に統一
         m_df['time'] = pd.to_datetime(m_df['time']).dt.tz_localize(None)
         
-        # 実際にデータが取得された座標を保持
         res_lat = res.get("latitude", lat)
         res_lon = res.get("longitude", lon)
         
-        # 3. 9日間の時間軸(time_series)に取得データを正確にマージ
-        # Flask側から渡される time_series も naive に変換して比較します
         time_df = pd.DataFrame({'time': [pd.to_datetime(t).replace(tzinfo=None) for t in time_series]})
-        
-        # left join により、APIから取得できた全期間を time_series にマッピングします
         merged = pd.merge(time_df, m_df, on='time', how='left')
         
-        # 4. 辞書形式で抽出 (Noneをnp.nanに置換してグラフ描画の断線を防ぐ)
         results = {
             "wave": merged['wave_height'].infer_objects(copy=False).fillna(np.nan).tolist(),
             "temp": merged['sea_surface_temperature'].infer_objects(copy=False).fillna(np.nan).tolist(),
             "tide": merged['sea_level_height_msl'].infer_objects(copy=False).fillna(np.nan).tolist()
         }
         
-        # 有効なデータが1つでもあるかチェック
-        # 全ての要素が NaN でなければ有効とみなす
-        if pd.Series(results["wave"]).isna().all() and pd.Series(results["tide"]).isna().all():
-            return None, res_lat, res_lon
+        # キャッシュに保存
+        try:
+            with open(cache_file, "w") as f:
+                json.dump({"results": results, "lat": res_lat, "lon": res_lon}, f)
+        except:
+            pass
 
         return results, res_lat, res_lon
 
     except Exception as e:
-        # エラー時はログに出力（デバッグ用）
-        print(f"Marine API Access Error: {e}")
+        # 通信エラー時も古いキャッシュがあれば返す
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, "r") as f:
+                    cached_data = json.load(f)
+                return cached_data["results"], cached_data["lat"], cached_data["lon"]
+            except: pass
         return None, lat, lon
 
 # ======================================================================================
