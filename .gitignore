@@ -1,0 +1,4 @@
+# 気象・海洋データのキャッシュファイルを除外 m
+weather_cache/*.csv
+weather_cache/*.meta
+weather_cache/*.json
