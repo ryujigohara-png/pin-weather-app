@@ -516,13 +516,14 @@ def setup_font(font_size=None):
 
 
 # ======================================================================================
-# 17. 気象データをAPIから取得するサブルーチン (キャッシュ対応・API制限フォールバック付)
+# 17. 気象データをAPIから取得するサブルーチン (メモリ節約・完全版)
 # ======================================================================================
 def fetch_weather_data(lat, lon, days):
     import os
     import time
     import pandas as pd
     import requests
+    import numpy as np
 
     CACHE_DIR = "weather_cache"
     if not os.path.exists(CACHE_DIR): 
@@ -540,7 +541,11 @@ def fetch_weather_data(lat, lon, days):
     if os.path.exists(cache_file) and os.path.exists(meta_file):
         if (time.time() - os.path.getmtime(cache_file)) < 14400:
             try:
+                # 修正：読み込み時に型を抑制しメモリを節約
                 df_cache = pd.read_csv(cache_file, parse_dates=['time'])
+                for col in df_cache.select_dtypes(include=['float64']).columns:
+                    df_cache[col] = df_cache[col].astype(np.float32)
+                
                 with open(meta_file, "r") as f:
                     offset = int(f.read())
                 df_cache.attrs['local_offset_seconds'] = offset
@@ -557,6 +562,9 @@ def fetch_weather_data(lat, lon, days):
         if res_raw.status_code != 200:
             if os.path.exists(cache_file):
                 df_old = pd.read_csv(cache_file, parse_dates=['time'])
+                # 修正：型を軽量化してリターン
+                for col in df_old.select_dtypes(include=['float64']).columns:
+                    df_old[col] = df_old[col].astype(np.float32)
                 if os.path.exists(meta_file):
                     with open(meta_file, "r") as f:
                         df_old.attrs['local_offset_seconds'] = int(f.read())
@@ -571,6 +579,10 @@ def fetch_weather_data(lat, lon, days):
         df['time'] = pd.to_datetime(df['time']).dt.tz_localize(None)
         df.attrs['local_offset_seconds'] = local_offset_s
         
+        # 修正：メモリ消費の激しいfloat64をfloat32へ一括変換（精度は維持）
+        for col in df.select_dtypes(include=['float64']).columns:
+            df[col] = df[col].astype(np.float32)
+
         def get_icon(code):
             if code == 0: return "☀️"
             if code <= 3: return "🌤️"
@@ -581,7 +593,8 @@ def fetch_weather_data(lat, lon, days):
             if code <= 86: return "🌨️"
             if code <= 99: return "⛈️"
             return "❓"
-        df['weather_icon'] = df['weather_code'].apply(get_icon)
+        # 修正：weather_codeを軽量なint16として処理
+        df['weather_icon'] = df['weather_code'].astype(np.int16).apply(get_icon)
 
         try:
             df.to_csv(cache_file, index=False)
@@ -597,6 +610,8 @@ def fetch_weather_data(lat, lon, days):
         if os.path.exists(cache_file):
             try:
                 df_old = pd.read_csv(cache_file, parse_dates=['time'])
+                for col in df_old.select_dtypes(include=['float64']).columns:
+                    df_old[col] = df_old[col].astype(np.float32)
                 if os.path.exists(meta_file):
                     with open(meta_file, "r") as f:
                         df_old.attrs['local_offset_seconds'] = int(f.read())
