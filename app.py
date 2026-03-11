@@ -10,17 +10,22 @@ import sys
 import requests
 import pandas as pd
 import numpy as np
-import matplotlib
-matplotlib.use('Agg') # GUIなしのバックエンド（サーバー用）を強制指定
-import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
-import matplotlib
-matplotlib.use('Agg') # 描画専用（GUIなし）に固定import urllib.request
+import urllib.request
 from datetime import datetime, timezone, timedelta
 from PIL import Image
 from flask import Flask, render_template, request, session, jsonify, redirect, url_for
 
+# Matplotlibの設定：GUIなしのバックエンドを強制し、フォントスキャン負荷を軽減する
+import matplotlib
+matplotlib.use('Agg') 
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+
+# メモリ節約のため、特殊なフォントスキャンを避ける設定を追記
+matplotlib.rcParams['font.family'] = 'sans-serif'
+
 app = Flask(__name__)
+
 # 秘密鍵は環境変数から取得、なければ固定値。
 # [重要] インデント（行頭の空白）は一切入れないこと
 app.secret_key = os.environ.get('SECRET_KEY', 'pin_weather_secret_key_2026')
@@ -517,7 +522,7 @@ def setup_font(font_size=None):
 
 
 # ======================================================================================
-# 17. 気象データをAPIから取得するサブルーチン (メモリ節約・完全版)
+# 17. 気象データをAPIから取得するサブルーチン (メモリ極限節約版)
 # ======================================================================================
 def fetch_weather_data(lat, lon, days):
     import os
@@ -528,62 +533,54 @@ def fetch_weather_data(lat, lon, days):
 
     CACHE_DIR = "weather_cache"
     if not os.path.exists(CACHE_DIR): 
-        try:
-            os.makedirs(CACHE_DIR)
-        except Exception as e:
-            # フォルダ作成失敗時も、システムを止めず例外処理へ
-            pass
+        try: os.makedirs(CACHE_DIR)
+        except: pass
     
     file_id = f"{round(lat, 2)}_{round(lon, 2)}"
     cache_file = os.path.join(CACHE_DIR, f"spot_{file_id}.csv")
     meta_file = os.path.join(CACHE_DIR, f"spot_{file_id}.meta")
     
-    # 1. 有効なキャッシュ（4時間以内）があれば即座に返す
+    # 1. キャッシュ読み込み（メモリ節約のため列を限定）
     if os.path.exists(cache_file) and os.path.exists(meta_file):
         if (time.time() - os.path.getmtime(cache_file)) < 14400:
             try:
-                # 修正：読み込み時に型を抑制しメモリを節約
-                df_cache = pd.read_csv(cache_file, parse_dates=['time'])
-                for col in df_cache.select_dtypes(include=['float64']).columns:
+                # 必要な列だけを指定してロード
+                cols = ['time', 'temperature_2m', 'wind_speed_10m', 'wind_direction_10m', 'weather_code', 'precipitation']
+                df_cache = pd.read_csv(cache_file, parse_dates=['time'], usecols=cols)
+                
+                # 数値型を即座に float32 / int16 へ
+                for col in ['temperature_2m', 'wind_speed_10m', 'wind_direction_10m', 'precipitation']:
                     df_cache[col] = df_cache[col].astype(np.float32)
+                df_cache['weather_code'] = df_cache['weather_code'].astype(np.int16)
                 
                 with open(meta_file, "r") as f:
                     offset = int(f.read())
                 df_cache.attrs['local_offset_seconds'] = offset
                 return df_cache
-            except: 
-                pass
+            except: pass
 
+    # 2. APIリクエスト
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&wind_speed_unit=ms&forecast_days={days}"
     
     try:
         res_raw = requests.get(url, timeout=10)
-        
-        # API制限(429)やエラー発生時
         if res_raw.status_code != 200:
-            if os.path.exists(cache_file):
-                df_old = pd.read_csv(cache_file, parse_dates=['time'])
-                # 修正：型を軽量化してリターン
-                for col in df_old.select_dtypes(include=['float64']).columns:
-                    df_old[col] = df_old[col].astype(np.float32)
-                if os.path.exists(meta_file):
-                    with open(meta_file, "r") as f:
-                        df_old.attrs['local_offset_seconds'] = int(f.read())
-                return df_old
-            # キャッシュすらない場合は、空のDataFrameを返してシステムダウンを防ぐ
             return pd.DataFrame()
 
         response = res_raw.json()
+        # ロード直後に辞書から必要な部分だけDF化
         df = pd.DataFrame(response["hourly"])
+        
+        # 不要なメモリ消費を抑えるため型を即変換
+        for col in ['temperature_2m', 'wind_speed_10m', 'wind_direction_10m', 'precipitation']:
+            df[col] = df[col].astype(np.float32)
+        df['weather_code'] = df['weather_code'].astype(np.int16)
         
         local_offset_s = response.get("utc_offset_seconds", 0)
         df['time'] = pd.to_datetime(df['time']).dt.tz_localize(None)
         df.attrs['local_offset_seconds'] = local_offset_s
         
-        # 修正：メモリ消費の激しいfloat64をfloat32へ一括変換（精度は維持）
-        for col in df.select_dtypes(include=['float64']).columns:
-            df[col] = df[col].astype(np.float32)
-
+        # 天気アイコン生成
         def get_icon(code):
             if code == 0: return "☀️"
             if code <= 3: return "🌤️"
@@ -594,32 +591,16 @@ def fetch_weather_data(lat, lon, days):
             if code <= 86: return "🌨️"
             if code <= 99: return "⛈️"
             return "❓"
-        # 修正：weather_codeを軽量なint16として処理
-        df['weather_icon'] = df['weather_code'].astype(np.int16).apply(get_icon)
+        df['weather_icon'] = df['weather_code'].apply(get_icon)
 
+        # キャッシュ保存
         try:
             df.to_csv(cache_file, index=False)
-            with open(meta_file, "w") as f: 
-                f.write(str(local_offset_s))
-        except Exception:
-            pass # 保存失敗は致命的エラーとせず進む
+            with open(meta_file, "w") as f: f.write(str(local_offset_s))
+        except: pass
 
         return df
-
-    except Exception as e:
-        # 通信エラーやタイムアウト時も、古いキャッシュがあれば返す
-        if os.path.exists(cache_file):
-            try:
-                df_old = pd.read_csv(cache_file, parse_dates=['time'])
-                for col in df_old.select_dtypes(include=['float64']).columns:
-                    df_old[col] = df_old[col].astype(np.float32)
-                if os.path.exists(meta_file):
-                    with open(meta_file, "r") as f:
-                        df_old.attrs['local_offset_seconds'] = int(f.read())
-                return df_old
-            except:
-                pass
-        # 最悪の場合も空のDataFrameを返し、RuntimeErrorを投げない
+    except:
         return pd.DataFrame()
 
 # ======================================================================================
@@ -640,7 +621,7 @@ def clear_weather_cache_files():
 
 
 # ======================================================================================
-# 19. 海洋データを取得するサブルーチン (メモリ節約・完全版)
+# 19. 海洋データを取得するサブルーチン (極限節約版)
 # ======================================================================================
 def get_marine_data(time_series, lat, lon):
     import requests
@@ -652,29 +633,24 @@ def get_marine_data(time_series, lat, lon):
 
     CACHE_DIR = "weather_cache"
     if not os.path.exists(CACHE_DIR):
-        try:
-            os.makedirs(CACHE_DIR, exist_ok=True)
-        except:
-            pass
+        try: os.makedirs(CACHE_DIR, exist_ok=True)
+        except: pass
 
     file_id = f"{round(lat, 2)}_{round(lon, 2)}"
     cache_file = os.path.join(CACHE_DIR, f"marine_{file_id}.json")
 
-    # 1. 有効なキャッシュ（4時間以内）があれば即座に返す
+    # 1. キャッシュ読み込み（数値を軽量な float32 で復元）
     if os.path.exists(cache_file):
         if (time.time() - os.path.getmtime(cache_file)) < 14400:
             try:
                 with open(cache_file, "r") as f:
                     cached_data = json.load(f)
-                
-                # 修正：リスト内の数値を軽量な型に変換してメモリを節約
                 res = cached_data["results"]
+                # 修正：各リストの数値を強制的に float32 (軽量) にして展開
                 for k in res:
-                    res[k] = [np.float32(v) if v is not None else np.nan for v in res[k]]
-                
+                    res[k] = [np.float32(v) if (v is not None and v != "None") else np.nan for v in res[k]]
                 return res, cached_data["lat"], cached_data["lon"]
-            except:
-                pass
+            except: pass
 
     url = "https://marine-api.open-meteo.com/v1/marine"
     params = {
@@ -688,33 +664,18 @@ def get_marine_data(time_series, lat, lon):
 
     try:
         res_raw = requests.get(url, params=params, timeout=15)
-        
-        # API制限等で失敗した場合のフォールバック
         if res_raw.status_code != 200:
-            if os.path.exists(cache_file):
-                try:
-                    with open(cache_file, "r") as f:
-                        cached_data = json.load(f)
-                    res = cached_data["results"]
-                    for k in res:
-                        res[k] = [np.float32(v) if v is not None else np.nan for v in res[k]]
-                    return res, cached_data["lat"], cached_data["lon"]
-                except:
-                    pass
-            # 失敗時はNoneを返し、呼び出し元のエラーハンドリングに任せる(raiseはしない)
             return None, lat, lon
 
         res = res_raw.json()
-        if "hourly" not in res:
-            return None, lat, lon
+        if "hourly" not in res: return None, lat, lon
         
+        # 修正：DataFrame作成時に即座に型を float32 に落とす
         m_df = pd.DataFrame(res["hourly"])
+        for col in m_df.select_dtypes(include=['float64']).columns:
+            m_df[col] = m_df[col].astype(np.float32)
+            
         m_df['time'] = pd.to_datetime(m_df['time']).dt.tz_localize(None)
-        
-        # 修正：マージ前に数値型を軽量化
-        for col in ['wave_height', 'sea_surface_temperature', 'sea_level_height_msl']:
-            if col in m_df.columns:
-                m_df[col] = m_df[col].astype(np.float32)
         
         res_lat = res.get("latitude", lat)
         res_lon = res.get("longitude", lon)
@@ -723,31 +684,19 @@ def get_marine_data(time_series, lat, lon):
         merged = pd.merge(time_df, m_df, on='time', how='left')
         
         results = {
-            "wave": merged['wave_height'].infer_objects(copy=False).fillna(np.nan).tolist(),
-            "temp": merged['sea_surface_temperature'].infer_objects(copy=False).fillna(np.nan).tolist(),
-            "tide": merged['sea_level_height_msl'].infer_objects(copy=False).fillna(np.nan).tolist()
+            "wave": merged['wave_height'].fillna(np.nan).tolist(),
+            "temp": merged['sea_surface_temperature'].fillna(np.nan).tolist(),
+            "tide": merged['sea_level_height_msl'].fillna(np.nan).tolist()
         }
         
-        # キャッシュに保存
         try:
             with open(cache_file, "w") as f:
                 json.dump({"results": results, "lat": res_lat, "lon": res_lon}, f)
-        except:
-            pass
+        except: pass
 
         return results, res_lat, res_lon
 
-    except Exception as e:
-        # 通信エラー時も古いキャッシュがあれば返す
-        if os.path.exists(cache_file):
-            try:
-                with open(cache_file, "r") as f:
-                    cached_data = json.load(f)
-                res = cached_data["results"]
-                for k in res:
-                    res[k] = [np.float32(v) if v is not None else np.nan for v in res[k]]
-                return res, cached_data["lat"], cached_data["lon"]
-            except: pass
+    except:
         return None, lat, lon
 
 # ======================================================================================
