@@ -1153,17 +1153,31 @@ def generate_weather_icons_html(df, ratio_info, contena_min_w, start_idx, design
     return header_html, body_html
 
 # ======================================================================================
-# 31. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (Render最適化サイズ版)
+# 31. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (仕様復旧・診断版)
 # ======================================================================================
 def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_params, now_jst):
     import pandas as pd
     import io, base64, os, sys
     import numpy as np
     from datetime import timedelta
+    import matplotlib
+    matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     from PIL import Image
     import matplotlib.font_manager as fm
 
+    # メモリー計測 (Linux/Render環境用)
+    def get_mem():
+        try:
+            import resource
+            # 現在のピークメモリ使用量をMB単位で取得
+            return f"{resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024:.1f}MB"
+        except:
+            return "N/A"
+
+    trace = []
+    trace.append(f"START:{get_mem()}")
+    
     df = pd.DataFrame()
     start_idx = 0
     split_px = 0
@@ -1188,7 +1202,10 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         # --- 2. データ取得 ---
         df_raw = fetch_weather_data(lat, lon, 9)
         if df_raw is None or df_raw.empty:
-            return "", "", (0.0, 0.0, 0.0), 0, pd.DataFrame(), 0
+            trace.append(f"FETCH_EMPTY:{get_mem()}")
+            return "ERR:FETCH_EMPTY", "", (0.0, 0.0, 0.0), 0, pd.DataFrame(), 0
+
+        trace.append(f"FETCH_OK:{get_mem()}")
 
         # --- 3. 時差・切り出し ---
         local_offset_s = df_raw.attrs.get('local_offset_seconds', 0)
@@ -1217,13 +1234,10 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         if any(k in active_plots for k in {"wave", "ocean_temp", "tide"}):
             marine_results, r_lat, r_lon = get_marine_data(df['time'], lat, lon)
 
-        # --- 6. サイズ設計 (メモリ節約のため横幅を 15 -> 10 に抑制) ---
+        # --- 6. サイズ設計 (元の仕様: DPI 72, 横幅 15.0インチ) ---
         unit_height_px = 100  
-        # dpi_value = design_params.get("graph_dpi", 50)
-        dpi_value = 35
-
-        # [重要] メモリ節約のため横幅を抑制
-        fig_w_inch = 10.0 
+        dpi_value = design_params.get("graph_dpi", 72)
+        fig_w_inch = design_params.get("width_inch", 15.0)
         
         fig_h_inch = (sum(height_ratios) * unit_height_px + 150) / dpi_value
         margin_left_inch = design_params.get("margin_left_inch", 0.8)
@@ -1233,22 +1247,18 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         fig, axes = plt.subplots(len(active_plots), 1, figsize=(fig_w_inch, fig_h_inch), dpi=dpi_value,
                                    gridspec_kw={'height_ratios': height_ratios})
         axes_list = np.array([axes]).flatten()
+        trace.append(f"SUBPLOTS:{get_mem()}")
 
         formatter = get_x_axis_formatter()
         for i, plot_type in enumerate(active_plots):
             ax = axes_list[i]
             is_bottom = (i == len(active_plots) - 1)
             
-            if plot_type == "wind":
-                render_wind_bar_chart(ax, df, danger_v, start_idx, design_params)
-            elif plot_type == "temp":
-                render_temp_line_chart(ax, df)
-            elif plot_type == "wave":
-                render_wave_height_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom)
-            elif plot_type == "ocean_temp":
-                render_ocean_temp_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom)
-            elif plot_type == "tide":
-                render_tide_curve_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom)
+            if plot_type == "wind": render_wind_bar_chart(ax, df, danger_v, start_idx, design_params)
+            elif plot_type == "temp": render_temp_line_chart(ax, df)
+            elif plot_type == "wave": render_wave_height_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom)
+            elif plot_type == "ocean_temp": render_ocean_temp_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom)
+            elif plot_type == "tide": render_tide_curve_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom)
 
             apply_common_axis_settings(ax, df, formatter, now_jst, design_params)
             
@@ -1259,19 +1269,21 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
             ax.set_ylabel(ax.get_ylabel(), fontproperties=fp)
 
         plt.subplots_adjust(left=left_margin_ratio, right=0.98, top=0.92, bottom=0.15, hspace=0.4)
+        trace.append(f"RENDER_OK:{get_mem()}")
 
         # --- 8. 画像出力 ---
         buf = io.BytesIO()
         fig.savefig(buf, format="png", bbox_inches=None, pad_inches=0, dpi=dpi_value)
         buf.seek(0)
+        trace.append(f"SAVEFIG:{get_mem()}")
+
         full_img = Image.open(buf)
         img_w, img_h = full_img.size
         
-        # 座標計算
         split_px = int(img_w * axes_list[0].get_position().x0)
         new_ratio_info = (float(img_w - split_px), (axes_list[0].get_position().width * img_w) / (len(df) - 1), 0.0)
         
-        # ここで plt.close し、メモリを即座に解放
+        # オブジェクトの明示的解放
         plt.close(fig)
         fig = None 
 
@@ -1288,19 +1300,16 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         l_b64 = img_to_b64(left_part)
         r_b64 = img_to_b64(right_part)
         
-        # オブジェクト解放
-        full_img.close()
-        left_part.close()
-        right_part.close()
-        buf.close()
+        full_img.close(); left_part.close(); right_part.close(); buf.close()
+        trace.append(f"FINISH:{get_mem()}")
 
         return l_b64, r_b64, new_ratio_info, start_idx, df, split_px
 
     except Exception as e:
-        # エラー発生時はサーバーログに内容を出力するように変更
-        print(f"Graph Generation Error: {str(e)}") 
         if fig is not None: plt.close(fig)
-        return "", "", (0.0, 0.0, 0.0), 0, pd.DataFrame(), 0
+        import traceback
+        err_detail = f"ERR_MSG:{str(e)} | TRACE:{' -> '.join(trace)} | {traceback.format_exc()}"
+        return f"ERROR_INFO:{err_detail}", "", (0.0, 0.0, 0.0), 0, pd.DataFrame(), 0
 
 # ======================================================================================
 # 32. グラフの個別高さ(inch)と表示設定を変更するダイアログ (Streamlit版)
@@ -2121,33 +2130,37 @@ def index():
     
 
 # ======================================================================================
-# 94. グラフ描画エリア生成サブルーチン (診断情報表示・不整合修正版)
+# 94. グラフ描画エリア生成サブルーチン (キャッシュ制御・診断対応版)
 # ======================================================================================
 def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
     """
-    引数 design_params から座標を確実に取得し、31番の統合エンジンを呼び出します。
-    診断情報(ERROR_INFO:)が含まれる場合は、それをデバッグ用HTMLとして返します。
+    引数 design_params から座標を取得し、31番の統合エンジンを呼び出します。
+    URL末尾に &no_cache=1 がある場合は、キャッシュ処理をバイパスするフラグをセットします。
     """
+    from flask import request
+
+    # URLパラメータから no_cache=1 を取得し、design_params に格納して #31 へ渡す
+    # これにより、既存の refresh=1 の仕様を壊さずに「キャッシュなし」を選択可能にします
+    design_params["no_cache"] = (request.args.get('no_cache') == '1')
+
     # セッションからではなく、引数(indexで決定した最新座標)から取得
     lat = design_params.get('lat')
     lon = design_params.get('lon')
 
     # --- 31番のサブルーチンを呼び出し ---
+    # ここで返ってくる res[0] に診断レポートが含まれる可能性があります
     res = generate_high_res_graph(
         lat, lon, danger_v, tuple(sel_dirs), design_params, now_jst
     )
     
-    # 診断情報のチェックとエラーハンドリング
     if not res or res[0] is None:
         return "<div class='alert alert-danger'>グラフの生成に失敗しました。(NULL)</div>"
     
-    # [診断追加] 31番からエラー情報(ERROR_INFO:)が返ってきた場合
+    # 診断情報(ERROR_INFO:)が含まれる場合は、それをそのまま画面に出力
     if isinstance(res[0], str) and res[0].startswith("ERROR_INFO:"):
-        error_content = res[0].replace("ERROR_INFO:", "")
-        # エラー詳細とメモリー推移を画面に表示
         return (
-            f'<div class="alert alert-warning" style="font-size:0.85rem; font-family:monospace; white-space:pre-wrap; border:2px solid #dc3545;">'
-            f'<strong>⚠️ 系統診断レポート:</strong><br><br>{error_content}'
+            f'<div class="alert alert-warning" style="font-family:monospace; font-size:0.8rem; white-space:pre-wrap; border:2px solid #dc3545; padding:10px;">'
+            f'<strong>⚠️ 系統診断レポート (no_cache={design_params["no_cache"]}):</strong><br><br>{res[0]}'
             f'</div>'
         )
         
@@ -2157,7 +2170,7 @@ def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
     # アイコンHTML生成
     header_h, body_h = generate_weather_icons_html(df_graph, ratio_info, w_right_px, start_idx, design_params)
     
-    # HTML構築
+    # HTML構築：Jinja2に渡すための最終的な文字列
     html_str = (
         f'<div id="graph-wrapper" style="display:flex; width:100%; background:white; border:1px solid #ddd; overflow:hidden;">'
         f'  <div id="graph-left" style="width:{split_px}px; min-width:{split_px}px; flex-shrink:0; overflow:hidden; border-right:1px solid #eee; background:white; z-index:10;">'
