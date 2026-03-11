@@ -1221,7 +1221,7 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         unit_height_px = 100  
         # dpi_value = design_params.get("graph_dpi", 50)
         dpi_value = 35
-        
+
         # [重要] メモリ節約のため横幅を抑制
         fig_w_inch = 10.0 
         
@@ -2121,29 +2121,43 @@ def index():
     
 
 # ======================================================================================
-# 94. グラフ描画エリア生成サブルーチン (座標不整合修正版)
+# 94. グラフ描画エリア生成サブルーチン (診断情報表示・不整合修正版)
 # ======================================================================================
 def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
     """
-    引数 design_params から座標を確実に取得し、30番の統合エンジンを呼び出します。
+    引数 design_params から座標を確実に取得し、31番の統合エンジンを呼び出します。
+    診断情報(ERROR_INFO:)が含まれる場合は、それをデバッグ用HTMLとして返します。
     """
     # セッションからではなく、引数(indexで決定した最新座標)から取得
     lat = design_params.get('lat')
     lon = design_params.get('lon')
 
-    # --- 30番のサブルーチンを呼び出し ---
+    # --- 31番のサブルーチンを呼び出し ---
     res = generate_high_res_graph(
         lat, lon, danger_v, tuple(sel_dirs), design_params, now_jst
     )
     
+    # 診断情報のチェックとエラーハンドリング
     if not res or res[0] is None:
-        return "<div class='alert alert-danger'>グラフの生成に失敗しました。</div>"
+        return "<div class='alert alert-danger'>グラフの生成に失敗しました。(NULL)</div>"
+    
+    # [診断追加] 31番からエラー情報(ERROR_INFO:)が返ってきた場合
+    if isinstance(res[0], str) and res[0].startswith("ERROR_INFO:"):
+        error_content = res[0].replace("ERROR_INFO:", "")
+        # エラー詳細とメモリー推移を画面に表示
+        return (
+            f'<div class="alert alert-warning" style="font-size:0.85rem; font-family:monospace; white-space:pre-wrap; border:2px solid #dc3545;">'
+            f'<strong>⚠️ 系統診断レポート:</strong><br><br>{error_content}'
+            f'</div>'
+        )
         
     left_b64, right_b64, ratio_info, start_idx, df_graph, split_px = res
     w_right_px = ratio_info[0]
     
+    # アイコンHTML生成
     header_h, body_h = generate_weather_icons_html(df_graph, ratio_info, w_right_px, start_idx, design_params)
     
+    # HTML構築
     html_str = (
         f'<div id="graph-wrapper" style="display:flex; width:100%; background:white; border:1px solid #ddd; overflow:hidden;">'
         f'  <div id="graph-left" style="width:{split_px}px; min-width:{split_px}px; flex-shrink:0; overflow:hidden; border-right:1px solid #eee; background:white; z-index:10;">'
