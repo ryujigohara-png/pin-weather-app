@@ -784,7 +784,7 @@ def get_x_axis_formatter():
     return formatter
 
 # ======================================================================================
-# 23. グラフの共通軸設定を適用するサブルーチン
+# 23. グラフの共通軸設定を適用するサブルーチン (メモリ負荷軽減版)
 # ======================================================================================
 def apply_common_axis_settings(ax, df, formatter, now_jst, design_params):
     import matplotlib.dates as mdates
@@ -817,8 +817,13 @@ def apply_common_axis_settings(ax, df, formatter, now_jst, design_params):
     ax.tick_params(axis='x', which='major', labelsize=l_size, pad=l_pad)
     ax.tick_params(axis='y', labelsize=l_size)
 
+    # 修正：canvas.draw() は非常に重いため、ラベルの色変更に必要な場合のみ最小限で実行
+    # 既にメモリが厳しい状態なので、ここで一旦 draw するのを避け、
+    # ラベル取得をより安全に行うようにします。
     fig = ax.figure
-    fig.canvas.draw()
+    # fig.canvas.draw() # ← これをコメントアウトまたは削除し、全体描画時に任せる
+
+    # ラベルの色変更（draw前でも取得可能なプロパティを使用）
     labels = ax.get_xticklabels()
     for label in labels:
         text = label.get_text()
@@ -1148,7 +1153,7 @@ def generate_weather_icons_html(df, ratio_info, contena_min_w, start_idx, design
     return header_html, body_html
 
 # ======================================================================================
-# 31. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (安全なリターン対応・完全版)
+# 31. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (メモリ節約・完全版)
 # ======================================================================================
 def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_params, now_jst):
     import pandas as pd
@@ -1163,6 +1168,7 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
     start_idx = 0
     split_px = 0
     new_ratio_info = (0.0, 0.0, 0.0)
+    fig = None # メモリ解放のために初期化
 
     try:
         # --- 1. フォントオブジェクトの絶対パス生成 ---
@@ -1170,7 +1176,6 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         fpath = os.path.join(base_dir, 'static', 'font.ttf')
         f_size = design_params.get("font_size", 10)
         
-        # フォントオブジェクトを生成
         if os.path.exists(fpath):
             fp = fm.FontProperties(fname=fpath, size=f_size)
             fm.fontManager.addfont(fpath)
@@ -1183,9 +1188,7 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         # --- 2. データ取得 ---
         df_raw = fetch_weather_data(lat, lon, 9)
         
-        # --- 修正箇所：取得失敗時に raise せず、呼び出し元が処理を続行できる空値を返す ---
         if df_raw is None or df_raw.empty:
-            # 呼び出し元の期待する戻り値の型（タプル）に合わせて空値を返す
             return "", "", (0.0, 0.0, 0.0), 0, pd.DataFrame(), 0
 
         # --- 3. 時差・切り出し ---
@@ -1261,23 +1264,37 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         buf.seek(0)
         full_img = Image.open(buf)
         img_w, img_h = full_img.size
+        
+        # 座標計算
         split_px = int(img_w * axes_list[0].get_position().x0)
         new_ratio_info = (float(img_w - split_px), (axes_list[0].get_position().width * img_w) / (len(df) - 1), 0.0)
-        plt.close(fig)
         
+        # メモリ解放
+        plt.close(fig)
+        fig = None 
+
         left_part = full_img.crop((0, 0, split_px, img_h))
         right_part = full_img.crop((split_px, 0, img_w, img_h))
         
         def img_to_b64(img):
             b = io.BytesIO()
             img.save(b, format="PNG")
-            return base64.b64encode(b.getvalue()).decode()
+            img_data = base64.b64encode(b.getvalue()).decode()
+            b.close()
+            return img_data
 
-        return img_to_b64(left_part), img_to_b64(right_part), new_ratio_info, start_idx, df, split_px
+        l_b64 = img_to_b64(left_part)
+        r_b64 = img_to_b64(right_part)
+        
+        # PIL画像も明示的に閉じる
+        full_img.close()
+        left_part.close()
+        right_part.close()
+
+        return l_b64, r_b64, new_ratio_info, start_idx, df, split_px
 
     except Exception as e:
-        if 'fig' in locals(): plt.close(fig)
-        # 異常系でも raise せず、空のデータを返してシステムを維持する
+        if fig is not None: plt.close(fig)
         return "", "", (0.0, 0.0, 0.0), 0, pd.DataFrame(), 0
 
 # ======================================================================================
@@ -1866,20 +1883,19 @@ def calculate_custom_layout_params_flask(user_settings):
     return active_ids, active_heights, total_h, top_margin
 
 #======================================================================================
-# 91. ユーザー指定の物理サイズ(inch)でダッシュボードを描画するサブルーチン (Flask版)
+# 91. ユーザー指定の物理サイズ(inch)でダッシュボードを描画するサブルーチン (Flask版・メモリ節約版)
 #======================================================================================
 def render_physical_dashboard_flask(df, marine_results, lat, lon, design_params):
-    """
-    Matplotlibを使用してダッシュボードを描画します。
-    Streamlit依存を完全に排除。
-    """
     import matplotlib.pyplot as plt
     from matplotlib import gridspec
-    # st.session_state ではなく design_params(session由来) を使用
+    
     active_items, active_heights, total_h, h_gap_inch = calculate_custom_layout_params_flask(design_params)
 
     if not active_items:
         return None
+
+    # メモリ節約のため、描画前に過去の図をすべてクリア
+    plt.close('all')
 
     fig = plt.figure(figsize=(design_params.get("width", 15.0), total_h))
     gs = gridspec.GridSpec(len(active_items), 1, height_ratios=active_heights)
@@ -1890,7 +1906,6 @@ def render_physical_dashboard_flask(df, marine_results, lat, lon, design_params)
         left=0.08, right=0.96, top=0.98, bottom=0.05
     )
 
-    # 軸フォーマッタ等の共通設定（これらもFlask対応のサブルーチンであることを想定）
     formatter = get_x_axis_formatter()
     now_jst = get_now_jst()
 
@@ -1898,7 +1913,6 @@ def render_physical_dashboard_flask(df, marine_results, lat, lon, design_params)
         ax = fig.add_subplot(gs[i])
         is_bottom = (i == len(active_items) - 1)
 
-        # 各チャート描画関数（これらは既存のものを流用可能）
         if tid == "WIND":
             render_wind_bar_chart(ax, df, design_params.get("danger_v", 10.0), 1, design_params)
         elif tid == "TEMP":
