@@ -75,7 +75,7 @@ CONFIG = {
     "SHOW_TIDE": True,
     "SHOW_W_TEXT": False,
     "SHOW_DIR_NAME": False,
-    "GRAPH_WIDTH": 15.0,
+    "GRAPH_WIDTH": 10.0,
     "FIXED_HSPACE_INCH": 0.2,
     "GRAPH_ORDER": ["WIND", "TEMP", "WAVE", "OCEAN", "TIDE"],
     "GRAPH_HEIGHTS": {"WIND": 1.2, "TEMP": 0.4, "WAVE": 0.4, "OCEAN": 0.4, "TIDE": 0.4},
@@ -1153,7 +1153,7 @@ def generate_weather_icons_html(df, ratio_info, contena_min_w, start_idx, design
     return header_html, body_html
 
 # ======================================================================================
-# 31. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (メモリ節約・完全版)
+# 31. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (Render最適化サイズ版)
 # ======================================================================================
 def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_params, now_jst):
     import pandas as pd
@@ -1168,10 +1168,10 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
     start_idx = 0
     split_px = 0
     new_ratio_info = (0.0, 0.0, 0.0)
-    fig = None # メモリ解放のために初期化
+    fig = None
 
     try:
-        # --- 1. フォントオブジェクトの絶対パス生成 ---
+        # --- 1. フォント設定 ---
         base_dir = os.path.dirname(os.path.abspath(__file__))
         fpath = os.path.join(base_dir, 'static', 'font.ttf')
         f_size = design_params.get("font_size", 10)
@@ -1187,7 +1187,6 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
 
         # --- 2. データ取得 ---
         df_raw = fetch_weather_data(lat, lon, 9)
-        
         if df_raw is None or df_raw.empty:
             return "", "", (0.0, 0.0, 0.0), 0, pd.DataFrame(), 0
 
@@ -1218,10 +1217,13 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         if any(k in active_plots for k in {"wave", "ocean_temp", "tide"}):
             marine_results, r_lat, r_lon = get_marine_data(df['time'], lat, lon)
 
-        # --- 6. サイズ設計 ---
+        # --- 6. サイズ設計 (メモリ節約のため横幅を 15 -> 10 に抑制) ---
         unit_height_px = 100  
         dpi_value = design_params.get("graph_dpi", 50)
-        fig_w_inch = design_params.get("width_inch", 15.0)
+        
+        # [重要] メモリ節約のため横幅を抑制
+        fig_w_inch = 10.0 
+        
         fig_h_inch = (sum(height_ratios) * unit_height_px + 150) / dpi_value
         margin_left_inch = design_params.get("margin_left_inch", 0.8)
         left_margin_ratio = margin_left_inch / fig_w_inch
@@ -1249,14 +1251,13 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
 
             apply_common_axis_settings(ax, df, formatter, now_jst, design_params)
             
+            # 各軸のフォント適用
             for text in ax.get_xticklabels() + ax.get_yticklabels():
                 text.set_fontproperties(fp)
             ax.set_xlabel(ax.get_xlabel(), fontproperties=fp)
             ax.set_ylabel(ax.get_ylabel(), fontproperties=fp)
-            if ax.get_title():
-                ax.set_title(ax.get_title(), fontproperties=fp)
 
-        plt.subplots_adjust(left=left_margin_ratio, right=0.98, top=0.92, bottom=0.15, hspace=design_params.get("hspace_inch", 0.4))
+        plt.subplots_adjust(left=left_margin_ratio, right=0.98, top=0.92, bottom=0.15, hspace=0.4)
 
         # --- 8. 画像出力 ---
         buf = io.BytesIO()
@@ -1269,7 +1270,7 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         split_px = int(img_w * axes_list[0].get_position().x0)
         new_ratio_info = (float(img_w - split_px), (axes_list[0].get_position().width * img_w) / (len(df) - 1), 0.0)
         
-        # メモリ解放
+        # ここで plt.close し、メモリを即座に解放
         plt.close(fig)
         fig = None 
 
@@ -1286,14 +1287,17 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         l_b64 = img_to_b64(left_part)
         r_b64 = img_to_b64(right_part)
         
-        # PIL画像も明示的に閉じる
+        # オブジェクト解放
         full_img.close()
         left_part.close()
         right_part.close()
+        buf.close()
 
         return l_b64, r_b64, new_ratio_info, start_idx, df, split_px
 
     except Exception as e:
+        # エラー発生時はサーバーログに内容を出力するように変更
+        print(f"Graph Generation Error: {str(e)}") 
         if fig is not None: plt.close(fig)
         return "", "", (0.0, 0.0, 0.0), 0, pd.DataFrame(), 0
 
