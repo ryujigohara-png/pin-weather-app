@@ -1997,14 +1997,8 @@ def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
     return html_str
 
 
-
 # ======================================================================================
-# グローバル変数でキャッシュを保持（Cookie制限 4KB 回避用）
-# ======================================================================================
-render_cache = {}
-
-# ======================================================================================
-# 93. Flask メインルート: インデックス表示 (LocalStorage 連携版)
+# 93. Flask メインルート: インデックス表示 (起動時・no_cache 物理回避版)
 # ======================================================================================
 @app.route('/')
 def index():
@@ -2028,7 +2022,7 @@ def index():
         "hspace_inch": float(user_settings.get('hspace_inch', 1.0)),
         "margin_left_inch": float(user_settings.get('margin_left_inch', 0.6)),
         "font_size": int(user_settings.get('font_size', 8)),
-        "graph_dpi": int(user_settings.get('graph_dpi', 50)),
+        "graph_dpi": int(user_settings.get('graph_dpi', 72)), # 元の仕様(72)に復帰
         "show_wind": user_settings.get('show_wind', True),
         "show_temp": user_settings.get('show_temp', True),
         "show_tide": user_settings.get('show_tide', True),
@@ -2050,15 +2044,24 @@ def index():
     cache_key = f"{lat:.4f}_{lon:.4f}_{selected_lang}"
     graph_cache_path = os.path.join(CACHE_DIR, f"graph_data_{cache_key}.json")
     
+    # --- 重要：no_cache パラメータの取得 ---
     force_refresh = (request.args.get('refresh') == '1')
+    no_cache_param = (request.args.get('no_cache') == '1')
+    
     should_render = False
     graph_html = None
     draw_time_str = ""
     debug_msg = ""
 
-    # キャッシュチェック処理
-    if force_refresh:
+    # 1. no_cache=1 が指定されている場合は、無条件で再描画（キャッシュ読込をスキップ）
+    if no_cache_param:
         should_render = True
+        debug_msg = "NoCache指定"
+    # 2. 更新ボタン押下時
+    elif force_refresh:
+        should_render = True
+        debug_msg = "強制更新"
+    # 3. メモリ上のキャッシュチェック
     elif cache_key in render_cache:
         cached_item = render_cache[cache_key]
         if (now_jst - cached_item.get('timestamp')).total_seconds() < 14400:
@@ -2067,12 +2070,16 @@ def index():
             debug_msg = "メモリ使用"
         else:
             should_render = True
+    # 4. 物理ファイル（JSON）の読み込み
+    # ここが「立ち上がり時のクラッシュ」の主因。no_cache=1 時はここを通さない。
     elif os.path.exists(graph_cache_path):
         try:
             with open(graph_cache_path, "r", encoding="utf-8") as f:
                 c_data = json.load(f)
                 graph_html = c_data['html']
                 draw_time_str = c_data.get('draw_time_str', "")
+            
+            # メモリ節約のため、大きなHTMLをグローバルに保持するかは慎重に判断
             render_cache[cache_key] = {
                 'html': graph_html, 
                 'timestamp': datetime.datetime.fromtimestamp(os.path.getmtime(graph_cache_path), tz=jst), 
@@ -2088,18 +2095,19 @@ def index():
         # 描画が必要な場合
         if should_render or graph_html is None:
             draw_time_str = now_jst.strftime('%H:%M')
-            # ここで内部のAPI取得がタイムアウトや429エラーになるとExceptionへ飛びます
+            # 94番経由で31番を呼び出し、最新のグラフを生成
             graph_html = render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst)
             
-            render_cache[cache_key] = {'html': graph_html, 'timestamp': now_jst, 'draw_time_str': draw_time_str}
-            try:
-                with open(graph_cache_path, "w", encoding="utf-8") as f:
-                    json.dump({'html': graph_html, 'draw_time_str': draw_time_str}, f)
-            except:
-                pass
+            # no_cache=1 の時は、メモリキャッシュもファイル保存もしない（徹底回避）
+            if not no_cache_param:
+                render_cache[cache_key] = {'html': graph_html, 'timestamp': now_jst, 'draw_time_str': draw_time_str}
+                try:
+                    with open(graph_cache_path, "w", encoding="utf-8") as f:
+                        json.dump({'html': graph_html, 'draw_time_str': draw_time_str}, f)
+                except:
+                    pass
 
         display_basho = session.get('last_basho') or session.get('basho') or CONFIG.get("DEFAULT_BASHO", "東京")
-
         w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,windspeed_10m,winddirection_10m,precipitation&timezone=auto"
         m_url = f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto"
 
@@ -2110,82 +2118,20 @@ def index():
             design_params=design_params, sel_dirs=sel_dirs,
             danger_v=danger_v, w_url=w_url, m_url=m_url,
             basho=display_basho, 
-            current_lat=lat,      # JSでの「戻るボタン不一致」解消用に追加
-            current_lon=lon,      # JSでの「戻るボタン不一致」解消用に追加
+            current_lat=lat,
+            current_lon=lon,
             debug_info=debug_msg,
             app_config={"icon_path": "static/pin_weather_01.png"}
         )
 
     except Exception as e:
-        # 「グラフ生成中」のまま固まるのを防ぐため、エラー時は即座にerror.htmlへ
         error_txt = str(e)
-        # API制限(429)の場合はユーザーに分かりやすいメッセージを添える
-        friendly_msg = "現在、気象データサーバー(Open-Meteo)へのアクセスが集中しており、一時的に制限がかかっています。" if "429" in error_txt else "データの取得またはグラフの生成中にエラーが発生しました。"
-        
+        friendly_msg = "現在、アクセス制限中か、グラフ生成に失敗しました。" if "429" in error_txt else "エラーが発生しました。"
         return render_template(
             'error.html',
             error_msg=f"{friendly_msg}\n\n詳細ログ:\n{traceback.format_exc()}",
             lang_dict=lang_dict
         )
-    
-
-# ======================================================================================
-# 94. グラフ描画エリア生成サブルーチン (キャッシュ制御・診断対応版)
-# ======================================================================================
-def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
-    """
-    引数 design_params から座標を取得し、31番の統合エンジンを呼び出します。
-    URL末尾に &no_cache=1 がある場合は、キャッシュ処理をバイパスするフラグをセットします。
-    """
-    from flask import request
-
-    # URLパラメータから no_cache=1 を取得し、design_params に格納して #31 へ渡す
-    # これにより、既存の refresh=1 の仕様を壊さずに「キャッシュなし」を選択可能にします
-    design_params["no_cache"] = (request.args.get('no_cache') == '1')
-
-    # セッションからではなく、引数(indexで決定した最新座標)から取得
-    lat = design_params.get('lat')
-    lon = design_params.get('lon')
-
-    # --- 31番のサブルーチンを呼び出し ---
-    # ここで返ってくる res[0] に診断レポートが含まれる可能性があります
-    res = generate_high_res_graph(
-        lat, lon, danger_v, tuple(sel_dirs), design_params, now_jst
-    )
-    
-    if not res or res[0] is None:
-        return "<div class='alert alert-danger'>グラフの生成に失敗しました。(NULL)</div>"
-    
-    # 診断情報(ERROR_INFO:)が含まれる場合は、それをそのまま画面に出力
-    if isinstance(res[0], str) and res[0].startswith("ERROR_INFO:"):
-        return (
-            f'<div class="alert alert-warning" style="font-family:monospace; font-size:0.8rem; white-space:pre-wrap; border:2px solid #dc3545; padding:10px;">'
-            f'<strong>⚠️ 系統診断レポート (no_cache={design_params["no_cache"]}):</strong><br><br>{res[0]}'
-            f'</div>'
-        )
-        
-    left_b64, right_b64, ratio_info, start_idx, df_graph, split_px = res
-    w_right_px = ratio_info[0]
-    
-    # アイコンHTML生成
-    header_h, body_h = generate_weather_icons_html(df_graph, ratio_info, w_right_px, start_idx, design_params)
-    
-    # HTML構築：Jinja2に渡すための最終的な文字列
-    html_str = (
-        f'<div id="graph-wrapper" style="display:flex; width:100%; background:white; border:1px solid #ddd; overflow:hidden;">'
-        f'  <div id="graph-left" style="width:{split_px}px; min-width:{split_px}px; flex-shrink:0; overflow:hidden; border-right:1px solid #eee; background:white; z-index:10;">'
-        f'    <div style="width:100%;">{header_h}</div>'
-        f'    <img src="data:image/png;base64,{left_b64}" style="width:100%; height:auto; display:block;">'
-        f'  </div>'
-        f'  <div id="graph-right" style="flex-grow:1; overflow-x:auto; background:white;">'
-        f'    <div style="width:{w_right_px}px; position:relative;">'
-        f'      {body_h}'
-        f'      <img src="data:image/png;base64,{right_b64}" style="width:100%; height:auto; display:block;">'
-        f'    </div>'
-        f'  </div>'
-        f'</div>'
-    )
-    return html_str
 
 # ======================================================================================
 # 95. Flask 設定更新ルーチン (修正版)
