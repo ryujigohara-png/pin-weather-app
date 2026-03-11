@@ -1219,7 +1219,8 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
 
         # --- 6. サイズ設計 (メモリ節約のため横幅を 15 -> 10 に抑制) ---
         unit_height_px = 100  
-        dpi_value = design_params.get("graph_dpi", 50)
+        # dpi_value = design_params.get("graph_dpi", 50)
+        dpi_value = 35
         
         # [重要] メモリ節約のため横幅を抑制
         fig_w_inch = 10.0 
