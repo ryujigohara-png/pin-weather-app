@@ -14,7 +14,8 @@ import matplotlib
 matplotlib.use('Agg') # GUIなしのバックエンド（サーバー用）を強制指定
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
-import urllib.request
+import matplotlib
+matplotlib.use('Agg') # 描画専用（GUIなし）に固定import urllib.request
 from datetime import datetime, timezone, timedelta
 from PIL import Image
 from flask import Flask, render_template, request, session, jsonify, redirect, url_for
@@ -639,7 +640,7 @@ def clear_weather_cache_files():
 
 
 # ======================================================================================
-# 19. 海洋データを取得するサブルーチン (キャッシュ対応・9日分完全対応版)
+# 19. 海洋データを取得するサブルーチン (メモリ節約・完全版)
 # ======================================================================================
 def get_marine_data(time_series, lat, lon):
     import requests
@@ -665,7 +666,13 @@ def get_marine_data(time_series, lat, lon):
             try:
                 with open(cache_file, "r") as f:
                     cached_data = json.load(f)
-                return cached_data["results"], cached_data["lat"], cached_data["lon"]
+                
+                # 修正：リスト内の数値を軽量な型に変換してメモリを節約
+                res = cached_data["results"]
+                for k in res:
+                    res[k] = [np.float32(v) if v is not None else np.nan for v in res[k]]
+                
+                return res, cached_data["lat"], cached_data["lon"]
             except:
                 pass
 
@@ -688,7 +695,10 @@ def get_marine_data(time_series, lat, lon):
                 try:
                     with open(cache_file, "r") as f:
                         cached_data = json.load(f)
-                    return cached_data["results"], cached_data["lat"], cached_data["lon"]
+                    res = cached_data["results"]
+                    for k in res:
+                        res[k] = [np.float32(v) if v is not None else np.nan for v in res[k]]
+                    return res, cached_data["lat"], cached_data["lon"]
                 except:
                     pass
             # 失敗時はNoneを返し、呼び出し元のエラーハンドリングに任せる(raiseはしない)
@@ -700,6 +710,11 @@ def get_marine_data(time_series, lat, lon):
         
         m_df = pd.DataFrame(res["hourly"])
         m_df['time'] = pd.to_datetime(m_df['time']).dt.tz_localize(None)
+        
+        # 修正：マージ前に数値型を軽量化
+        for col in ['wave_height', 'sea_surface_temperature', 'sea_level_height_msl']:
+            if col in m_df.columns:
+                m_df[col] = m_df[col].astype(np.float32)
         
         res_lat = res.get("latitude", lat)
         res_lon = res.get("longitude", lon)
@@ -728,28 +743,12 @@ def get_marine_data(time_series, lat, lon):
             try:
                 with open(cache_file, "r") as f:
                     cached_data = json.load(f)
-                return cached_data["results"], cached_data["lat"], cached_data["lon"]
+                res = cached_data["results"]
+                for k in res:
+                    res[k] = [np.float32(v) if v is not None else np.nan for v in res[k]]
+                return res, cached_data["lat"], cached_data["lon"]
             except: pass
         return None, lat, lon
-
-# ======================================================================================
-# 20. 天気コードからテキストと色を取得するサブルーチン
-# ======================================================================================
-def get_weather_info(code):
-    from flask import session
-    translations = get_language_dict()
-    current_lang = session.get('lang', 'ja')
-    lang_dict = translations[current_lang]
-
-    if pd.isna(code): return "", "black"
-    if code <= 3: return lang_dict.get("晴", "Clear"), "#FF4500" 
-    if code == 45 or code == 48: return lang_dict.get("霧", "Fog"), "#708090" 
-    if code <= 67: return lang_dict.get("雨", "Rain"), "#00008B" 
-    if code <= 77: return lang_dict.get("雪", "Snow"), "#00BFFF" 
-    if code <= 82: return lang_dict.get("雨", "Rain"), "#00008B"
-    if code <= 86: return lang_dict.get("雪", "Snow"), "#00BFFF"
-    if code <= 99: return lang_dict.get("雷", "Storm"), "#8B0000" 
-    return "？", "black"
 
 # ======================================================================================
 # 21. 風向き・速度・色の判定を行うデータ処理サブルーチン (型不一致解消・完全版)
