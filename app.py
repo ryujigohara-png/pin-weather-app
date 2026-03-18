@@ -1133,16 +1133,20 @@ def generate_weather_icons_html(df, ratio_info, contena_min_w, start_idx, design
     return header_html, body_html
 
 # ======================================================================================
-# 34. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (フォント直接指定・完全版)
+# 34. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (詳細計測・完全版)
 # ======================================================================================
 def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_params, now_jst):
     import pandas as pd
     import io, base64, os, sys
     import numpy as np
+    import time  # 計測用
     from datetime import timedelta
     import matplotlib.pyplot as plt
     from PIL import Image
     import matplotlib.font_manager as fm
+
+    # 全体開始
+    t_all_start = time.time()
 
     df = pd.DataFrame()
     start_idx = 0
@@ -1151,6 +1155,7 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
 
     try:
         # --- 1. フォントオブジェクトの絶対パス生成 ---
+        t_font_s = time.time()
         base_dir = os.path.dirname(os.path.abspath(__file__))
         fpath = os.path.join(base_dir, 'static', 'font.ttf')
         f_size = design_params.get("font_size", 10)
@@ -1167,13 +1172,17 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
             fp = fm.FontProperties(family='sans-serif', size=f_size)
 
         plt.rcParams['axes.unicode_minus'] = False
+        t_font_e = time.time()
 
         # --- 2. データ取得 ---
+        t_data_s = time.time()
         df_raw = fetch_weather_data(lat, lon, 9)
         if df_raw is None or df_raw.empty:
             raise RuntimeError("気象データの取得に失敗しました。")
+        t_data_e = time.time()
 
         # --- 3. 時差・切り出し ---
+        t_proc_s = time.time()
         local_offset_s = df_raw.attrs.get('local_offset_seconds', 0)
         browser_offset = now_jst.utcoffset()
         browser_offset_s = browser_offset.total_seconds() if browser_offset else 0
@@ -1194,11 +1203,14 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         if design_params.get("show_wave", True): active_plots.append("wave"); height_ratios.append(1)
         if design_params.get("show_ocean_temp", True): active_plots.append("ocean_temp"); height_ratios.append(1)
         if design_params.get("show_tide", True): active_plots.append("tide"); height_ratios.append(1)
+        t_proc_e = time.time()
 
         # --- 5. 海洋データ準備 ---
+        t_marine_s = time.time()
         marine_results, r_lat, r_lon = None, lat, lon
         if any(k in active_plots for k in {"wave", "ocean_temp", "tide"}):
             marine_results, r_lat, r_lon = get_marine_data(df['time'], lat, lon)
+        t_marine_e = time.time()
 
         # --- 6. サイズ設計 ---
         unit_height_px = 100  
@@ -1209,12 +1221,15 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         left_margin_ratio = margin_left_inch / fig_w_inch
 
         # --- 7. グラフ描画 ---
+        t_draw_s = time.time()
         fig, axes = plt.subplots(len(active_plots), 1, figsize=(fig_w_inch, fig_h_inch), dpi=dpi_value,
-                                    gridspec_kw={'height_ratios': height_ratios})
+                                   gridspec_kw={'height_ratios': height_ratios})
         axes_list = np.array([axes]).flatten()
 
         formatter = get_x_axis_formatter()
         for i, plot_type in enumerate(active_plots):
+            # 個別計測開始
+            t_plot_item_s = time.time()
             ax = axes_list[i]
             is_bottom = (i == len(active_plots) - 1)
             
@@ -1240,10 +1255,15 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
             ax.set_ylabel(ax.get_ylabel(), fontproperties=fp)
             if ax.get_title():
                 ax.set_title(ax.get_title(), fontproperties=fp)
+            
+            # 個別結果表示
+            print(f"  - Plot [{plot_type:10}]: {time.time() - t_plot_item_s:.4f}s")
 
         plt.subplots_adjust(left=left_margin_ratio, right=0.98, top=0.92, bottom=0.15, hspace=design_params.get("hspace_inch", 0.4))
+        t_draw_e = time.time()
 
         # --- 8. 画像出力 ---
+        t_out_s = time.time()
         buf = io.BytesIO()
         fig.savefig(buf, format="png", bbox_inches=None, pad_inches=0, dpi=dpi_value)
         buf.seek(0)
@@ -1261,12 +1281,26 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
             img.save(b, format="PNG")
             return base64.b64encode(b.getvalue()).decode()
 
-        return img_to_b64(left_part), img_to_b64(right_part), new_ratio_info, start_idx, df, split_px
+        res_l = img_to_b64(left_part)
+        res_r = img_to_b64(right_part)
+        t_out_e = time.time()
+
+        # --- 最終ログ表示 ---
+        print(f"\n--- [34. generate_high_res_graph] Performance ---")
+        print(f"  Font Setup      : {t_font_e - t_font_s:.4f}s")
+        print(f"  Weather Data    : {t_data_e - t_data_s:.4f}s")
+        print(f"  Processing      : {t_proc_e - t_proc_s:.4f}s")
+        print(f"  Marine Data     : {t_marine_e - t_marine_s:.4f}s")
+        print(f"  Plotting TOTAL  : {t_draw_e - t_draw_s:.4f}s")
+        print(f"  Save & Encode   : {t_out_e - t_out_s:.4f}s")
+        print(f"  TOTAL           : {time.time() - t_all_start:.4f}s")
+        print(f"--------------------------------------------------\n")
+
+        return res_l, res_r, new_ratio_info, start_idx, df, split_px
 
     except Exception as e:
         if 'fig' in locals(): plt.close(fig)
         raise RuntimeError(str(e))
-
 
 # ======================================================================================
 # 35. グラフの個別高さ(inch)と表示設定を変更するダイアログ (Streamlit版)
