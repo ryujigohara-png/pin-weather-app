@@ -1144,6 +1144,7 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
     import matplotlib.pyplot as plt
     from PIL import Image
     import matplotlib.font_manager as fm
+    import gc # メモリ解放用
 
     # 全体開始
     t_all_start = time.time()
@@ -1152,6 +1153,8 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
     start_idx = 0
     split_px = 0
     new_ratio_info = (0.0, 0.0, 0.0)
+    fig = None # 初期化
+    buf = None # 初期化
 
     try:
         # --- 1. フォントオブジェクトの絶対パス生成 ---
@@ -1271,7 +1274,6 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         img_w, img_h = full_img.size
         split_px = int(img_w * axes_list[0].get_position().x0)
         new_ratio_info = (float(img_w - split_px), (axes_list[0].get_position().width * img_w) / (len(df) - 1), 0.0)
-        plt.close(fig)
         
         left_part = full_img.crop((0, 0, split_px, img_h))
         right_part = full_img.crop((split_px, 0, img_w, img_h))
@@ -1299,8 +1301,14 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         return res_l, res_r, new_ratio_info, start_idx, df, split_px
 
     except Exception as e:
-        if 'fig' in locals(): plt.close(fig)
         raise RuntimeError(str(e))
+    finally:
+        # メモリ解放の徹底
+        if fig is not None:
+            plt.close(fig)
+        if buf is not None:
+            buf.close()
+        gc.collect()
 
 # ======================================================================================
 # 35. グラフの個別高さ(inch)と表示設定を変更するダイアログ (Streamlit版)
@@ -2153,7 +2161,18 @@ def index():
             app_config={"icon_path": "static/pin_weather_01.png"}
         )
     except Exception:
-        return render_template('index.html', config=config, lang_dict=lang_dict, error_msg=traceback.format_exc(), basho="Error")
+        # エラー発生時に index.html がクラッシュしないよう、必要な変数を網羅して渡す
+        return render_template(
+            'index.html', 
+            config=config, 
+            lang_dict=lang_dict, 
+            error_msg=traceback.format_exc(), 
+            basho="Error",
+            sel_dirs=sel_dirs,
+            danger_v=danger_v,
+            design_params=design_params,
+            now_jst=now_jst
+        )
     
 
 # ======================================================================================
