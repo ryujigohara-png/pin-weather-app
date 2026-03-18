@@ -10,28 +10,22 @@ import sys
 import requests
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use('Agg') # GUIなしのバックエンド（サーバー用）を強制指定
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 import urllib.request
 from datetime import datetime, timezone, timedelta
 from PIL import Image
 from flask import Flask, render_template, request, session, jsonify, redirect, url_for
 
-# Matplotlibの設定：GUIなしのバックエンドを強制し、フォントスキャン負荷を軽減する
-import matplotlib
-matplotlib.use('Agg') 
-import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
-
-# メモリ節約のため、特殊なフォントスキャンを避ける設定を追記
-matplotlib.rcParams['font.family'] = 'sans-serif'
-
 app = Flask(__name__)
-
 # 秘密鍵は環境変数から取得、なければ固定値。
 # [重要] インデント（行頭の空白）は一切入れないこと
 app.secret_key = os.environ.get('SECRET_KEY', 'pin_weather_secret_key_2026')
 
 # ======================================================================================
-# 11. 環境判定サブルーチン (Local / Beta / Main)
+# 10_1. 環境判定サブルーチン (Local / Beta / Main)
 # ======================================================================================
 def get_env_config():
     # Renderが割り当てるホスト名を取得
@@ -60,7 +54,7 @@ def get_env_config():
         }
 
 # ======================================================================================
-# 12. 定数・基本設定 (CONFIG)
+# 11. 定数・基本設定 (CONFIG)
 # ======================================================================================
 CONFIG = {
     "TITLE_SIZE": 20,
@@ -75,7 +69,7 @@ CONFIG = {
     "SHOW_TIDE": True,
     "SHOW_W_TEXT": False,
     "SHOW_DIR_NAME": False,
-    "GRAPH_WIDTH": 10.0,
+    "GRAPH_WIDTH": 15.0,
     "FIXED_HSPACE_INCH": 0.2,
     "GRAPH_ORDER": ["WIND", "TEMP", "WAVE", "OCEAN", "TIDE"],
     "GRAPH_HEIGHTS": {"WIND": 1.2, "TEMP": 0.4, "WAVE": 0.4, "OCEAN": 0.4, "TIDE": 0.4},
@@ -85,7 +79,7 @@ CONFIG = {
     "GRAPH_FONT_SIZE": 10,
     "LABEL_SIZE": 7,
     "LABEL_PAD": 0,
-    "DPI": 50,
+    "DPI": 200,
     "DEFAULT_DANGER_V": 10.0,
     "DEFAULT_PRECIP_Y": 1.05,
     "DEFAULT_ICON_MARGIN": 0,
@@ -128,16 +122,13 @@ CONFIG = {
 ALL_DIRECTIONS = ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"]
 
 # ======================================================================================
-# 13. 多言語表示用の辞書データを定義するサブルーチン。
+# 12. 多言語表示用の辞書データを定義するサブルーチン。
 # ======================================================================================
 def get_language_dict():
     """
     多言語表示用の辞書データを定義するサブルーチン。
     Flask版の新規UI（詳細設定モーダル等）に必要なキーを既存の辞書に統合。
     """
-    # 共通の日本語16方位リスト（判定値の一貫性確保のため）
-    ja_16_list = ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"]
-
     return {
         "ja": {
             "表示設定": "表示設定",
@@ -177,7 +168,7 @@ def get_language_dict():
             "削除": "削除",
             "中止": "中止",
             "グラフ表示設定の詳細": "グラフ表示設定の詳細",
-            "デザイン微調整": "デザイン微調整",
+            "デザイン微調整": "デザイン微調整", # 新規
             "風向・風速グラフ表示": "風向・風速グラフ表示",
             "気温グラフ表示": "気温グラフ表示",
             "潮位グラフ表示": "潮位グラフ表示",
@@ -187,13 +178,13 @@ def get_language_dict():
             "風向名表示": "風向名表示",
             "グラフ枠横幅 (inch)": "グラフ枠横幅 (inch)",
             "グラフ枠縦幅 (inch)": "グラフ枠縦幅 (inch)",
-            "グラフ横幅": "グラフ横幅",
-            "グラフ縦幅": "グラフ縦幅",
-            "上余白": "上余白",
-            "上下間隔": "上下間隔",
-            "左余白": "左余白",
+            "グラフ横幅": "グラフ横幅", # スライダー用
+            "グラフ縦幅": "グラフ縦幅", # スライダー用
+            "上余白": "上余白",         # スライダー用
+            "上下間隔": "上下間隔",      # スライダー用
+            "左余白": "左余白",         # スライダー用
             "グラフ内文字サイズ": "グラフ内文字サイズ",
-            "フォントサイズ": "フォントサイズ",
+            "フォントサイズ": "フォントサイズ", # スライダー用
             "軸ラベル文字サイズ": "軸ラベル文字サイズ",
             "危険風速ライン(m/s)": "危険風速ライン(m/s)",
             "色付風向選択": "色付風向選択",
@@ -216,8 +207,8 @@ def get_language_dict():
             "比率:気温": "比率:気温",
             "比率:潮位": "比率:潮位",
             "初期設定に戻す": "初期設定に戻す",
-            "リセット": "リセット",
-            "デフォルトに戻す": "デフォルトに戻す",
+            "リセット": "リセット", # 追加
+            "デフォルトに戻す": "デフォルトに戻す", # 追加
             "更新": "更新",
             "キャンセル": "キャンセル",
             "現在の登録地点 (クリックで削除)": "現在の登録地点 (クリックで削除)",
@@ -270,8 +261,7 @@ def get_language_dict():
             "LINK_MARINE": "海洋気象APIデータ",
             "WEEKS": ["月", "火", "水", "木", "金", "土", "日"],
             "WEATHER_TEXT": {"晴": "晴", "霧": "霧", "雨": "雨", "雪": "雪", "雷": "雷", "？": "？"},
-            "ALL_DIRECTIONS": ja_16_list,
-            "DIRECTIONS_16JA": ja_16_list,  # 追加：これが不足していたためエラーが出ていました
+            "ALL_DIRECTIONS": ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"],
             "DIRECTIONS_8": ["北", "北東", "東", "南東", "南", "南西", "西", "北西"],
             "NORTH":"北",
             "LOCATIONS": {
@@ -325,7 +315,7 @@ def get_language_dict():
             "削除": "Delete",
             "中止": "Cancel",
             "グラフ表示設定の詳細": "Detailed Display Settings",
-            "デザイン微調整": "Design Adjustment",
+            "デザイン微調整": "Design Adjustment", # 新規
             "風向・風速グラフ表示": "Show Wind Speed/Dir",
             "気温グラフ表示": "Show Temperature",
             "潮位グラフ表示": "Show Tide Level",
@@ -335,13 +325,13 @@ def get_language_dict():
             "風向名表示": "Show Wind Dir Name",
             "グラフ枠横幅 (inch)": "Graph Width (inch)",
             "グラフ枠縦幅 (inch)": "Graph Height (inch)",
-            "グラフ横幅": "Graph Width",
-            "グラフ縦幅": "Graph Height",
-            "上余白": "Top Margin",
-            "上下間隔": "V-Spacing",
-            "左余白": "Left Margin",
+            "グラフ横幅": "Graph Width",   # スライダー用
+            "グラフ縦幅": "Graph Height",  # スライダー用
+            "上余白": "Top Margin",      # スライダー用
+            "上下間隔": "V-Spacing",      # スライダー用
+            "左余白": "Left Margin",     # スライダー用
             "グラフ内文字サイズ": "Graph Font Size",
-            "フォントサイズ": "Font Size",
+            "フォントサイズ": "Font Size", # スライダー用
             "軸ラベル文字サイズ": "Axis Label Size",
             "危険風速ライン(m/s)": "Danger Wind (m/s)",
             "色付風向選択": "Colored Wind Dir",
@@ -364,9 +354,9 @@ def get_language_dict():
             "比率:気温": "Ratio: Temp",
             "比率:潮位": "Ratio: Tide",
             "初期設定に戻す": "Reset to Default",
-            "リセット": "Reset",
-            "デフォルトに戻す": "Restore Default",
-            "更新": "Update",
+            "リセット": "Reset", # 追加
+            "デフォルトに戻す": "Restore Default", # 追加
+            "更新": "Update", 
             "キャンセル": "Cancel",
             "現在の登録地点 (クリックで削除)": "Current My Spots (Click to delete)",
             "--- 地点の追加 ---": "--- Add New Spot ---",
@@ -419,7 +409,6 @@ def get_language_dict():
             "WEEKS": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
             "WEATHER_TEXT": {"晴": "Sunny", "霧": "Fog", "雨": "Rain", "雪": "Snow", "雷": "T-Storm", "？": "?"},
             "ALL_DIRECTIONS": ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"],
-            "DIRECTIONS_16JA": ja_16_list,
             "DIRECTIONS_8": ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
             "NORTH":"N",
             "LOCATIONS": {
@@ -438,7 +427,7 @@ def get_language_dict():
     }
 
 # ======================================================================================
-# 14. アプリケーション初期化サブルーチン
+# 12_1. アプリケーション初期化サブルーチン
 # ======================================================================================
 def initialize_app_settings():
     """
@@ -461,7 +450,7 @@ def initialize_app_settings():
     return config
 
 # ======================================================================================
-# 15. ヘルスチェック用サブルーチン (Renderのデプロイ成功率向上のため)
+# 13_2. ヘルスチェック用サブルーチン (Renderのデプロイ成功率向上のため)
 # ======================================================================================
 @app.route('/healthz')
 def health_check():
@@ -469,7 +458,7 @@ def health_check():
     return "OK", 200
 
 # ======================================================================================
-# 16. 日本語フォントセットアップサブルーチン (Render/Linux 強化版)
+# 13. 日本語フォントセットアップサブルーチン (Render/Linux 強化版)
 # ======================================================================================
 def setup_font(font_size=None):
     """
@@ -522,65 +511,44 @@ def setup_font(font_size=None):
 
 
 # ======================================================================================
-# 17. 気象データをAPIから取得するサブルーチン (メモリ極限節約版)
+# 14. 気象データをAPIから取得するサブルーチン (キャッシュ対応)
 # ======================================================================================
 def fetch_weather_data(lat, lon, days):
-    import os
-    import time
-    import pandas as pd
-    import requests
-    import numpy as np
-
     CACHE_DIR = "weather_cache"
     if not os.path.exists(CACHE_DIR): 
-        try: os.makedirs(CACHE_DIR)
-        except: pass
+        try:
+            os.makedirs(CACHE_DIR)
+        except Exception as e:
+            raise RuntimeError(f"【フォルダ作成失敗】キャッシュ用フォルダを作れません: {e}")
     
     file_id = f"{round(lat, 2)}_{round(lon, 2)}"
     cache_file = os.path.join(CACHE_DIR, f"spot_{file_id}.csv")
     meta_file = os.path.join(CACHE_DIR, f"spot_{file_id}.meta")
     
-    # 1. キャッシュ読み込み（メモリ節約のため列を限定）
     if os.path.exists(cache_file) and os.path.exists(meta_file):
-        if (time.time() - os.path.getmtime(cache_file)) < 14400:
+        if (time.time() - os.path.getmtime(cache_file)) < 86400:
             try:
-                # 必要な列だけを指定してロード
-                cols = ['time', 'temperature_2m', 'wind_speed_10m', 'wind_direction_10m', 'weather_code', 'precipitation']
-                df_cache = pd.read_csv(cache_file, parse_dates=['time'], usecols=cols)
-                
-                # 数値型を即座に float32 / int16 へ
-                for col in ['temperature_2m', 'wind_speed_10m', 'wind_direction_10m', 'precipitation']:
-                    df_cache[col] = df_cache[col].astype(np.float32)
-                df_cache['weather_code'] = df_cache['weather_code'].astype(np.int16)
-                
+                df_cache = pd.read_csv(cache_file, parse_dates=['time'])
                 with open(meta_file, "r") as f:
                     offset = int(f.read())
                 df_cache.attrs['local_offset_seconds'] = offset
                 return df_cache
             except: pass
 
-    # 2. APIリクエスト
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&wind_speed_unit=ms&forecast_days={days}"
     
     try:
         res_raw = requests.get(url, timeout=10)
         if res_raw.status_code != 200:
-            return pd.DataFrame()
+            raise RuntimeError(f"【API取得失敗】Open-Meteo APIがエラーを返しました (HTTP {res_raw.status_code})")
 
         response = res_raw.json()
-        # ロード直後に辞書から必要な部分だけDF化
         df = pd.DataFrame(response["hourly"])
-        
-        # 不要なメモリ消費を抑えるため型を即変換
-        for col in ['temperature_2m', 'wind_speed_10m', 'wind_direction_10m', 'precipitation']:
-            df[col] = df[col].astype(np.float32)
-        df['weather_code'] = df['weather_code'].astype(np.int16)
         
         local_offset_s = response.get("utc_offset_seconds", 0)
         df['time'] = pd.to_datetime(df['time']).dt.tz_localize(None)
         df.attrs['local_offset_seconds'] = local_offset_s
         
-        # 天気アイコン生成
         def get_icon(code):
             if code == 0: return "☀️"
             if code <= 3: return "🌤️"
@@ -593,22 +561,25 @@ def fetch_weather_data(lat, lon, days):
             return "❓"
         df['weather_icon'] = df['weather_code'].apply(get_icon)
 
-        # キャッシュ保存
         try:
             df.to_csv(cache_file, index=False)
             with open(meta_file, "w") as f: f.write(str(local_offset_s))
-        except: pass
+        except PermissionError:
+            raise RuntimeError(f"【アクセス拒否】キャッシュファイル '{cache_file}' が開かれています。")
+        except Exception as e:
+            raise RuntimeError(f"【保存失敗】キャッシュデータの保存に失敗しました: {e}")
 
         return df
-    except:
-        return pd.DataFrame()
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"【通信エラー】APIに接続できませんでした: {e}")
+    except Exception as e:
+        raise RuntimeError(f"【システムエラー】予期せぬエラーが発生しました: {e}")
 
 # ======================================================================================
-# 18. 気象データキャッシュファイルを物理削除するサブルーチン
+# 15. 気象データキャッシュファイルを物理削除するサブルーチン
 # ======================================================================================
 def clear_weather_cache_files():
     import shutil
-    import os
     CACHE_DIR = "weather_cache"
     if os.path.exists(CACHE_DIR):
         try:
@@ -621,86 +592,88 @@ def clear_weather_cache_files():
 
 
 # ======================================================================================
-# 19. 海洋データを取得するサブルーチン (極限節約版)
+# 16. 海洋データを取得するサブルーチン (9日分完全対応版)
 # ======================================================================================
 def get_marine_data(time_series, lat, lon):
     import requests
     import pandas as pd
     import numpy as np
-    import os
-    import time
-    import json
 
-    CACHE_DIR = "weather_cache"
-    if not os.path.exists(CACHE_DIR):
-        try: os.makedirs(CACHE_DIR, exist_ok=True)
-        except: pass
-
-    file_id = f"{round(lat, 2)}_{round(lon, 2)}"
-    cache_file = os.path.join(CACHE_DIR, f"marine_{file_id}.json")
-
-    # 1. キャッシュ読み込み（数値を軽量な float32 で復元）
-    if os.path.exists(cache_file):
-        if (time.time() - os.path.getmtime(cache_file)) < 14400:
-            try:
-                with open(cache_file, "r") as f:
-                    cached_data = json.load(f)
-                res = cached_data["results"]
-                # 修正：各リストの数値を強制的に float32 (軽量) にして展開
-                for k in res:
-                    res[k] = [np.float32(v) if (v is not None and v != "None") else np.nan for v in res[k]]
-                return res, cached_data["lat"], cached_data["lon"]
-            except: pass
-
+    # 1. URLとパラメータの修正
+    # ご指摘の通り、正しいエンドポイントと明示的なパラメータ指定を行います
     url = "https://marine-api.open-meteo.com/v1/marine"
     params = {
         "latitude": round(float(lat), 4),
         "longitude": round(float(lon), 4),
         "hourly": "wave_height,sea_surface_temperature,sea_level_height_msl",
         "timezone": "auto",
-        "forecast_days": 9,
+        "forecast_days": 9,  # 正しいURLであれば9日分(またはそれ以上)取得可能です
         "cell_selection": "sea"
     }
 
     try:
-        res_raw = requests.get(url, params=params, timeout=15)
-        if res_raw.status_code != 200:
-            return None, lat, lon
-
-        res = res_raw.json()
-        if "hourly" not in res: return None, lat, lon
+        # APIリクエスト
+        res = requests.get(url, params=params, timeout=15).json()
         
-        # 修正：DataFrame作成時に即座に型を float32 に落とす
+        if "hourly" not in res:
+            return None, lat, lon
+        
+        # 2. API取得データをDataFrame化
         m_df = pd.DataFrame(res["hourly"])
-        for col in m_df.select_dtypes(include=['float64']).columns:
-            m_df[col] = m_df[col].astype(np.float32)
-            
+        # APIの時間を naive (タイムゾーンなし) に統一
         m_df['time'] = pd.to_datetime(m_df['time']).dt.tz_localize(None)
         
+        # 実際にデータが取得された座標を保持
         res_lat = res.get("latitude", lat)
         res_lon = res.get("longitude", lon)
         
+        # 3. 9日間の時間軸(time_series)に取得データを正確にマージ
+        # Flask側から渡される time_series も naive に変換して比較します
         time_df = pd.DataFrame({'time': [pd.to_datetime(t).replace(tzinfo=None) for t in time_series]})
+        
+        # left join により、APIから取得できた全期間を time_series にマッピングします
         merged = pd.merge(time_df, m_df, on='time', how='left')
         
+        # 4. 辞書形式で抽出 (Noneをnp.nanに置換してグラフ描画の断線を防ぐ)
         results = {
-            "wave": merged['wave_height'].fillna(np.nan).tolist(),
-            "temp": merged['sea_surface_temperature'].fillna(np.nan).tolist(),
-            "tide": merged['sea_level_height_msl'].fillna(np.nan).tolist()
+            "wave": merged['wave_height'].infer_objects(copy=False).fillna(np.nan).tolist(),
+            "temp": merged['sea_surface_temperature'].infer_objects(copy=False).fillna(np.nan).tolist(),
+            "tide": merged['sea_level_height_msl'].infer_objects(copy=False).fillna(np.nan).tolist()
         }
         
-        try:
-            with open(cache_file, "w") as f:
-                json.dump({"results": results, "lat": res_lat, "lon": res_lon}, f)
-        except: pass
+        # 有効なデータが1つでもあるかチェック
+        # 全ての要素が NaN でなければ有効とみなす
+        if pd.Series(results["wave"]).isna().all() and pd.Series(results["tide"]).isna().all():
+            return None, res_lat, res_lon
 
         return results, res_lat, res_lon
 
-    except:
+    except Exception as e:
+        # エラー時はログに出力（デバッグ用）
+        print(f"Marine API Access Error: {e}")
         return None, lat, lon
 
 # ======================================================================================
-# 21. 風向き・速度・色の判定を行うデータ処理サブルーチン (型不一致解消・完全版)
+# 17. 天気コードからテキストと色を取得するサブルーチン
+# ======================================================================================
+def get_weather_info(code):
+    from flask import session
+    translations = get_language_dict()
+    current_lang = session.get('lang', 'ja')
+    lang_dict = translations[current_lang]
+
+    if pd.isna(code): return "", "black"
+    if code <= 3: return lang_dict.get("晴", "Clear"), "#FF4500" 
+    if code == 45 or code == 48: return lang_dict.get("霧", "Fog"), "#708090" 
+    if code <= 67: return lang_dict.get("雨", "Rain"), "#00008B" 
+    if code <= 77: return lang_dict.get("雪", "Snow"), "#00BFFF" 
+    if code <= 82: return lang_dict.get("雨", "Rain"), "#00008B"
+    if code <= 86: return lang_dict.get("雪", "Snow"), "#00BFFF"
+    if code <= 99: return lang_dict.get("雷", "Storm"), "#8B0000" 
+    return "？", "black"
+
+# ======================================================================================
+# 20. 風向き・速度・色の判定を行うデータ処理サブルーチン (型不一致解消・完全版)
 # ======================================================================================
 def process_wind_data(df, target_dirs_input):
     import pandas as pd
@@ -758,7 +731,7 @@ def process_wind_data(df, target_dirs_input):
     return df
 
 # ======================================================================================
-# 22. X軸の表示形式（日付・時刻）を定義するサブルーチン
+# 21. X軸の表示形式（日付・時刻）を定義するサブルーチン
 # ======================================================================================
 def get_x_axis_formatter():
     import matplotlib.dates as mdates
@@ -784,7 +757,7 @@ def get_x_axis_formatter():
     return formatter
 
 # ======================================================================================
-# 23. グラフの共通軸設定を適用するサブルーチン (メモリ負荷軽減版)
+# 22. グラフの共通軸設定を適用するサブルーチン
 # ======================================================================================
 def apply_common_axis_settings(ax, df, formatter, now_jst, design_params):
     import matplotlib.dates as mdates
@@ -817,13 +790,8 @@ def apply_common_axis_settings(ax, df, formatter, now_jst, design_params):
     ax.tick_params(axis='x', which='major', labelsize=l_size, pad=l_pad)
     ax.tick_params(axis='y', labelsize=l_size)
 
-    # 修正：canvas.draw() は非常に重いため、ラベルの色変更に必要な場合のみ最小限で実行
-    # 既にメモリが厳しい状態なので、ここで一旦 draw するのを避け、
-    # ラベル取得をより安全に行うようにします。
     fig = ax.figure
-    # fig.canvas.draw() # ← これをコメントアウトまたは削除し、全体描画時に任せる
-
-    # ラベルの色変更（draw前でも取得可能なプロパティを使用）
+    fig.canvas.draw()
     labels = ax.get_xticklabels()
     for label in labels:
         text = label.get_text()
@@ -834,7 +802,7 @@ def apply_common_axis_settings(ax, df, formatter, now_jst, design_params):
                 label.set_color('blue')
 
 # ======================================================================================
-# 24. 風速棒グラフを描画するサブルーチン (降水量：0より大きい場合に小数点1位表示)
+# 23. 風速棒グラフを描画するサブルーチン (降水量：0より大きい場合に小数点1位表示)
 # ======================================================================================
 def render_wind_bar_chart(ax, df, danger_v, wind_step, design_params=None):
     import pandas as pd
@@ -905,7 +873,7 @@ def render_wind_bar_chart(ax, df, danger_v, wind_step, design_params=None):
                             fontsize=l_fs, color="blue", transform=ax.get_xaxis_transform(), clip_on=False)
 
 # ======================================================================================
-# 25. 気温グラフを描画するサブルーチン (整数表示)
+# 24. 気温グラフを描画するサブルーチン (整数表示)
 # ======================================================================================
 def render_temp_line_chart(ax, df):
     import pandas as pd
@@ -932,7 +900,7 @@ def render_temp_line_chart(ax, df):
                     transform=ax.get_xaxis_transform(), clip_on=False)
 
 # ======================================================================================
-# 26. 波高グラフを描画するサブルーチン (整数cm・四捨五入・マイナス対応版)
+# 25. 波高グラフを描画するサブルーチン (整数cm・四捨五入・マイナス対応版)
 # ======================================================================================
 def render_wave_height_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, is_bottom=False):
     import numpy as np
@@ -972,7 +940,7 @@ def render_wave_height_chart(ax, df, lat, lon, marine_results, res_lat, res_lon,
         render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_dict)
 
 # ======================================================================================
-# 27. 海面水温グラフを描画するサブルーチン (整数表示・地点情報下げ)
+# 26. 海面水温グラフを描画するサブルーチン (整数表示・地点情報下げ)
 # ======================================================================================
 def render_ocean_temp_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, is_bottom=False):
     import numpy as np
@@ -1005,7 +973,7 @@ def render_ocean_temp_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, 
         render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_dict)
 
 # ======================================================================================
-# 28. 潮位グラフを描画するサブルーチン (地点情報呼び出し含む)
+# 27. 潮位グラフを描画するサブルーチン (地点情報呼び出し含む)
 # ======================================================================================
 def render_tide_curve_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, is_bottom=False):
     import numpy as np
@@ -1041,7 +1009,7 @@ def render_tide_curve_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, 
         render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_dict)
 
 # ======================================================================================
-# 29. 海洋データの地点情報を描画するサブルーチン (位置自動計算・多言語対応版)
+# 28. 海洋データの地点情報を描画するサブルーチン (位置自動計算・多言語対応版)
 # ======================================================================================
 def render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_dict):
     """
@@ -1085,7 +1053,7 @@ def render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_di
                 va='top')
 
 # ======================================================================================
-# 30. 天気アイコン部分のHTMLを生成するサブルーチン (はみ出し防止・連動修正版)
+# 29. 天気アイコン部分のHTMLを生成するサブルーチン (はみ出し防止・連動修正版)
 # ======================================================================================
 def generate_weather_icons_html(df, ratio_info, contena_min_w, start_idx, design_params):
     import pandas as pd
@@ -1153,48 +1121,37 @@ def generate_weather_icons_html(df, ratio_info, contena_min_w, start_idx, design
     return header_html, body_html
 
 # ======================================================================================
-# 31. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (仕様復旧・診断版)
+# 30. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (フォント直接指定・完全版)
 # ======================================================================================
 def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_params, now_jst):
     import pandas as pd
     import io, base64, os, sys
     import numpy as np
     from datetime import timedelta
-    import matplotlib
-    matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     from PIL import Image
     import matplotlib.font_manager as fm
 
-    # メモリー計測 (Linux/Render環境用)
-    def get_mem():
-        try:
-            import resource
-            # 現在のピークメモリ使用量をMB単位で取得
-            return f"{resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024:.1f}MB"
-        except:
-            return "N/A"
-
-    trace = []
-    trace.append(f"START:{get_mem()}")
-    
     df = pd.DataFrame()
     start_idx = 0
     split_px = 0
     new_ratio_info = (0.0, 0.0, 0.0)
-    fig = None
 
     try:
-        # --- 1. フォント設定 ---
+        # --- 1. フォントオブジェクトの絶対パス生成 ---
         base_dir = os.path.dirname(os.path.abspath(__file__))
         fpath = os.path.join(base_dir, 'static', 'font.ttf')
         f_size = design_params.get("font_size", 10)
         
+        # フォントオブジェクトを生成 (各描画関数でこれを使います)
         if os.path.exists(fpath):
+            # fm.FontProperties を生成
             fp = fm.FontProperties(fname=fpath, size=f_size)
+            # 念のため全体設定も行うが、今回は個別指定を優先する
             fm.fontManager.addfont(fpath)
             plt.rcParams['font.family'] = fp.get_name()
         else:
+            # 異常系：ファイルがない場合は標準フォント
             fp = fm.FontProperties(family='sans-serif', size=f_size)
 
         plt.rcParams['axes.unicode_minus'] = False
@@ -1202,10 +1159,7 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         # --- 2. データ取得 ---
         df_raw = fetch_weather_data(lat, lon, 9)
         if df_raw is None or df_raw.empty:
-            trace.append(f"FETCH_EMPTY:{get_mem()}")
-            return "ERR:FETCH_EMPTY", "", (0.0, 0.0, 0.0), 0, pd.DataFrame(), 0
-
-        trace.append(f"FETCH_OK:{get_mem()}")
+            raise RuntimeError("気象データの取得に失敗しました。")
 
         # --- 3. 時差・切り出し ---
         local_offset_s = df_raw.attrs.get('local_offset_seconds', 0)
@@ -1234,85 +1188,76 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         if any(k in active_plots for k in {"wave", "ocean_temp", "tide"}):
             marine_results, r_lat, r_lon = get_marine_data(df['time'], lat, lon)
 
-        # --- 6. サイズ設計 (元の仕様: DPI 72, 横幅 15.0インチ) ---
+        # --- 6. サイズ設計 ---
         unit_height_px = 100  
-        dpi_value = design_params.get("graph_dpi", 72)
+        dpi_value = design_params.get("graph_dpi", 200)
         fig_w_inch = design_params.get("width_inch", 15.0)
-        
         fig_h_inch = (sum(height_ratios) * unit_height_px + 150) / dpi_value
         margin_left_inch = design_params.get("margin_left_inch", 0.8)
         left_margin_ratio = margin_left_inch / fig_w_inch
 
         # --- 7. グラフ描画 ---
         fig, axes = plt.subplots(len(active_plots), 1, figsize=(fig_w_inch, fig_h_inch), dpi=dpi_value,
-                                   gridspec_kw={'height_ratios': height_ratios})
+                                    gridspec_kw={'height_ratios': height_ratios})
         axes_list = np.array([axes]).flatten()
-        trace.append(f"SUBPLOTS:{get_mem()}")
 
         formatter = get_x_axis_formatter()
         for i, plot_type in enumerate(active_plots):
             ax = axes_list[i]
             is_bottom = (i == len(active_plots) - 1)
             
-            if plot_type == "wind": render_wind_bar_chart(ax, df, danger_v, start_idx, design_params)
-            elif plot_type == "temp": render_temp_line_chart(ax, df)
-            elif plot_type == "wave": render_wave_height_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom)
-            elif plot_type == "ocean_temp": render_ocean_temp_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom)
-            elif plot_type == "tide": render_tide_curve_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom)
+            # 各レンダリング関数を呼び出し
+            if plot_type == "wind":
+                render_wind_bar_chart(ax, df, danger_v, start_idx, design_params)
+            elif plot_type == "temp":
+                render_temp_line_chart(ax, df)
+            elif plot_type == "wave":
+                render_wave_height_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom)
+            elif plot_type == "ocean_temp":
+                render_ocean_temp_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom)
+            elif plot_type == "tide":
+                render_tide_curve_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom)
 
+            # 共通設定を適用
             apply_common_axis_settings(ax, df, formatter, now_jst, design_params)
             
-            # 各軸のフォント適用
+            # --- ここが豆腐対策の核心：生成した軸ラベルやタイトルに直接フォントを注入 ---
             for text in ax.get_xticklabels() + ax.get_yticklabels():
                 text.set_fontproperties(fp)
             ax.set_xlabel(ax.get_xlabel(), fontproperties=fp)
             ax.set_ylabel(ax.get_ylabel(), fontproperties=fp)
+            if ax.get_title():
+                ax.set_title(ax.get_title(), fontproperties=fp)
 
-        plt.subplots_adjust(left=left_margin_ratio, right=0.98, top=0.92, bottom=0.15, hspace=0.4)
-        trace.append(f"RENDER_OK:{get_mem()}")
+        plt.subplots_adjust(left=left_margin_ratio, right=0.98, top=0.92, bottom=0.15, hspace=design_params.get("hspace_inch", 0.4))
 
         # --- 8. 画像出力 ---
         buf = io.BytesIO()
         fig.savefig(buf, format="png", bbox_inches=None, pad_inches=0, dpi=dpi_value)
         buf.seek(0)
-        trace.append(f"SAVEFIG:{get_mem()}")
-
         full_img = Image.open(buf)
         img_w, img_h = full_img.size
-        
         split_px = int(img_w * axes_list[0].get_position().x0)
         new_ratio_info = (float(img_w - split_px), (axes_list[0].get_position().width * img_w) / (len(df) - 1), 0.0)
-        
-        # オブジェクトの明示的解放
         plt.close(fig)
-        fig = None 
-
+        
         left_part = full_img.crop((0, 0, split_px, img_h))
         right_part = full_img.crop((split_px, 0, img_w, img_h))
         
         def img_to_b64(img):
             b = io.BytesIO()
             img.save(b, format="PNG")
-            img_data = base64.b64encode(b.getvalue()).decode()
-            b.close()
-            return img_data
+            return base64.b64encode(b.getvalue()).decode()
 
-        l_b64 = img_to_b64(left_part)
-        r_b64 = img_to_b64(right_part)
-        
-        full_img.close(); left_part.close(); right_part.close(); buf.close()
-        trace.append(f"FINISH:{get_mem()}")
-
-        return l_b64, r_b64, new_ratio_info, start_idx, df, split_px
+        return img_to_b64(left_part), img_to_b64(right_part), new_ratio_info, start_idx, df, split_px
 
     except Exception as e:
-        if fig is not None: plt.close(fig)
-        import traceback
-        err_detail = f"ERR_MSG:{str(e)} | TRACE:{' -> '.join(trace)} | {traceback.format_exc()}"
-        return f"ERROR_INFO:{err_detail}", "", (0.0, 0.0, 0.0), 0, pd.DataFrame(), 0
+        if 'fig' in locals(): plt.close(fig)
+        raise RuntimeError(str(e))
+
 
 # ======================================================================================
-# 32. グラフの個別高さ(inch)と表示設定を変更するダイアログ (Streamlit版)
+# 30. グラフの個別高さ(inch)と表示設定を変更するダイアログ (Streamlit版)
 # ======================================================================================
 def show_settings_dialog():
     """
@@ -1381,7 +1326,7 @@ def show_settings_dialog():
 
 
 # ======================================================================================
-# 33. 設定更新系サブルーチン (サイドバー：風向選択専用)
+# 31. 設定更新系サブルーチン (サイドバー：風向選択専用)
 # ======================================================================================
 @app.route('/update_display_toggle', methods=['POST'])
 def update_display_toggle_handler():
@@ -1406,7 +1351,7 @@ def update_display_toggle_handler():
 
 
 # ======================================================================================
-# 34. 設定更新系サブルーチン (詳細設定モーダル：表示フラグ + 数値)
+# 31_1. 設定更新系サブルーチン (詳細設定モーダル：表示フラグ + 数値)
 # ======================================================================================
 @app.route('/update_settings', methods=['POST'])
 def update_settings_handler():
@@ -1444,7 +1389,7 @@ def update_settings_handler():
 
 
 # ======================================================================================
-# 35. 設定更新系サブルーチン (リセット)
+# 31_2. 設定更新系サブルーチン (リセット)
 # ======================================================================================
 @app.route('/reset_settings')
 def reset_settings_handler():
@@ -1462,7 +1407,7 @@ def reset_settings_handler():
     return redirect(url_for('index', refresh='1', t=int(time.time())))
 
 # ======================================================================================
-# 40. 地図・位置情報連携サブルーチン (現在地名称の自動取得・一本化)
+# 33. 地図・位置情報連携サブルーチン (現在地名称の自動取得・一本化)
 # ======================================================================================
 @app.route('/set_location')
 def set_location_handler():
@@ -1502,7 +1447,7 @@ def set_location_handler():
     return redirect(url_for('index'))
 
 # ======================================================================================
-# 41. 地図・位置情報連携サブルーチン (地図画面遷移・検索モード対応)
+# 33_1. 地図・位置情報連携サブルーチン (地図画面遷移・検索モード対応)
 # ======================================================================================
 @app.route('/map_select')
 def map_select_view():
@@ -1526,7 +1471,7 @@ def map_select_view():
                            search_mode=search_mode)
 
 # ======================================================================================
-# 42. 地図からの座標更新ハンドラ (地名ラベル取得統合 完全版)
+# 33_2. 地図からの座標更新ハンドラ (地名ラベル取得統合 完全版)
 # ======================================================================================
 @app.route('/update_by_map')
 def update_by_map_handler():
@@ -1556,7 +1501,7 @@ def update_by_map_handler():
     return redirect(url_for('index'))
     
 # ======================================================================================
-# 43. 座標から住所ラベルを取得するサブルーチン (Reverse Geocoding 完全版)
+# 35. 座標から住所ラベルを取得するサブルーチン (Reverse Geocoding 完全版)
 # ======================================================================================
 def get_address_from_coords(lat, lon):
     """
@@ -1600,7 +1545,7 @@ def get_address_from_coords(lat, lon):
     return f"{lat:.4f}, {lon:.4f}"
 
 # ======================================================================================
-# 44. 地名検索・地図連携サブルーチン (地名ラベル取得統合 完全版)
+# 34. 地名検索・地図連携サブルーチン (地名ラベル取得統合 完全版)
 # ======================================================================================
 @app.route('/search_address')
 def search_address_handler():
@@ -1646,7 +1591,7 @@ def search_address_handler():
     return redirect(url_for('map_select_view'))
 
 # ======================================================================================
-# 50. My Spots 追加ハンドラ (API形式: JavaScriptから呼び出し・完全版)
+# 41. My Spots 追加ハンドラ (API形式: JavaScriptから呼び出し・完全版)
 # ======================================================================================
 @app.route('/add_to_myspots', methods=['POST'])
 def add_to_myspots():
@@ -1686,7 +1631,7 @@ def add_to_myspots():
     return jsonify({"status": "success", "name": display_name})
 
 # ======================================================================================
-# 51. My Spots 管理画面 (編集・並び替え・削除・完全版)
+# 42. My Spots 管理画面 (編集・並び替え・削除・完全版)
 # ======================================================================================
 @app.route('/edit_spots')
 def edit_spots():
@@ -1736,7 +1681,7 @@ def delete_spot(idx):
     return redirect(url_for('edit_spots'))
 
 # ======================================================================================
-# 52. 地点選択ハンドラ (ID指定・index/座標パラメータ指定 全対応完全版)
+# 43. 地点選択ハンドラ (ID指定・index/座標パラメータ指定 全対応完全版)
 # ======================================================================================
 @app.route('/select_spot')
 @app.route('/select_spot/<int:spot_id>')
@@ -1793,7 +1738,7 @@ def select_spot_handler(spot_id=None):
     return redirect(url_for('index'))
 
 # ======================================================================================
-# 53. ブラウザGPS取得スクリプト生成サブルーチン (自動実行を廃止した完全版)
+# 90. ブラウザGPS取得スクリプト生成サブルーチン (自動実行を廃止した完全版)
 # ======================================================================================
 def get_gps_script_js():
     """
@@ -1843,7 +1788,7 @@ def get_gps_script_js():
     """
 
 #======================================================================================
-# 54. 地点リスト・マスタ合成サブルーチン
+# 91. 地点リスト・マスタ合成サブルーチン
 #======================================================================================
 def get_location_buttons_html():
     """
@@ -1866,9 +1811,9 @@ def get_location_buttons_html():
     html += '</div>'
     return html
 
-#======================================================================================
-# 90. カスタムレイアウトパラメータを計算するサブルーチン (Flask版)
-#======================================================================================
+# #======================================================================================
+# # 92. カスタムレイアウトパラメータを計算するサブルーチン (Flask版)
+# #======================================================================================
 def calculate_custom_layout_params_flask(user_settings):
     """
     表示項目、個別高さ、合計インチ数を計算します。
@@ -1896,20 +1841,21 @@ def calculate_custom_layout_params_flask(user_settings):
 
     return active_ids, active_heights, total_h, top_margin
 
-#======================================================================================
-# 91. ユーザー指定の物理サイズ(inch)でダッシュボードを描画するサブルーチン (Flask版・メモリ節約版)
-#======================================================================================
+# #======================================================================================
+# # 93. ユーザー指定の物理サイズ(inch)でダッシュボードを描画するサブルーチン (Flask版)
+# #======================================================================================
 def render_physical_dashboard_flask(df, marine_results, lat, lon, design_params):
+    """
+    Matplotlibを使用してダッシュボードを描画します。
+    Streamlit依存を完全に排除。
+    """
     import matplotlib.pyplot as plt
     from matplotlib import gridspec
-    
+    # st.session_state ではなく design_params(session由来) を使用
     active_items, active_heights, total_h, h_gap_inch = calculate_custom_layout_params_flask(design_params)
 
     if not active_items:
         return None
-
-    # メモリ節約のため、描画前に過去の図をすべてクリア
-    plt.close('all')
 
     fig = plt.figure(figsize=(design_params.get("width", 15.0), total_h))
     gs = gridspec.GridSpec(len(active_items), 1, height_ratios=active_heights)
@@ -1920,6 +1866,7 @@ def render_physical_dashboard_flask(df, marine_results, lat, lon, design_params)
         left=0.08, right=0.96, top=0.98, bottom=0.05
     )
 
+    # 軸フォーマッタ等の共通設定（これらもFlask対応のサブルーチンであることを想定）
     formatter = get_x_axis_formatter()
     now_jst = get_now_jst()
 
@@ -1927,6 +1874,7 @@ def render_physical_dashboard_flask(df, marine_results, lat, lon, design_params)
         ax = fig.add_subplot(gs[i])
         is_bottom = (i == len(active_items) - 1)
 
+        # 各チャート描画関数（これらは既存のものを流用可能）
         if tid == "WIND":
             render_wind_bar_chart(ax, df, design_params.get("danger_v", 10.0), 1, design_params)
         elif tid == "TEMP":
@@ -1944,7 +1892,7 @@ def render_physical_dashboard_flask(df, marine_results, lat, lon, design_params)
 
 
 #======================================================================================
-# 92. グラフ描画エリア・パーツ生成サブルーチン (Flask連携版)
+# 96. グラフ描画エリア・パーツ生成サブルーチン (Flask連携版)
 #======================================================================================
 def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
     """
@@ -1970,7 +1918,7 @@ def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
     left_b64, right_b64, ratio_info, start_idx, df_graph, split_px = res
     
     # デザイン設定の取得
-    dpi = design_params.get("graph_dpi", )
+    dpi = design_params.get("graph_dpi", 200)
     # 高さは30番の内部計算結果に合わせるため auto に設定
     
     # 横幅計算（30番の計算結果を利用）
@@ -1996,29 +1944,44 @@ def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
     )
     return html_str
 
+
+
 # ======================================================================================
 # グローバル変数でキャッシュを保持（Cookie制限 4KB 回避用）
 # ======================================================================================
 render_cache = {}
 
 # ======================================================================================
-# 93. Flask メインルート: インデックス表示 (起動時・no_cache 物理回避版)
+# 98. Flask メインルート: インデックス表示 (LocalStorage 連携版)
 # ======================================================================================
 @app.route('/')
 def index():
     import pytz, datetime, traceback, os, time, json
     from flask import session, render_template, request
     
-    # --- (config, lang_dict, now_jst, design_params, sel_dirs の定義) ---
+    # 環境判定の実行
     config = get_env_config()
+    
     all_langs = get_language_dict()
     selected_lang = session.get('lang', 'ja')
     lang_dict = all_langs.get(selected_lang, all_langs['ja'])
+
     jst = pytz.timezone('Asia/Tokyo')
     now_jst = datetime.datetime.now(jst)
+    
     user_settings = session.get('design_params', {})
+    
+    req_lat = request.args.get('lat')
+    req_lon = request.args.get('lon')
+    if req_lat and req_lon:
+        user_settings['lat'] = float(req_lat)
+        user_settings['lon'] = float(req_lon)
+        session['design_params'] = user_settings
+        session.modified = True
+
     lat = float(user_settings.get('lat', CONFIG.get("DEFAULT_LAT", 31.337)))
     lon = float(user_settings.get('lon', CONFIG.get("DEFAULT_LON", 130.795)))
+
     design_params = {
         "width_inch": float(user_settings.get('width_inch', 15.0)),
         "height_inch": float(user_settings.get('height_inch', 0.6)),
@@ -2026,7 +1989,7 @@ def index():
         "hspace_inch": float(user_settings.get('hspace_inch', 1.0)),
         "margin_left_inch": float(user_settings.get('margin_left_inch', 0.6)),
         "font_size": int(user_settings.get('font_size', 8)),
-        "graph_dpi": int(user_settings.get('graph_dpi', 72)), # 元の仕様(72)に復帰
+        "graph_dpi": int(user_settings.get('graph_dpi', 200)),
         "show_wind": user_settings.get('show_wind', True),
         "show_temp": user_settings.get('show_temp', True),
         "show_tide": user_settings.get('show_tide', True),
@@ -2037,6 +2000,7 @@ def index():
         "lon": lon,
         "danger_v": float(session.get('danger_v', 10.0))
     }
+
     danger_v = design_params["danger_v"]
     sel_dirs = session.get('sel_dirs', [True]*16)
 
@@ -2048,97 +2012,129 @@ def index():
     cache_key = f"{lat:.4f}_{lon:.4f}_{selected_lang}"
     graph_cache_path = os.path.join(CACHE_DIR, f"graph_data_{cache_key}.json")
     
-    # --- 重要：no_cache パラメータの取得 ---
     force_refresh = (request.args.get('refresh') == '1')
-    no_cache_param = (request.args.get('no_cache') == '1')
-    
     should_render = False
     graph_html = None
     draw_time_str = ""
     debug_msg = ""
 
-    # 1. no_cache=1 が指定されている場合は、無条件で再描画（キャッシュ読込をスキップ）
-    if no_cache_param:
+    if force_refresh:
         should_render = True
-        debug_msg = "NoCache指定"
-    # 2. 更新ボタン押下時
-    elif force_refresh:
-        should_render = True
-        debug_msg = "強制更新"
-    # 3. メモリ上のキャッシュチェック
+        debug_msg = "強制再描画"
     elif cache_key in render_cache:
         cached_item = render_cache[cache_key]
-        if (now_jst - cached_item.get('timestamp')).total_seconds() < 14400:
+        if (now_jst - cached_item.get('timestamp')).total_seconds() < 86400:
             graph_html = cached_item['html']
             draw_time_str = cached_item.get('draw_time_str', "")
-            debug_msg = "メモリ使用"
+            debug_msg = f"メモリ使用 ({int((now_jst - cached_item['timestamp']).total_seconds())}s前)"
         else:
             should_render = True
-    # 4. 物理ファイル（JSON）の読み込み
-    # ここが「立ち上がり時のクラッシュ」の主因。no_cache=1 時はここを通さない。
     elif os.path.exists(graph_cache_path):
-        try:
-            with open(graph_cache_path, "r", encoding="utf-8") as f:
-                c_data = json.load(f)
-                graph_html = c_data['html']
-                draw_time_str = c_data.get('draw_time_str', "")
-            
-            # メモリ節約のため、大きなHTMLをグローバルに保持するかは慎重に判断
-            render_cache[cache_key] = {
-                'html': graph_html, 
-                'timestamp': datetime.datetime.fromtimestamp(os.path.getmtime(graph_cache_path), tz=jst), 
-                'draw_time_str': draw_time_str
-            }
-            debug_msg = "物理使用"
-        except:
+        age = time.time() - os.path.getmtime(graph_cache_path)
+        if age < 86400:
+            try:
+                with open(graph_cache_path, "r", encoding="utf-8") as f:
+                    c_data = json.load(f)
+                    graph_html = c_data['html']
+                    draw_time_str = c_data.get('draw_time_str', "")
+                render_cache[cache_key] = {
+                    'html': graph_html, 
+                    'timestamp': datetime.datetime.fromtimestamp(os.path.getmtime(graph_cache_path), tz=jst),
+                    'draw_time_str': draw_time_str
+                }
+                debug_msg = f"物理使用 ({int(age)}s前)"
+            except:
+                should_render = True
+        else:
             should_render = True
     else:
         should_render = True
 
     try:
-        # 描画が必要な場合
         if should_render or graph_html is None:
             draw_time_str = now_jst.strftime('%H:%M')
-            # 94番経由で31番を呼び出し、最新のグラフを生成
             graph_html = render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst)
-            
-            # no_cache=1 の時は、メモリキャッシュもファイル保存もしない（徹底回避）
-            if not no_cache_param:
-                render_cache[cache_key] = {'html': graph_html, 'timestamp': now_jst, 'draw_time_str': draw_time_str}
-                try:
-                    with open(graph_cache_path, "w", encoding="utf-8") as f:
-                        json.dump({'html': graph_html, 'draw_time_str': draw_time_str}, f)
-                except:
-                    pass
+            render_cache[cache_key] = {'html': graph_html, 'timestamp': now_jst, 'draw_time_str': draw_time_str}
+            try:
+                with open(graph_cache_path, "w", encoding="utf-8") as f:
+                    json.dump({'html': graph_html, 'draw_time_str': draw_time_str}, f)
+            except: pass
+            session['needs_refresh'] = False
+            session.modified = True
 
         display_basho = session.get('last_basho') or session.get('basho') or CONFIG.get("DEFAULT_BASHO", "東京")
+
+        # セッションサイズの計測
+        try:
+            session_size = len(json.dumps(dict(session)).encode('utf-8'))
+            debug_msg += f" | Session: {session_size} bytes"
+        except: pass
+
         w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,windspeed_10m,winddirection_10m,precipitation&timezone=auto"
         m_url = f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto"
 
         return render_template(
             'index.html',
-            config=config, lang_dict=lang_dict, now_jst=now_jst,
-            draw_time_str=draw_time_str, graph_html=graph_html,
-            design_params=design_params, sel_dirs=sel_dirs,
-            danger_v=danger_v, w_url=w_url, m_url=m_url,
-            basho=display_basho, 
-            current_lat=lat,
-            current_lon=lon,
+            config=config,   # ← ここ：追加しました
+            lang_dict=lang_dict,
+            now_jst=now_jst,
+            draw_time_str=draw_time_str,
+            graph_html=graph_html,
+            design_params=design_params,
+            sel_dirs=sel_dirs,
+            danger_v=danger_v,
+            w_url=w_url,
+            m_url=m_url,
+            basho=display_basho,
             debug_info=debug_msg,
             app_config={"icon_path": "static/pin_weather_01.png"}
         )
-
-    except Exception as e:
-        error_txt = str(e)
-        friendly_msg = "現在、アクセス制限中か、グラフ生成に失敗しました。" if "429" in error_txt else "エラーが発生しました。"
-        return render_template(
-            'error.html',
-            error_msg=f"{friendly_msg}\n\n詳細ログ:\n{traceback.format_exc()}",
-            lang_dict=lang_dict
-        )
+    except Exception:
+        return render_template('index.html', config=config, lang_dict=lang_dict, error_msg=traceback.format_exc(), basho="Error")
+    
 
 # ======================================================================================
-# 95. Flask 設定更新ルーチン (修正版)
+# 96. グラフ描画エリア生成サブルーチン (座標不整合修正版)
+# ======================================================================================
+def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
+    """
+    引数 design_params から座標を確実に取得し、30番の統合エンジンを呼び出します。
+    """
+    # セッションからではなく、引数(indexで決定した最新座標)から取得
+    lat = design_params.get('lat')
+    lon = design_params.get('lon')
+
+    # --- 30番のサブルーチンを呼び出し ---
+    res = generate_high_res_graph(
+        lat, lon, danger_v, tuple(sel_dirs), design_params, now_jst
+    )
+    
+    if not res or res[0] is None:
+        return "<div class='alert alert-danger'>グラフの生成に失敗しました。</div>"
+        
+    left_b64, right_b64, ratio_info, start_idx, df_graph, split_px = res
+    w_right_px = ratio_info[0]
+    
+    header_h, body_h = generate_weather_icons_html(df_graph, ratio_info, w_right_px, start_idx, design_params)
+    
+    html_str = (
+        f'<div id="graph-wrapper" style="display:flex; width:100%; background:white; border:1px solid #ddd; overflow:hidden;">'
+        f'  <div id="graph-left" style="width:{split_px}px; min-width:{split_px}px; flex-shrink:0; overflow:hidden; border-right:1px solid #eee; background:white; z-index:10;">'
+        f'    <div style="width:100%;">{header_h}</div>'
+        f'    <img src="data:image/png;base64,{left_b64}" style="width:100%; height:auto; display:block;">'
+        f'  </div>'
+        f'  <div id="graph-right" style="flex-grow:1; overflow-x:auto; background:white;">'
+        f'    <div style="width:{w_right_px}px; position:relative;">'
+        f'      {body_h}'
+        f'      <img src="data:image/png;base64,{right_b64}" style="width:100%; height:auto; display:block;">'
+        f'    </div>'
+        f'  </div>'
+        f'</div>'
+    )
+    return html_str
+
+# ======================================================================================
+# 99_1. Flask 設定更新ルーチン (修正版)
 # ======================================================================================
 @app.route('/update_settings', methods=['POST'])
 def update_settings():
@@ -2162,7 +2158,7 @@ def update_settings():
     return redirect(url_for('index'))
 
 #======================================================================================
-# 96. Flask 設定リセットルーチン
+# 99_2. Flask 設定リセットルーチン
 #======================================================================================
 @app.route('/reset_settings')
 def reset_settings():
@@ -2183,7 +2179,7 @@ def reset_settings():
         raise RuntimeError(traceback.format_exc())
 
 # ======================================================================================
-# 97. バックアップからのデータ復元用 (PWA同期用)
+# 99_3. バックアップからのデータ復元用 (PWA同期用)
 # ======================================================================================
 @app.route('/restore_backup', methods=['POST'])
 def restore_backup():
@@ -2206,7 +2202,7 @@ def restore_backup():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ======================================================================================
-# 98. 言語切り替えエンドポイント (確実な登録版)
+# 80. 言語切り替えエンドポイント (確実な登録版)
 # ======================================================================================
 @app.route('/change_lang')
 def change_lang():
@@ -2217,7 +2213,7 @@ def change_lang():
     return redirect(request.referrer or url_for('index'))
     
 # ======================================================================================
-# 99. LocalStorage からのセッション復元ハンドラ
+# 44. LocalStorage からのセッション復元ハンドラ
 # ======================================================================================
 @app.route('/restore_settings', methods=['POST'])
 def restore_settings():
@@ -2280,6 +2276,7 @@ if __name__ == "__main__":
     
     # アプリケーションの起動
     app.run(host=target_host, port=port, debug=is_debug)
+
 
 
 
