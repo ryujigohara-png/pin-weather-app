@@ -25,7 +25,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'pin_weather_secret_key_2026')
 
 # ======================================================================================
-# 10_1. 環境判定サブルーチン (Local / Beta / Main)
+# 11. 環境判定サブルーチン (Local / Beta / Main)
 # ======================================================================================
 def get_env_config():
     # Renderが割り当てるホスト名を取得
@@ -54,7 +54,7 @@ def get_env_config():
         }
 
 # ======================================================================================
-# 11. 定数・基本設定 (CONFIG)
+# 12. 定数・基本設定 (CONFIG)
 # ======================================================================================
 CONFIG = {
     "TITLE_SIZE": 20,
@@ -122,7 +122,7 @@ CONFIG = {
 ALL_DIRECTIONS = ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"]
 
 # ======================================================================================
-# 12. 多言語表示用の辞書データを定義するサブルーチン。
+# 13. 多言語表示用の辞書データを定義するサブルーチン。
 # ======================================================================================
 def get_language_dict():
     """
@@ -427,7 +427,7 @@ def get_language_dict():
     }
 
 # ======================================================================================
-# 12_1. アプリケーション初期化サブルーチン
+# 14. アプリケーション初期化サブルーチン
 # ======================================================================================
 def initialize_app_settings():
     """
@@ -450,7 +450,7 @@ def initialize_app_settings():
     return config
 
 # ======================================================================================
-# 13_2. ヘルスチェック用サブルーチン (Renderのデプロイ成功率向上のため)
+# 15. ヘルスチェック用サブルーチン (Renderのデプロイ成功率向上のため)
 # ======================================================================================
 @app.route('/healthz')
 def health_check():
@@ -458,7 +458,7 @@ def health_check():
     return "OK", 200
 
 # ======================================================================================
-# 13. 日本語フォントセットアップサブルーチン (Render/Linux 強化版)
+# 16. 日本語フォントセットアップサブルーチン (Render/Linux 強化版)
 # ======================================================================================
 def setup_font(font_size=None):
     """
@@ -511,9 +511,15 @@ def setup_font(font_size=None):
 
 
 # ======================================================================================
-# 14. 気象データをAPIから取得するサブルーチン (キャッシュ対応)
+# 20. 気象データをAPIから取得するサブルーチン (キャッシュ対応・精度調整版)
 # ======================================================================================
 def fetch_weather_data(lat, lon, days):
+    import os
+    import time
+    import pandas as pd
+    import requests
+    import numpy as np
+
     CACHE_DIR = "weather_cache"
     if not os.path.exists(CACHE_DIR): 
         try:
@@ -545,6 +551,12 @@ def fetch_weather_data(lat, lon, days):
         response = res_raw.json()
         df = pd.DataFrame(response["hourly"])
         
+        # --- メモリ節約のため数値列を Float16 に変換 ---
+        float_cols = ['temperature_2m', 'wind_speed_10m', 'precipitation']
+        for col in float_cols:
+            if col in df.columns:
+                df[col] = df[col].astype(np.float16)
+
         local_offset_s = response.get("utc_offset_seconds", 0)
         df['time'] = pd.to_datetime(df['time']).dt.tz_localize(None)
         df.attrs['local_offset_seconds'] = local_offset_s
@@ -576,7 +588,7 @@ def fetch_weather_data(lat, lon, days):
         raise RuntimeError(f"【システムエラー】予期せぬエラーが発生しました: {e}")
 
 # ======================================================================================
-# 15. 気象データキャッシュファイルを物理削除するサブルーチン
+# 21. 気象データキャッシュファイルを物理削除するサブルーチン
 # ======================================================================================
 def clear_weather_cache_files():
     import shutil
@@ -592,7 +604,7 @@ def clear_weather_cache_files():
 
 
 # ======================================================================================
-# 16. 海洋データを取得するサブルーチン (9日分完全対応版)
+# 22. 海洋データを取得するサブルーチン (9日分完全対応版)
 # ======================================================================================
 def get_marine_data(time_series, lat, lon):
     import requests
@@ -654,7 +666,7 @@ def get_marine_data(time_series, lat, lon):
         return None, lat, lon
 
 # ======================================================================================
-# 17. 天気コードからテキストと色を取得するサブルーチン
+# 23. 天気コードからテキストと色を取得するサブルーチン
 # ======================================================================================
 def get_weather_info(code):
     from flask import session
@@ -673,7 +685,7 @@ def get_weather_info(code):
     return "？", "black"
 
 # ======================================================================================
-# 20. 風向き・速度・色の判定を行うデータ処理サブルーチン (型不一致解消・完全版)
+# 24. 風向き・速度・色の判定を行うデータ処理サブルーチン (型不一致解消・完全版)
 # ======================================================================================
 def process_wind_data(df, target_dirs_input):
     import pandas as pd
@@ -731,7 +743,7 @@ def process_wind_data(df, target_dirs_input):
     return df
 
 # ======================================================================================
-# 21. X軸の表示形式（日付・時刻）を定義するサブルーチン
+# 25. X軸の表示形式（日付・時刻）を定義するサブルーチン
 # ======================================================================================
 def get_x_axis_formatter():
     import matplotlib.dates as mdates
@@ -757,7 +769,7 @@ def get_x_axis_formatter():
     return formatter
 
 # ======================================================================================
-# 22. グラフの共通軸設定を適用するサブルーチン
+# 26. グラフの共通軸設定を適用するサブルーチン
 # ======================================================================================
 def apply_common_axis_settings(ax, df, formatter, now_jst, design_params):
     import matplotlib.dates as mdates
@@ -802,7 +814,7 @@ def apply_common_axis_settings(ax, df, formatter, now_jst, design_params):
                 label.set_color('blue')
 
 # ======================================================================================
-# 23. 風速棒グラフを描画するサブルーチン (降水量：0より大きい場合に小数点1位表示)
+# 27. 風速棒グラフを描画するサブルーチン (降水量：0より大きい場合に小数点1位表示)
 # ======================================================================================
 def render_wind_bar_chart(ax, df, danger_v, wind_step, design_params=None):
     import pandas as pd
@@ -873,7 +885,7 @@ def render_wind_bar_chart(ax, df, danger_v, wind_step, design_params=None):
                             fontsize=l_fs, color="blue", transform=ax.get_xaxis_transform(), clip_on=False)
 
 # ======================================================================================
-# 24. 気温グラフを描画するサブルーチン (整数表示)
+# 28. 気温グラフを描画するサブルーチン (整数表示)
 # ======================================================================================
 def render_temp_line_chart(ax, df):
     import pandas as pd
@@ -900,7 +912,7 @@ def render_temp_line_chart(ax, df):
                     transform=ax.get_xaxis_transform(), clip_on=False)
 
 # ======================================================================================
-# 25. 波高グラフを描画するサブルーチン (整数cm・四捨五入・マイナス対応版)
+# 29. 波高グラフを描画するサブルーチン (整数cm・四捨五入・マイナス対応版)
 # ======================================================================================
 def render_wave_height_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, is_bottom=False):
     import numpy as np
@@ -940,7 +952,7 @@ def render_wave_height_chart(ax, df, lat, lon, marine_results, res_lat, res_lon,
         render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_dict)
 
 # ======================================================================================
-# 26. 海面水温グラフを描画するサブルーチン (整数表示・地点情報下げ)
+# 30. 海面水温グラフを描画するサブルーチン (整数表示・地点情報下げ)
 # ======================================================================================
 def render_ocean_temp_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, is_bottom=False):
     import numpy as np
@@ -973,7 +985,7 @@ def render_ocean_temp_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, 
         render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_dict)
 
 # ======================================================================================
-# 27. 潮位グラフを描画するサブルーチン (地点情報呼び出し含む)
+# 31. 潮位グラフを描画するサブルーチン (地点情報呼び出し含む)
 # ======================================================================================
 def render_tide_curve_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, is_bottom=False):
     import numpy as np
@@ -1009,7 +1021,7 @@ def render_tide_curve_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, 
         render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_dict)
 
 # ======================================================================================
-# 28. 海洋データの地点情報を描画するサブルーチン (位置自動計算・多言語対応版)
+# 32. 海洋データの地点情報を描画するサブルーチン (位置自動計算・多言語対応版)
 # ======================================================================================
 def render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_dict):
     """
@@ -1053,7 +1065,7 @@ def render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_di
                 va='top')
 
 # ======================================================================================
-# 29. 天気アイコン部分のHTMLを生成するサブルーチン (はみ出し防止・連動修正版)
+# 33. 天気アイコン部分のHTMLを生成するサブルーチン (はみ出し防止・連動修正版)
 # ======================================================================================
 def generate_weather_icons_html(df, ratio_info, contena_min_w, start_idx, design_params):
     import pandas as pd
@@ -1121,7 +1133,7 @@ def generate_weather_icons_html(df, ratio_info, contena_min_w, start_idx, design
     return header_html, body_html
 
 # ======================================================================================
-# 30. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (フォント直接指定・完全版)
+# 34. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (フォント直接指定・完全版)
 # ======================================================================================
 def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_params, now_jst):
     import pandas as pd
@@ -1257,7 +1269,7 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
 
 
 # ======================================================================================
-# 30. グラフの個別高さ(inch)と表示設定を変更するダイアログ (Streamlit版)
+# 35. グラフの個別高さ(inch)と表示設定を変更するダイアログ (Streamlit版)
 # ======================================================================================
 def show_settings_dialog():
     """
@@ -1326,7 +1338,7 @@ def show_settings_dialog():
 
 
 # ======================================================================================
-# 31. 設定更新系サブルーチン (サイドバー：風向選択専用)
+# 40. 設定更新系サブルーチン (サイドバー：風向選択専用)
 # ======================================================================================
 @app.route('/update_display_toggle', methods=['POST'])
 def update_display_toggle_handler():
@@ -1351,7 +1363,7 @@ def update_display_toggle_handler():
 
 
 # ======================================================================================
-# 31_1. 設定更新系サブルーチン (詳細設定モーダル：表示フラグ + 数値)
+# 41. 設定更新系サブルーチン (詳細設定モーダル：表示フラグ + 数値)
 # ======================================================================================
 @app.route('/update_settings', methods=['POST'])
 def update_settings_handler():
@@ -1389,7 +1401,7 @@ def update_settings_handler():
 
 
 # ======================================================================================
-# 31_2. 設定更新系サブルーチン (リセット)
+# 42. 設定更新系サブルーチン (リセット)
 # ======================================================================================
 @app.route('/reset_settings')
 def reset_settings_handler():
@@ -1407,7 +1419,7 @@ def reset_settings_handler():
     return redirect(url_for('index', refresh='1', t=int(time.time())))
 
 # ======================================================================================
-# 33. 地図・位置情報連携サブルーチン (現在地名称の自動取得・一本化)
+# 43. 地図・位置情報連携サブルーチン (現在地名称の自動取得・一本化)
 # ======================================================================================
 @app.route('/set_location')
 def set_location_handler():
@@ -1447,7 +1459,7 @@ def set_location_handler():
     return redirect(url_for('index'))
 
 # ======================================================================================
-# 33_1. 地図・位置情報連携サブルーチン (地図画面遷移・検索モード対応)
+# 44. 地図・位置情報連携サブルーチン (地図画面遷移・検索モード対応)
 # ======================================================================================
 @app.route('/map_select')
 def map_select_view():
@@ -1471,7 +1483,7 @@ def map_select_view():
                            search_mode=search_mode)
 
 # ======================================================================================
-# 33_2. 地図からの座標更新ハンドラ (地名ラベル取得統合 完全版)
+# 45. 地図からの座標更新ハンドラ (地名ラベル取得統合 完全版)
 # ======================================================================================
 @app.route('/update_by_map')
 def update_by_map_handler():
@@ -1501,7 +1513,7 @@ def update_by_map_handler():
     return redirect(url_for('index'))
     
 # ======================================================================================
-# 35. 座標から住所ラベルを取得するサブルーチン (Reverse Geocoding 完全版)
+# 46. 座標から住所ラベルを取得するサブルーチン (Reverse Geocoding 完全版)
 # ======================================================================================
 def get_address_from_coords(lat, lon):
     """
@@ -1545,7 +1557,7 @@ def get_address_from_coords(lat, lon):
     return f"{lat:.4f}, {lon:.4f}"
 
 # ======================================================================================
-# 34. 地名検索・地図連携サブルーチン (地名ラベル取得統合 完全版)
+# 47. 地名検索・地図連携サブルーチン (地名ラベル取得統合 完全版)
 # ======================================================================================
 @app.route('/search_address')
 def search_address_handler():
@@ -1591,7 +1603,7 @@ def search_address_handler():
     return redirect(url_for('map_select_view'))
 
 # ======================================================================================
-# 41. My Spots 追加ハンドラ (API形式: JavaScriptから呼び出し・完全版)
+# 48. My Spots 追加ハンドラ (API形式: JavaScriptから呼び出し・完全版)
 # ======================================================================================
 @app.route('/add_to_myspots', methods=['POST'])
 def add_to_myspots():
@@ -1631,7 +1643,7 @@ def add_to_myspots():
     return jsonify({"status": "success", "name": display_name})
 
 # ======================================================================================
-# 42. My Spots 管理画面 (編集・並び替え・削除・完全版)
+# 49. My Spots 管理画面 (編集・並び替え・削除・完全版)
 # ======================================================================================
 @app.route('/edit_spots')
 def edit_spots():
@@ -1681,7 +1693,7 @@ def delete_spot(idx):
     return redirect(url_for('edit_spots'))
 
 # ======================================================================================
-# 43. 地点選択ハンドラ (ID指定・index/座標パラメータ指定 全対応完全版)
+#　50. 地点選択ハンドラ (ID指定・index/座標パラメータ指定 全対応完全版)
 # ======================================================================================
 @app.route('/select_spot')
 @app.route('/select_spot/<int:spot_id>')
@@ -1738,7 +1750,7 @@ def select_spot_handler(spot_id=None):
     return redirect(url_for('index'))
 
 # ======================================================================================
-# 90. ブラウザGPS取得スクリプト生成サブルーチン (自動実行を廃止した完全版)
+# 80. ブラウザGPS取得スクリプト生成サブルーチン (自動実行を廃止した完全版)
 # ======================================================================================
 def get_gps_script_js():
     """
@@ -1788,7 +1800,7 @@ def get_gps_script_js():
     """
 
 #======================================================================================
-# 91. 地点リスト・マスタ合成サブルーチン
+# 81. 地点リスト・マスタ合成サブルーチン
 #======================================================================================
 def get_location_buttons_html():
     """
@@ -1812,7 +1824,7 @@ def get_location_buttons_html():
     return html
 
 # #======================================================================================
-# # 92. カスタムレイアウトパラメータを計算するサブルーチン (Flask版)
+# # 82. カスタムレイアウトパラメータを計算するサブルーチン (Flask版)
 # #======================================================================================
 def calculate_custom_layout_params_flask(user_settings):
     """
@@ -1842,7 +1854,7 @@ def calculate_custom_layout_params_flask(user_settings):
     return active_ids, active_heights, total_h, top_margin
 
 # #======================================================================================
-# # 93. ユーザー指定の物理サイズ(inch)でダッシュボードを描画するサブルーチン (Flask版)
+# # 83. ユーザー指定の物理サイズ(inch)でダッシュボードを描画するサブルーチン (Flask版)
 # #======================================================================================
 def render_physical_dashboard_flask(df, marine_results, lat, lon, design_params):
     """
@@ -1892,7 +1904,7 @@ def render_physical_dashboard_flask(df, marine_results, lat, lon, design_params)
 
 
 #======================================================================================
-# 96. グラフ描画エリア・パーツ生成サブルーチン (Flask連携版)
+# 84. グラフ描画エリア・パーツ生成サブルーチン (Flask連携版)
 #======================================================================================
 def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
     """
@@ -1952,11 +1964,12 @@ def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
 render_cache = {}
 
 # ======================================================================================
-# 98. Flask メインルート: インデックス表示 (LocalStorage 連携版)
+# 85. Flask メインルート: インデックス表示 (動的キャッシュ制御版)
 # ======================================================================================
 @app.route('/')
 def index():
     import pytz, datetime, traceback, os, time, json
+    import numpy as np
     from flask import session, render_template, request
     
     # 環境判定の実行
@@ -2004,6 +2017,10 @@ def index():
     danger_v = design_params["danger_v"]
     sel_dirs = session.get('sel_dirs', [True]*16)
 
+    # --- キャッシュ制御パラメータの取得 ---
+    do_cache_param = (request.args.get('do_cache') == '1')
+    force_refresh = (request.args.get('refresh') == '1')
+
     CACHE_DIR = "weather_cache"
     if not os.path.exists(CACHE_DIR):
         try: os.makedirs(CACHE_DIR)
@@ -2012,53 +2029,65 @@ def index():
     cache_key = f"{lat:.4f}_{lon:.4f}_{selected_lang}"
     graph_cache_path = os.path.join(CACHE_DIR, f"graph_data_{cache_key}.json")
     
-    force_refresh = (request.args.get('refresh') == '1')
     should_render = False
     graph_html = None
     draw_time_str = ""
     debug_msg = ""
 
+    # 1. 強制更新の場合
     if force_refresh:
         should_render = True
         debug_msg = "強制再描画"
-    elif cache_key in render_cache:
-        cached_item = render_cache[cache_key]
-        if (now_jst - cached_item.get('timestamp')).total_seconds() < 86400:
-            graph_html = cached_item['html']
-            draw_time_str = cached_item.get('draw_time_str', "")
-            debug_msg = f"メモリ使用 ({int((now_jst - cached_item['timestamp']).total_seconds())}s前)"
-        else:
-            should_render = True
-    elif os.path.exists(graph_cache_path):
-        age = time.time() - os.path.getmtime(graph_cache_path)
-        if age < 86400:
-            try:
-                with open(graph_cache_path, "r", encoding="utf-8") as f:
-                    c_data = json.load(f)
-                    graph_html = c_data['html']
-                    draw_time_str = c_data.get('draw_time_str', "")
-                render_cache[cache_key] = {
-                    'html': graph_html, 
-                    'timestamp': datetime.datetime.fromtimestamp(os.path.getmtime(graph_cache_path), tz=jst),
-                    'draw_time_str': draw_time_str
-                }
-                debug_msg = f"物理使用 ({int(age)}s前)"
-            except:
+    
+    # 2. パラメータ do_cache=1 がある場合のみキャッシュを確認
+    elif do_cache_param:
+        if cache_key in render_cache:
+            cached_item = render_cache[cache_key]
+            if (now_jst - cached_item.get('timestamp')).total_seconds() < 86400:
+                graph_html = cached_item['html']
+                draw_time_str = cached_item.get('draw_time_str', "")
+                debug_msg = f"メモリ使用 ({int((now_jst - cached_item['timestamp']).total_seconds())}s前)"
+            else:
+                should_render = True
+        elif os.path.exists(graph_cache_path):
+            age = time.time() - os.path.getmtime(graph_cache_path)
+            if age < 86400:
+                try:
+                    with open(graph_cache_path, "r", encoding="utf-8") as f:
+                        c_data = json.load(f)
+                        graph_html = c_data['html']
+                        draw_time_str = c_data.get('draw_time_str', "")
+                    render_cache[cache_key] = {
+                        'html': graph_html, 
+                        'timestamp': datetime.datetime.fromtimestamp(os.path.getmtime(graph_cache_path), tz=jst),
+                        'draw_time_str': draw_time_str
+                    }
+                    debug_msg = f"物理使用 ({int(age)}s前)"
+                except:
+                    should_render = True
+            else:
                 should_render = True
         else:
             should_render = True
+    
+    # 3. do_cache=1 がない場合は常に再描画（メモリに蓄積しない）
     else:
         should_render = True
+        debug_msg = "キャッシュオフモード"
 
     try:
         if should_render or graph_html is None:
             draw_time_str = now_jst.strftime('%H:%M')
             graph_html = render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst)
-            render_cache[cache_key] = {'html': graph_html, 'timestamp': now_jst, 'draw_time_str': draw_time_str}
-            try:
-                with open(graph_cache_path, "w", encoding="utf-8") as f:
-                    json.dump({'html': graph_html, 'draw_time_str': draw_time_str}, f)
-            except: pass
+            
+            # do_cache=1 の時だけ保存を実行
+            if do_cache_param:
+                render_cache[cache_key] = {'html': graph_html, 'timestamp': now_jst, 'draw_time_str': draw_time_str}
+                try:
+                    with open(graph_cache_path, "w", encoding="utf-8") as f:
+                        json.dump({'html': graph_html, 'draw_time_str': draw_time_str}, f)
+                except: pass
+            
             session['needs_refresh'] = False
             session.modified = True
 
@@ -2075,7 +2104,7 @@ def index():
 
         return render_template(
             'index.html',
-            config=config,   # ← ここ：追加しました
+            config=config,
             lang_dict=lang_dict,
             now_jst=now_jst,
             draw_time_str=draw_time_str,
@@ -2094,7 +2123,7 @@ def index():
     
 
 # ======================================================================================
-# 96. グラフ描画エリア生成サブルーチン (座標不整合修正版)
+# 86. グラフ描画エリア生成サブルーチン (座標不整合修正版)
 # ======================================================================================
 def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
     """
@@ -2134,7 +2163,7 @@ def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
     return html_str
 
 # ======================================================================================
-# 99_1. Flask 設定更新ルーチン (修正版)
+# 87. Flask 設定更新ルーチン (修正版)
 # ======================================================================================
 @app.route('/update_settings', methods=['POST'])
 def update_settings():
@@ -2158,7 +2187,7 @@ def update_settings():
     return redirect(url_for('index'))
 
 #======================================================================================
-# 99_2. Flask 設定リセットルーチン
+# 88. Flask 設定リセットルーチン
 #======================================================================================
 @app.route('/reset_settings')
 def reset_settings():
@@ -2179,7 +2208,7 @@ def reset_settings():
         raise RuntimeError(traceback.format_exc())
 
 # ======================================================================================
-# 99_3. バックアップからのデータ復元用 (PWA同期用)
+# 89. バックアップからのデータ復元用 (PWA同期用)
 # ======================================================================================
 @app.route('/restore_backup', methods=['POST'])
 def restore_backup():
@@ -2202,7 +2231,7 @@ def restore_backup():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ======================================================================================
-# 80. 言語切り替えエンドポイント (確実な登録版)
+# 90. 言語切り替えエンドポイント (確実な登録版)
 # ======================================================================================
 @app.route('/change_lang')
 def change_lang():
@@ -2213,7 +2242,7 @@ def change_lang():
     return redirect(request.referrer or url_for('index'))
     
 # ======================================================================================
-# 44. LocalStorage からのセッション復元ハンドラ
+# 91. LocalStorage からのセッション復元ハンドラ
 # ======================================================================================
 @app.route('/restore_settings', methods=['POST'])
 def restore_settings():

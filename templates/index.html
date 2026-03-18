@@ -127,7 +127,7 @@
                         <span class="loc-coords">({{ "%.4f"|format(design_params.lat) }}, {{ "%.4f"|format(design_params.lon) }})</span>
                     </div>
                 </div>
-                <button onclick="showLoading(); location.href='/?refresh=1&t=' + new Date().getTime()" class="btn-refresh">
+                <button onclick="reloadWithCache()" class="btn-refresh">
                     🔄 {{ draw_time_str }}
                 </button>
             </div>
@@ -228,11 +228,17 @@
     <script>
         /**
          * サブルーチン：ホスト判別と表示更新
-         * サーバー側の判定結果を優先して表示します
          */
         function updateHostIndicator() {
-            // サーバー側 config がある場合は JS 側での上書きは最小限にする
             console.log("Environment: {{ config.env_name }}");
+        }
+
+        /**
+         * サブルーチン：明示的なリロード（キャッシュ有効化）
+         */
+        function reloadWithCache() {
+            showLoading();
+            window.location.href = '/?refresh=1&do_cache=1&t=' + new Date().getTime();
         }
 
         /**
@@ -248,19 +254,17 @@
             }
             showLoading(); 
             setTimeout(() => {
-                window.location.href = '/?refresh=1&t=' + new Date().getTime();
+                window.location.href = '/?refresh=1&do_cache=1&t=' + new Date().getTime();
             }, 15000);
         }
 
         /**
          * サブルーチン：バックアップデータの保存
-         * 【保護ロック】地点データが空の場合は、スマホ内の既存データを上書きしないようにガードします。
          */
         function saveBackupToLocal() {
             const userLocs = {{ session.get('user_locations', [])|tojson }};
             const currentBasho = "{{ basho }}";
 
-            // ガード条件: サーバー側(Flask)に有効な地点データがある時のみ上書き保存を許可
             if (userLocs && userLocs.length > 0 && currentBasho !== "Error" && currentBasho !== "未設定" && currentBasho !== "") {
                 const backupData = {
                     user_locations: userLocs,
@@ -271,14 +275,11 @@
                 };
                 localStorage.setItem('pin_weather_backup_v1', JSON.stringify(backupData));
                 console.log("LocalStorage: Backup saved.");
-            } else {
-                console.log("LocalStorage: Save skipped (Server session might be empty).");
             }
         }
 
         /**
          * サブルーチン：バックアップデータからの復元
-         * スマホ側のデータを優先し、サーバー側(Flask)に同期させます。
          */
         async function restoreFromLocalBackup() {
             const stored = localStorage.getItem('pin_weather_backup_v1');
@@ -288,7 +289,6 @@
             const userLocsCount = {{ session.get('user_locations', [])|length }};
             const currentBasho = "{{ basho }}";
 
-            // サーバー側のセッションが空（初期化された）状態を検知
             if (userLocsCount === 0 || currentBasho === "Error" || currentBasho === "未設定" || currentBasho === "") {
                 console.log("LocalStorage: Detecting empty server session. Attempting restore...");
                 showLoading();
@@ -299,8 +299,7 @@
                         body: JSON.stringify(data)
                     });
                     if (response.ok) {
-                        // 同期に成功したらリロードしてサーバー側の最新状態を反映
-                        window.location.href = '/?refresh=1';
+                        window.location.href = '/?refresh=1&do_cache=1';
                         return true; 
                     }
                 } catch (e) {
@@ -308,7 +307,6 @@
                 }
             }
             
-            // UI上のセレクトボックスが空なら、バックアップから項目を一時的に補充（リロードまでの繋ぎ）
             const selector = document.getElementById('spot-selector');
             if (selector && selector.options.length <= 1 && data.user_locations.length > 0) {
                 data.user_locations.forEach((spot, index) => {
@@ -336,7 +334,7 @@
             navigator.geolocation.getCurrentPosition(
                 function(position) {
                     showLoading();
-                    window.location.href = `/set_location?lat=${position.coords.latitude}&lon=${position.coords.longitude}&name=現在地`;
+                    window.location.href = `/set_location?lat=${position.coords.latitude}&lon=${position.coords.longitude}&name=現在地&do_cache=1`;
                 },
                 function(error) { alert("位置情報の取得に失敗しました。設定を確認してください。"); },
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -349,9 +347,7 @@
             
             window.addEventListener('load', async () => {
                 updateHostIndicator();
-                // 1. まず復元が必要かチェック
                 const isRestoring = await restoreFromLocalBackup();
-                // 2. 復元中でなければ、現在の健全な状態を保存し、ローディングを消す
                 if (!isRestoring) {
                     saveBackupToLocal();
                     hideLoading();
@@ -365,8 +361,7 @@
                 const diffY = moveY - startY;
                 if (window.scrollY === 0 && diffY > 120) {
                     if (document.getElementById('loading-overlay').style.display !== 'flex') {
-                        showLoading();
-                        location.href = '/?refresh=1&t=' + new Date().getTime();
+                        reloadWithCache();
                     }
                 }
             }, {passive: true});
@@ -374,22 +369,18 @@
 
         /**
          * サブルーチン：お気に入り登録
-         * 確実に動く完全版：セッションと表示名を同期してリロードします
          */
         async function registerMySpot() {
             const currentName = "{{ basho }}";
             const btn = document.getElementById('btn-star');
             
-            // 既に登録済み（星マーク）なら何もしない
             if (btn.innerText.trim() === "🌟") return;
 
-            // ユーザーに名称を確認
             const newName = prompt("{{ lang_dict['この地点を My Spots に保存します。'] }}", currentName);
             if (!newName) return;
 
             showLoading(); 
             try {
-                // 1. サーバーへ地点を追加
                 const response = await fetch('/add_to_myspots', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -403,7 +394,6 @@
                 if (response.ok) {
                     const result = await response.json();
                     if (result.status === "success") {
-                        // 2. ローカルのバックアップ用リストを更新
                         const currentLocs = {{ session.get('user_locations', [])|tojson }};
                         currentLocs.push({
                             name: result.name, 
@@ -411,7 +401,6 @@
                             lon: {{ design_params.lon }}
                         });
 
-                        // 3. localStorage（保護ロック付き復元用）を更新
                         localStorage.setItem('pin_weather_backup_v1', JSON.stringify({
                             user_locations: currentLocs,
                             design_params: {{ design_params|tojson }},
@@ -420,12 +409,11 @@
                             last_basho: result.name
                         }));
 
-                        // 4. 【重要】サーバーのセッション(last_basho)を更新するため、
-                        // select_spot 経由でリロードして画面表示名を確定させる
                         const params = new URLSearchParams({
                             lat: {{ design_params.lat }},
                             lon: {{ design_params.lon }},
-                            name: result.name
+                            name: result.name,
+                            do_cache: "1"
                         });
                         window.location.href = `/select_spot?${params.toString()}`;
 
@@ -440,6 +428,7 @@
                 handleServerError();
             }
         }
+
         function showShareQR() {
             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.origin)}`;
             const shareModal = document.createElement('div');
