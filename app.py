@@ -12,6 +12,10 @@ import pandas as pd
 import numpy as np
 import matplotlib
 matplotlib.use('Agg') # GUIなしのバックエンド（サーバー用）を強制指定
+# --- Render起動時のフォントスキャンによるフリーズを防止 ---
+matplotlib.rcParams['font.family'] = 'sans-serif'
+matplotlib.rcParams['font.sans-serif'] = ['DejaVu Sans']
+# --------------------------------------------------------
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import urllib.request
