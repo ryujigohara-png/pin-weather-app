@@ -2017,14 +2017,14 @@ def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
 render_cache = {}
 
 # ======================================================================================
-# 85. Flask メインルート: インデックス表示 (詳細パフォーマンス計測版)
+# 85. Flask メインルート: インデックス表示 (非同期描画対応・Render回避版)
 # ======================================================================================
 @app.route('/')
 def index():
     import pytz, datetime, traceback, os, time, json
     import numpy as np
     from flask import session, render_template, request
-    
+
     # --- 全体計測開始 ---
     t_main_start = time.time()
     
@@ -2037,6 +2037,12 @@ def index():
 
     jst = pytz.timezone('Asia/Tokyo')
     now_jst = datetime.datetime.now(jst)
+
+    # --- [追加] Renderの起動テスト回避 ---
+    user_agent = request.headers.get('User-Agent', '')
+    if 'Go-http-client' in user_agent:
+        return "OK", 200
+    # ----------------------------------
     
     user_settings = session.get('design_params', {})
     
@@ -2126,18 +2132,23 @@ def index():
         else:
             should_render = True
     
-    # 3. do_cache=1 がない場合は常に再描画（メモリに蓄積しない）
+    # 3. do_cache=1 がない場合は常に再描画
     else:
         should_render = True
         debug_msg = "キャッシュオフモード"
 
     try:
         t_render_start = time.time()
-        if should_render or graph_html is None:
+        # --- [修正] 45秒かかる描画を、初回アクセス時はスキップする ---
+        if (should_render or graph_html is None) and not request.args.get('async_draw'):
+            # 描画せずに、後ほどJSから async_draw=1 で再リクエストさせる
+            graph_html = None 
+            draw_time_str = "---"
+        elif (should_render or graph_html is None):
+            # async_draw=1 または再描画が必要な場合のみ、重い処理を実行
             draw_time_str = now_jst.strftime('%H:%M')
             graph_html = render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst)
             
-            # do_cache=1 の時だけ保存を実行
             if do_cache_param:
                 render_cache[cache_key] = {'html': graph_html, 'timestamp': now_jst, 'draw_time_str': draw_time_str}
                 try:
@@ -2147,6 +2158,11 @@ def index():
             
             session['needs_refresh'] = False
             session.modified = True
+            
+            # JSリクエスト(async_draw)への応答なら、HTML片だけを返す
+            if request.args.get('async_draw'):
+                return json.dumps({'html': graph_html, 'draw_time': draw_time_str})
+
         t_render_end = time.time()
 
         display_basho = session.get('last_basho') or session.get('basho') or CONFIG.get("DEFAULT_BASHO", "東京")
@@ -2179,18 +2195,11 @@ def index():
         )
         t_tmpl_end = time.time()
 
-        # --- 全体パフォーマンス出力 ---
-        print(f"\n===== [Main Routine: index] Performance =====")
-        print(f"  Logic & Setup    : {t_render_start - t_main_start:.4f}s")
-        print(f"  Graph Rendering  : {t_render_end - t_render_start:.4f}s (subroutines included)")
-        print(f"  Template Engine  : {t_tmpl_end - t_tmpl_start:.4f}s")
-        print(f"  TOTAL RESPONSE   : {time.time() - t_main_start:.4f}s")
-        print(f"=============================================\n")
+        print(f"TOTAL RESPONSE : {time.time() - t_main_start:.4f}s")
 
         return rendered_page
 
     except Exception:
-        # エラー発生時に index.html がクラッシュしないよう、必要な変数を網羅して渡す
         return render_template(
             'index.html', 
             config=config, 
