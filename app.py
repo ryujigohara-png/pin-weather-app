@@ -1219,13 +1219,20 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
             marine_results, r_lat, r_lon = get_marine_data(df['time'], lat, lon)
         t_marine_e = time.time()
 
-        # --- 6. サイズ設計 ---
-        unit_height_px = 100  
+
+        # --- 6. サイズ設計 (DPI変更時もピクセル横幅を維持する修正版) ---
+        unit_height_px = 100 
         dpi_value = design_params.get("graph_dpi", 200)
-        fig_w_inch = design_params.get("width_inch", 15.0)
+                
+        # 基準となる横幅(15inch相当)をピクセルで固定し、DPIに合わせてインチを逆算
+        # これにより、DPIを100に下げても横に詰まらなくなります
+        base_w_px = 3000 
+        fig_w_inch = base_w_px / dpi_value
+                
         fig_h_inch = (sum(height_ratios) * unit_height_px + 150) / dpi_value
         margin_left_inch = design_params.get("margin_left_inch", 0.8)
         left_margin_ratio = margin_left_inch / fig_w_inch
+
 
         # --- 7. グラフ描画 ---
         t_draw_s = time.time()
@@ -2010,13 +2017,16 @@ def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
 render_cache = {}
 
 # ======================================================================================
-# 85. Flask メインルート: インデックス表示 (動的キャッシュ制御版)
+# 85. Flask メインルート: インデックス表示 (詳細パフォーマンス計測版)
 # ======================================================================================
 @app.route('/')
 def index():
     import pytz, datetime, traceback, os, time, json
     import numpy as np
     from flask import session, render_template, request
+    
+    # --- 全体計測開始 ---
+    t_main_start = time.time()
     
     # 環境判定の実行
     config = get_env_config()
@@ -2122,6 +2132,7 @@ def index():
         debug_msg = "キャッシュオフモード"
 
     try:
+        t_render_start = time.time()
         if should_render or graph_html is None:
             draw_time_str = now_jst.strftime('%H:%M')
             graph_html = render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst)
@@ -2136,6 +2147,7 @@ def index():
             
             session['needs_refresh'] = False
             session.modified = True
+        t_render_end = time.time()
 
         display_basho = session.get('last_basho') or session.get('basho') or CONFIG.get("DEFAULT_BASHO", "東京")
 
@@ -2148,7 +2160,8 @@ def index():
         w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,windspeed_10m,winddirection_10m,precipitation&timezone=auto"
         m_url = f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto"
 
-        return render_template(
+        t_tmpl_start = time.time()
+        rendered_page = render_template(
             'index.html',
             config=config,
             lang_dict=lang_dict,
@@ -2164,6 +2177,18 @@ def index():
             debug_info=debug_msg,
             app_config={"icon_path": "static/pin_weather_01.png"}
         )
+        t_tmpl_end = time.time()
+
+        # --- 全体パフォーマンス出力 ---
+        print(f"\n===== [Main Routine: index] Performance =====")
+        print(f"  Logic & Setup    : {t_render_start - t_main_start:.4f}s")
+        print(f"  Graph Rendering  : {t_render_end - t_render_start:.4f}s (subroutines included)")
+        print(f"  Template Engine  : {t_tmpl_end - t_tmpl_start:.4f}s")
+        print(f"  TOTAL RESPONSE   : {time.time() - t_main_start:.4f}s")
+        print(f"=============================================\n")
+
+        return rendered_page
+
     except Exception:
         # エラー発生時に index.html がクラッシュしないよう、必要な変数を網羅して渡す
         return render_template(
@@ -2177,23 +2202,25 @@ def index():
             design_params=design_params,
             now_jst=now_jst
         )
-    
 
 # ======================================================================================
-# 86. グラフ描画エリア生成サブルーチン (座標不整合修正版)
+# 86. グラフ描画エリア生成サブルーチン (座標不整合修正版・計測追加)
 # ======================================================================================
 def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
     """
     引数 design_params から座標を確実に取得し、30番の統合エンジンを呼び出します。
     """
+    t_step_s = time.time()
+    
     # セッションからではなく、引数(indexで決定した最新座標)から取得
     lat = design_params.get('lat')
     lon = design_params.get('lon')
 
-    # --- 30番のサブルーチンを呼び出し ---
+    # --- 34番のサブルーチンを呼び出し (内部でも詳細計測が走る) ---
     res = generate_high_res_graph(
         lat, lon, danger_v, tuple(sel_dirs), design_params, now_jst
     )
+    t_graph_done = time.time()
     
     if not res or res[0] is None:
         return "<div class='alert alert-danger'>グラフの生成に失敗しました。</div>"
@@ -2201,7 +2228,10 @@ def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
     left_b64, right_b64, ratio_info, start_idx, df_graph, split_px = res
     w_right_px = ratio_info[0]
     
+    # アイコンHTML生成の計測
+    t_icon_s = time.time()
     header_h, body_h = generate_weather_icons_html(df_graph, ratio_info, w_right_px, start_idx, design_params)
+    t_icon_e = time.time()
     
     html_str = (
         f'<div id="graph-wrapper" style="display:flex; width:100%; background:white; border:1px solid #ddd; overflow:hidden;">'
@@ -2217,6 +2247,10 @@ def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
         f'  </div>'
         f'</div>'
     )
+    
+    print(f"    [Sub 86] generate_high_res_graph: {t_graph_done - t_step_s:.4f}s")
+    print(f"    [Sub 86] generate_weather_icons : {t_icon_e - t_icon_s:.4f}s")
+    
     return html_str
 
 # ======================================================================================
