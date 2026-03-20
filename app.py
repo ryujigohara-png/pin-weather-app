@@ -1275,12 +1275,12 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         base_dir = os.path.dirname(os.path.abspath(__file__))
         fpath = os.path.join(base_dir, 'static', 'font.ttf')
         
-        # [重要] サイドバーから送られてくる font_size を優先的に全ての基準サイズとする
+        # サイドバーの font_size を絶対基準とする
         unified_fs = design_params.get("font_size", 10)
         
-        # design_params内の個別サイズ設定も、未設定なら unified_fs に強制統一
-        design_params["label_font_size"] = design_params.get("label_font_size", unified_fs)
-        design_params["base_font_size"] = design_params.get("base_font_size", unified_fs)
+        # 全てのパラメータを unified_fs に上書きして統一
+        design_params["label_font_size"] = unified_fs
+        design_params["base_font_size"] = unified_fs
         
         if os.path.exists(fpath):
             fp = fm.FontProperties(fname=fpath, size=unified_fs)
@@ -1343,6 +1343,7 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
             ax = axes_list[i]
             is_bottom = (i == len(active_plots) - 1)
             
+            # 各レンダラー呼び出し
             if plot_type == "wind":
                 render_wind_bar_chart(ax, df, danger_v, start_idx, design_params, fp=fp)
             elif plot_type == "temp":
@@ -1354,15 +1355,19 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
             elif plot_type == "tide":
                 render_tide_curve_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom, fp=fp)
 
-            # 共通軸設定 (design_paramsを渡すことで label_font_size を反映)
+            # 共通軸設定
             apply_common_axis_settings(ax, df, formatter, now_jst, design_params, fp=fp)
             
-            # [修正] 軸ラベルのフォントサイズを unified_fs に強制同期
-            if fp: fp.set_size(unified_fs)
-            ax.set_xlabel(ax.get_xlabel(), fontproperties=fp)
-            ax.set_ylabel(ax.get_ylabel(), fontproperties=fp)
-            for label in ax.get_xticklabels(): label.set_fontproperties(fp)
-            for label in ax.get_yticklabels(): label.set_fontproperties(fp)
+            # [修正] 軸ラベルのフォントをfp（サイズunified_fs, 太さnormal）に強制固定
+            if fp:
+                fp.set_size(unified_fs)
+                # 軸ラベルのテキスト一つ一つに対し、fpを再適用して太さをリセット
+                for label in ax.get_xticklabels():
+                    label.set_fontproperties(fp)
+                for label in ax.get_yticklabels():
+                    label.set_fontproperties(fp)
+                ax.xaxis.label.set_fontproperties(fp)
+                ax.yaxis.label.set_fontproperties(fp)
             
             print(f"    [Sub 34] Render {plot_type}: {time.time() - t_sub_start:.4f}s")
 
