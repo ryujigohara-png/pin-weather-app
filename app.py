@@ -487,32 +487,29 @@ def setup_font(font_size=None):
     
     if os.path.exists(font_path):
         try:
-            # フォントをキャッシュを介さず直接追加
-            fm.fontManager.addfont(font_path)
+            # --- [修正点] キャッシュスキャンを誘発する addfont をコメントアウト ---
+            # fm.fontManager.addfont(font_path)
+            
+            # フォントファイルを直接指定してプロパティを作成（スキャンをスキップ）
             prop = fm.FontProperties(fname=font_path)
             font_name = prop.get_name()
             
-            # --- ここが最重要：matplotlib全体のデフォルトを強制上書き ---
-            plt.rcParams['font.family'] = font_name
+            # --- ここが最重要：フォントスキャンを走らせない設定 ---
             plt.rcParams['font.size'] = font_size
-            # グラフ内の細かいフォント設定も念のため上書き
-            mpl.rc('font', family=font_name)
             
             # マイナス記号の文字化け防止
             plt.rcParams['axes.unicode_minus'] = False
             
-            # キャッシュによる不具合を防ぐため、今の描画オブジェクトにも適用
-            plt.gca().title.set_fontproperties(prop)
+            # [PCテスト用] ログ出力
+            print(f"Font scan skipped. Direct path used: {font_path}")
             
-            print(f"Font successfully applied: {font_name}")
-            return prop # 呼び出し元で個別に使いたい場合のために返す
+            return prop # 呼び出し元の plt.text(..., fontproperties=prop) 等で使う
         except Exception as e:
             print(f"Font Apply Error: {e}")
     else:
         print(f"Font file NOT FOUND at: {font_path}")
     
     return None
-
 
 # ======================================================================================
 # 20. 気象データをAPIから取得するサブルーチン (キャッシュ対応・精度調整版)
@@ -775,7 +772,7 @@ def get_x_axis_formatter():
 # ======================================================================================
 # 26. グラフの共通軸設定を適用するサブルーチン
 # ======================================================================================
-def apply_common_axis_settings(ax, df, formatter, now_jst, design_params):
+def apply_common_axis_settings(ax, df, formatter, now_jst, design_params, fp=None):
     import matplotlib.dates as mdates
     import matplotlib.pyplot as plt
     from datetime import timedelta
@@ -803,24 +800,37 @@ def apply_common_axis_settings(ax, df, formatter, now_jst, design_params):
     
     l_size = design_params.get("label_font_size", CONFIG["LABEL_SIZE"])
     l_pad = design_params.get("label_pad", CONFIG["LABEL_PAD"])
+    
+    # [修正] tick_params に fontproperties は直接渡せないため、後のループで一括適用します
     ax.tick_params(axis='x', which='major', labelsize=l_size, pad=l_pad)
     ax.tick_params(axis='y', labelsize=l_size)
 
     fig = ax.figure
     fig.canvas.draw()
+    
+    # [修正] X軸ラベル（曜日など）へのフォント適用
     labels = ax.get_xticklabels()
     for label in labels:
+        # フォントを適用（これで曜日がトーフになりません）
+        if fp:
+            label.set_fontproperties(fp)
+            
         text = label.get_text()
         if '(' in text:
             if sat_label in text or sun_label in text:
                 label.set_color('red')
             else:
                 label.set_color('blue')
+    
+    # [修正] Y軸の数値ラベルにもフォントを適用（一貫性と遅延防止のため）
+    if fp:
+        for label in ax.get_yticklabels():
+            label.set_fontproperties(fp)
 
 # ======================================================================================
 # 27. 風速棒グラフを描画するサブルーチン (降水量：0より大きい場合に小数点1位表示)
 # ======================================================================================
-def render_wind_bar_chart(ax, df, danger_v, wind_step, design_params=None):
+def render_wind_bar_chart(ax, df, danger_v, wind_step, design_params=None, fp=None):
     import pandas as pd
     from flask import session
 
@@ -845,13 +855,15 @@ def render_wind_bar_chart(ax, df, danger_v, wind_step, design_params=None):
     max_speed = df['wind_speed_10m'].max() if not df['wind_speed_10m'].dropna().empty else 0
     y_limit = max(max_speed + (4 * step) + 1.0, danger_v + 3.0)
     ax.set_ylim(0, y_limit)
-    ax.set_ylabel(lang_dict.get('風速 (m/s)', 'Wind Speed (m/s)'), fontsize=l_fs) 
+    
+    # [修正] 成功している手法(fontproperties=fp)をラベル・テキスト全てに適用
+    ax.set_ylabel(lang_dict.get('風速 (m/s)', 'Wind Speed (m/s)'), fontsize=l_fs, fontproperties=fp) 
 
     graph_left_time = df['time'].iloc[0] 
     precip_label = lang_dict.get("降水量mm　", "Precip. ")
     ax.text(graph_left_time, precip_y, precip_label, 
             ha='right', va='bottom', fontsize=l_fs, color="blue", 
-            transform=ax.get_xaxis_transform(), clip_on=False)
+            transform=ax.get_xaxis_transform(), clip_on=False, fontproperties=fp)
     
     for i, bar in enumerate(bars):
         if i < 3: continue
@@ -862,36 +874,41 @@ def render_wind_bar_chart(ax, df, danger_v, wind_step, design_params=None):
         if (i - 3) % wind_step == 0:
             if pd.isna(row['wind_speed_10m']): continue
             base_y = bar.get_height()
-            ax.text(x_pos, base_y + base, f"{row['wind_speed_10m']:.0f}", ha='center', va='bottom', fontsize=fs-2)
+            # 数値テキスト
+            ax.text(x_pos, base_y + base, f"{row['wind_speed_10m']:.0f}", 
+                    ha='center', va='bottom', fontsize=fs-2, fontproperties=fp)
             current_y = base_y + base + step
             arrow_icon = row.get('arrow', '')
             if arrow_icon:
+                # 矢印アイコン
                 ax.text(x_pos, current_y, arrow_icon, ha='center', va='bottom', 
-                        fontsize=fs+2, fontweight='bold', color=CONFIG["ARROW_COLOR"])
+                        fontsize=fs+2, fontweight='bold', color=CONFIG["ARROW_COLOR"], fontproperties=fp)
             if show_d:
                 current_y += step
                 dir_name = row.get('dir_name', '')
                 if dir_name:
-                    ax.text(x_pos, current_y, dir_name, ha='center', va='bottom', fontsize=fs-2)
+                    # 方位名（ここがトーフの原因の一つ）
+                    ax.text(x_pos, current_y, dir_name, ha='center', va='bottom', fontsize=fs-2, fontproperties=fp)
             if show_w:
                 current_y += step
                 w_text = row.get('w_text', '')
                 if w_text:
+                    # 風の状態テキスト
                     ax.text(x_pos, current_y, w_text, ha='center', va='bottom', 
-                            color=row.get('w_color', 'black'), fontweight='bold', fontsize=fs-1)
+                            color=row.get('w_color', 'black'), fontweight='bold', fontsize=fs-1, fontproperties=fp)
 
         if (i - 3) % 3 == 0:
             precip = row.get('precipitation', 0)
             if pd.notna(precip):
-                # 0より大きい場合のみ、小数点第1位まで表示
                 if precip > 0:
+                    # 降水量数値
                     ax.text(dt, precip_y, f"{precip:.1f}", ha='center', va='bottom', 
-                            fontsize=l_fs, color="blue", transform=ax.get_xaxis_transform(), clip_on=False)
+                            fontsize=l_fs, color="blue", transform=ax.get_xaxis_transform(), clip_on=False, fontproperties=fp)
 
 # ======================================================================================
 # 28. 気温グラフを描画するサブルーチン (整数表示)
 # ======================================================================================
-def render_temp_line_chart(ax, df):
+def render_temp_line_chart(ax, df, fp=None):
     import pandas as pd
     from flask import session
     current_lang = session.get('lang', 'ja')
@@ -900,7 +917,8 @@ def render_temp_line_chart(ax, df):
     label_fs = int(session.get("label_font_size", CONFIG["LABEL_SIZE"]))
 
     ax.plot(df['time'], df['temperature_2m'], color=CONFIG["TEMP_COLOR"], linewidth=2, marker='o', markersize=3, markevery=3)
-    ax.set_ylabel(lang_dict.get('気温 (℃)', 'Temp. (°C)'), fontsize=label_fs)
+    # [修正] yラベルにフォント適用
+    ax.set_ylabel(lang_dict.get('気温 (℃)', 'Temp. (°C)'), fontsize=label_fs, fontproperties=fp)
     
     t_max = df['temperature_2m'].max()
     t_min = df['temperature_2m'].min()
@@ -911,14 +929,15 @@ def render_temp_line_chart(ax, df):
         dt = df['time'].iloc[i]
         temp = df['temperature_2m'].iloc[i]
         if not pd.isna(temp) and (dt.hour % 3 == 0):
+            # [修正] 気温数値テキストにフォント適用
             ax.text(dt, 1.02, f"{temp:.0f}", ha='center', va='bottom', 
                     fontsize=label_fs, color=CONFIG["TEMP_COLOR"], 
-                    transform=ax.get_xaxis_transform(), clip_on=False)
+                    transform=ax.get_xaxis_transform(), clip_on=False, fontproperties=fp)
 
 # ======================================================================================
 # 29. 波高グラフを描画するサブルーチン (整数cm・四捨五入・マイナス対応版)
 # ======================================================================================
-def render_wave_height_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, is_bottom=False):
+def render_wave_height_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, is_bottom=False, fp=None):
     import numpy as np
     import pandas as pd
     from flask import session
@@ -931,7 +950,8 @@ def render_wave_height_chart(ax, df, lat, lon, marine_results, res_lat, res_lon,
         ax.clear()
         ax.set_axis_off()
         no_data_msg = lang_dict.get("OCEAN_NONE", "※指定地点の近傍に有効な海洋データがないため表示されません")
-        ax.text(0.0, 0.5, no_data_msg, transform=ax.transAxes, color="gray", fontsize=label_fs, ha='left', va='center')
+        # [修正] データなしメッセージにフォント適用
+        ax.text(0.0, 0.5, no_data_msg, transform=ax.transAxes, color="gray", fontsize=label_fs, ha='left', va='center', fontproperties=fp)
         return
 
     # 波高(m)をcmに変換し、四捨五入を適用。マイナスの値もそのまま維持します。
@@ -940,7 +960,8 @@ def render_wave_height_chart(ax, df, lat, lon, marine_results, res_lat, res_lon,
     df['wave_cm'] = np.round(raw_waves * 100)
 
     ax.plot(df['time'], df['wave_cm'], color="#2ca02c", linewidth=2, marker='o', markersize=3, markevery=3)
-    ax.set_ylabel(lang_dict.get("波高 (cm)", "Wave (cm)"), fontsize=label_fs)
+    # [修正] yラベルにフォント適用
+    ax.set_ylabel(lang_dict.get("波高 (cm)", "Wave (cm)"), fontsize=label_fs, fontproperties=fp)
     ax.grid(True, axis='y', linestyle='--', alpha=0.5)
 
     # 数値ラベルの描画
@@ -949,16 +970,18 @@ def render_wave_height_chart(ax, df, lat, lon, marine_results, res_lat, res_lon,
         if not pd.isna(val):
             # 0の場合は非表示 (Excel 0;;# 相当のロジックを適用)
             if val != 0:
+                # [修正] 数値テキストにフォント適用
                 ax.text(dt, 1.05, f"{val:.0f}", ha='center', va='bottom', color="#2ca02c", 
-                        fontsize=label_fs, transform=ax.get_xaxis_transform())
+                        fontsize=label_fs, transform=ax.get_xaxis_transform(), fontproperties=fp)
 
     if is_bottom:
-        render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_dict)
+        # [修正] 地点情報描画に fp を継承
+        render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_dict, fp=fp)
 
 # ======================================================================================
 # 30. 海面水温グラフを描画するサブルーチン (整数表示・地点情報下げ)
 # ======================================================================================
-def render_ocean_temp_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, is_bottom=False):
+def render_ocean_temp_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, is_bottom=False, fp=None):
     import numpy as np
     import pandas as pd
     from flask import session
@@ -971,27 +994,31 @@ def render_ocean_temp_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, 
         ax.clear()
         ax.set_axis_off()
         no_data_msg = lang_dict.get("OCEAN_NONE", "※指定地点の近傍に有効な海洋データがないため表示されません")
-        ax.text(0.0, 0.5, no_data_msg, transform=ax.transAxes, color="gray", fontsize=label_fs, ha='left', va='center')
+        # [修正] データなしメッセージにフォント適用
+        ax.text(0.0, 0.5, no_data_msg, transform=ax.transAxes, color="gray", fontsize=label_fs, ha='left', va='center', fontproperties=fp)
         return
 
     df['ocean_temp'] = [v if v is not None else np.nan for v in marine_results["temp"]]
     ax.plot(df['time'], df['ocean_temp'], color="#ff7f0e", linewidth=2, marker='o', markersize=3, markevery=3)
-    ax.set_ylabel(lang_dict.get("海水温 (℃)", "Water (°C)"), fontsize=label_fs)
+    # [修正] yラベルにフォント適用
+    ax.set_ylabel(lang_dict.get("海水温 (℃)", "Water (°C)"), fontsize=label_fs, fontproperties=fp)
     ax.grid(True, axis='y', linestyle='--', alpha=0.5)
 
     for i in range(0, len(df), 3):
         dt, val = df['time'].iloc[i], df['ocean_temp'].iloc[i]
         if not pd.isna(val):
+            # [修正] 数値テキストにフォント適用
             ax.text(dt, 1.05, f"{val:.0f}", ha='center', va='bottom', color="#ff7f0e", 
-                    fontsize=label_fs, transform=ax.get_xaxis_transform())
+                    fontsize=label_fs, transform=ax.get_xaxis_transform(), fontproperties=fp)
 
     if is_bottom:
-        render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_dict)
+        # ※ render_ocean_location_info 側でも fp を受け取るよう修正が必要です
+        render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_dict, fp=fp)
 
 # ======================================================================================
 # 31. 潮位グラフを描画するサブルーチン (地点情報呼び出し含む)
 # ======================================================================================
-def render_tide_curve_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, is_bottom=False):
+def render_tide_curve_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, is_bottom=False, fp=None):
     import numpy as np
     import pandas as pd
     from flask import session
@@ -1006,28 +1033,31 @@ def render_tide_curve_chart(ax, df, lat, lon, marine_results, res_lat, res_lon, 
         ax.clear()
         ax.set_axis_off()
         no_data_msg = lang_dict.get("OCEAN_NONE", "※指定地点の近傍に有効な海洋データがないため表示されません")
-        ax.text(0.0, 0.5, no_data_msg, transform=ax.transAxes, color="gray", fontsize=label_fs, ha='left', va='center')
+        # [修正] データなしメッセージにフォント適用
+        ax.text(0.0, 0.5, no_data_msg, transform=ax.transAxes, color="gray", fontsize=label_fs, ha='left', va='center', fontproperties=fp)
         return
 
     df['tide_cm'] = [v * 100 if v is not None else np.nan for v in tide_levels]
     ax.plot(df['time'], df['tide_cm'], color="#1f77b4", linewidth=2, marker='o', markersize=3, markevery=3)
-    ax.set_ylabel(lang_dict.get("潮位 (cm)", "Tide (cm)"), fontsize=label_fs)
+    # [修正] yラベルにフォント適用
+    ax.set_ylabel(lang_dict.get("潮位 (cm)", "Tide (cm)"), fontsize=label_fs, fontproperties=fp)
     ax.grid(True, axis='y', linestyle='--', alpha=0.5)
 
     for i in range(0, len(df), 3):
         dt, val = df['time'].iloc[i], df['tide_cm'].iloc[i]
         if not pd.isna(val):
-            # 整数表示
+            # 整数表示 [修正] 数値テキストにフォント適用
             ax.text(dt, 1.05, f"{val:.0f}", ha='center', va='bottom', color="#1f77b4", 
-                    fontsize=label_fs, transform=ax.get_xaxis_transform())
+                    fontsize=label_fs, transform=ax.get_xaxis_transform(), fontproperties=fp)
 
     if is_bottom:
-        render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_dict)
+        # [修正] 地点情報サブルーチンへfpを継承
+        render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_dict, fp=fp)
 
 # ======================================================================================
 # 32. 海洋データの地点情報を描画するサブルーチン (位置自動計算・多言語対応版)
 # ======================================================================================
-def render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_dict):
+def render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_dict, fp=None):
     """
     指定地点とAPI取得地点の距離・方位を計算し、グラフ下部に重ならないよう自動配置します。
     """
@@ -1060,18 +1090,19 @@ def render_ocean_location_info(ax, lat, lon, res_lat, res_lon, label_fs, lang_di
         offset_in_points = - (label_fs * 3.6)
         offset_trans = ScaledTranslation(0, offset_in_points / 72, ax.figure.dpi_scale_trans)
         
-        # 表示実行
+        # 表示実行 [修正] fontproperties=fp を追加して日本語トーフと遅延を防止
         ax.text(0.01, 0.0, info_text, 
                 transform=ax.transAxes + offset_trans, 
                 color="#d62728", 
                 fontsize=label_fs - 1, 
                 ha='left', 
-                va='top')
+                va='top',
+                fontproperties=fp)
 
 # ======================================================================================
 # 33. 天気アイコン部分のHTMLを生成するサブルーチン (はみ出し防止・連動修正版)
 # ======================================================================================
-def generate_weather_icons_html(df, ratio_info, contena_min_w, start_idx, design_params):
+def generate_weather_icons_html(df, ratio_info, contena_min_w, start_idx, design_params, fp=None):
     import pandas as pd
     
     # 1. デザインパラメータから上余白(inch)を取得し、ピクセルに変換
@@ -1137,7 +1168,7 @@ def generate_weather_icons_html(df, ratio_info, contena_min_w, start_idx, design
     return header_html, body_html
 
 # ======================================================================================
-# 34. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (詳細計測・完全版)
+# 34. 高解像度グラフ画像を生成し、左右に分割するサブルーチン (PNG回帰・サイズ安定版)
 # ======================================================================================
 def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_params, now_jst):
     import pandas as pd
@@ -1150,59 +1181,45 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
     import matplotlib.font_manager as fm
     import gc # メモリ解放用
 
-    # 全体開始
     t_all_start = time.time()
-
     df = pd.DataFrame()
     start_idx = 0
     split_px = 0
     new_ratio_info = (0.0, 0.0, 0.0)
-    fig = None # 初期化
-    buf = None # 初期化
+    fig = None 
+    buf = None 
 
     try:
-        # --- 1. フォントオブジェクトの絶対パス生成 ---
-        t_font_s = time.time()
+        # --- 1. フォント設定 (スキャン・システム依存を完全に排除) ---
         base_dir = os.path.dirname(os.path.abspath(__file__))
         fpath = os.path.join(base_dir, 'static', 'font.ttf')
         f_size = design_params.get("font_size", 10)
         
-        # フォントオブジェクトを生成 (各描画関数でこれを使います)
         if os.path.exists(fpath):
-            # fm.FontProperties を生成
             fp = fm.FontProperties(fname=fpath, size=f_size)
-            # 念のため全体設定も行うが、今回は個別指定を優先する
-            fm.fontManager.addfont(fpath)
-            plt.rcParams['font.family'] = fp.get_name()
         else:
-            # 異常系：ファイルがない場合は標準フォント
             fp = fm.FontProperties(family='sans-serif', size=f_size)
-
+        
         plt.rcParams['axes.unicode_minus'] = False
-        t_font_e = time.time()
 
-        # --- 2. データ取得 ---
-        t_data_s = time.time()
+        # --- 2. データ取得 (完全維持) ---
         df_raw = fetch_weather_data(lat, lon, 9)
         if df_raw is None or df_raw.empty:
             raise RuntimeError("気象データの取得に失敗しました。")
-        t_data_e = time.time()
 
-        # --- 3. 時差・切り出し ---
-        t_proc_s = time.time()
+        # --- 3. 時差・切り出し (完全維持) ---
         local_offset_s = df_raw.attrs.get('local_offset_seconds', 0)
         browser_offset = now_jst.utcoffset()
         browser_offset_s = browser_offset.total_seconds() if browser_offset else 0
         now_local = now_jst.replace(tzinfo=None) - timedelta(seconds=browser_offset_s) + timedelta(seconds=local_offset_s)
         display_start_time = now_local.replace(hour=(now_local.hour // 3) * 3, minute=0, second=0, microsecond=0)
         padding_start_time = display_start_time - timedelta(hours=3)
-        
         df = df_raw[pd.to_datetime(df_raw['time']) >= padding_start_time].copy().reset_index(drop=True)
         df = df.head(195)
         start_idx = 3
         df = process_wind_data(df, list(selected_dirs_tuple))
 
-        # --- 4. 描画項目の決定 ---
+        # --- 4. 描画項目の決定 (完全維持) ---
         active_plots = []
         height_ratios = []
         if design_params.get("show_wind", True): active_plots.append("wind"); height_ratios.append(4)
@@ -1210,76 +1227,63 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         if design_params.get("show_wave", True): active_plots.append("wave"); height_ratios.append(1)
         if design_params.get("show_ocean_temp", True): active_plots.append("ocean_temp"); height_ratios.append(1)
         if design_params.get("show_tide", True): active_plots.append("tide"); height_ratios.append(1)
-        t_proc_e = time.time()
 
-        # --- 5. 海洋データ準備 ---
-        t_marine_s = time.time()
+        # --- 5. 海洋データ準備 (完全維持) ---
         marine_results, r_lat, r_lon = None, lat, lon
         if any(k in active_plots for k in {"wave", "ocean_temp", "tide"}):
             marine_results, r_lat, r_lon = get_marine_data(df['time'], lat, lon)
-        t_marine_e = time.time()
 
-
-        # --- 6. サイズ設計 (DPI変更時もピクセル横幅を維持する修正版) ---
-        unit_height_px = 100 
-        dpi_value = design_params.get("graph_dpi", 200)
-                
-        # 基準となる横幅(15inch相当)をピクセルで固定し、DPIに合わせてインチを逆算
-        # これにより、DPIを100に下げても横に詰まらなくなります
-        base_w_px = 3000 
-        fig_w_inch = base_w_px / dpi_value
-                
-        fig_h_inch = (sum(height_ratios) * unit_height_px + 150) / dpi_value
-        margin_left_inch = design_params.get("margin_left_inch", 0.8)
+        # --- 6. サイズ設計 (DPI変動対策版) ---
+        unit_height_inch = 0.5 
+        dpi_value = design_params.get("graph_dpi", CONFIG.get("DPI", 100))
+        
+        # [修正] DPIに関わらず物理サイズを維持
+        base_dpi = 200.0
+        scale_factor = base_dpi / dpi_value
+        fig_w_inch = 15.0 * scale_factor
+        fig_h_inch = ((sum(height_ratios) * unit_height_inch) + 1.5) * scale_factor
+        
+        margin_left_inch = design_params.get("margin_left_inch", 0.8) * scale_factor
         left_margin_ratio = margin_left_inch / fig_w_inch
 
-
         # --- 7. グラフ描画 ---
-        t_draw_s = time.time()
         fig, axes = plt.subplots(len(active_plots), 1, figsize=(fig_w_inch, fig_h_inch), dpi=dpi_value,
                                    gridspec_kw={'height_ratios': height_ratios})
         axes_list = np.array([axes]).flatten()
-
         formatter = get_x_axis_formatter()
+        
         for i, plot_type in enumerate(active_plots):
-            # 個別計測開始
-            t_plot_item_s = time.time()
             ax = axes_list[i]
             is_bottom = (i == len(active_plots) - 1)
             
-            # 各レンダリング関数を呼び出し
+            # [修正] fp=fp を確実に渡し、海洋データがあるかチェック
             if plot_type == "wind":
-                render_wind_bar_chart(ax, df, danger_v, start_idx, design_params)
+                render_wind_bar_chart(ax, df, danger_v, start_idx, design_params, fp=fp)
             elif plot_type == "temp":
-                render_temp_line_chart(ax, df)
+                render_temp_line_chart(ax, df, fp=fp)
             elif plot_type == "wave":
-                render_wave_height_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom)
+                render_wave_height_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom, fp=fp)
             elif plot_type == "ocean_temp":
-                render_ocean_temp_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom)
+                render_ocean_temp_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom, fp=fp)
             elif plot_type == "tide":
-                render_tide_curve_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom)
+                render_tide_curve_chart(ax, df, lat, lon, marine_results, r_lat, r_lon, is_bottom, fp=fp)
 
-            # 共通設定を適用
-            apply_common_axis_settings(ax, df, formatter, now_jst, design_params)
+            # [重要] 共通軸設定 (ここで曜日トーフが発生するため fp=fp が必須)
+            apply_common_axis_settings(ax, df, formatter, now_jst, design_params, fp=fp)
             
-            # --- ここが豆腐対策の核心：生成した軸ラベルやタイトルに直接フォントを注入 ---
-            for text in ax.get_xticklabels() + ax.get_yticklabels():
-                text.set_fontproperties(fp)
+            # 軸ラベル・目盛りのフォントを直接適用
             ax.set_xlabel(ax.get_xlabel(), fontproperties=fp)
             ax.set_ylabel(ax.get_ylabel(), fontproperties=fp)
-            if ax.get_title():
-                ax.set_title(ax.get_title(), fontproperties=fp)
-            
-            # 個別結果表示
-            print(f"  - Plot [{plot_type:10}]: {time.time() - t_plot_item_s:.4f}s")
+            for label in ax.get_xticklabels(): label.set_fontproperties(fp)
+            for label in ax.get_yticklabels(): label.set_fontproperties(fp)
 
         plt.subplots_adjust(left=left_margin_ratio, right=0.98, top=0.92, bottom=0.15, hspace=design_params.get("hspace_inch", 0.4))
-        t_draw_e = time.time()
 
         # --- 8. 画像出力 ---
-        t_out_s = time.time()
         buf = io.BytesIO()
         fig.savefig(buf, format="png", bbox_inches=None, pad_inches=0, dpi=dpi_value)
+        plt.close(fig) 
+        
         buf.seek(0)
         full_img = Image.open(buf)
         img_w, img_h = full_img.size
@@ -1291,34 +1295,21 @@ def generate_high_res_graph(lat, lon, danger_v, selected_dirs_tuple, design_para
         
         def img_to_b64(img):
             b = io.BytesIO()
-            img.save(b, format="PNG")
+            img.save(b, format="PNG", optimize=True) 
             return base64.b64encode(b.getvalue()).decode()
 
         res_l = img_to_b64(left_part)
         res_r = img_to_b64(right_part)
-        t_out_e = time.time()
-
-        # --- 最終ログ表示 ---
-        print(f"\n--- [34. generate_high_res_graph] Performance ---")
-        print(f"  Font Setup      : {t_font_e - t_font_s:.4f}s")
-        print(f"  Weather Data    : {t_data_e - t_data_s:.4f}s")
-        print(f"  Processing      : {t_proc_e - t_proc_s:.4f}s")
-        print(f"  Marine Data     : {t_marine_e - t_marine_s:.4f}s")
-        print(f"  Plotting TOTAL  : {t_draw_e - t_draw_s:.4f}s")
-        print(f"  Save & Encode   : {t_out_e - t_out_s:.4f}s")
-        print(f"  TOTAL           : {time.time() - t_all_start:.4f}s")
-        print(f"--------------------------------------------------\n")
-
+        
+        print(f"--- [34. generate_high_res_graph] Performance: {time.time() - t_all_start:.4f}s ---")
         return res_l, res_r, new_ratio_info, start_idx, df, split_px
 
     except Exception as e:
+        print(f"Error in generate_high_res_graph: {str(e)}")
         raise RuntimeError(str(e))
     finally:
-        # メモリ解放の徹底
-        if fig is not None:
-            plt.close(fig)
-        if buf is not None:
-            buf.close()
+        if fig is not None: plt.close(fig)
+        if buf is not None: buf.close()
         gc.collect()
 
 # ======================================================================================
@@ -1437,21 +1428,30 @@ def update_settings_handler():
     for key in display_keys:
         user_settings[key] = True if request.form.get(key) else False
 
-    # B. スライダー数値の更新
+    # B. スライダー数値の更新 (dpi を追加)
     fields = [
         'height_inch', 'top_margin_inch', 'hspace_inch', 
-        'width_inch', 'margin_left_inch', 'font_size'
+        'width_inch', 'margin_left_inch', 'font_size', 'graph_dpi'
     ]
     for f in fields:
         val = request.form.get(f)
         if val is not None:
-            user_settings[f] = int(val) if f == 'font_size' else float(val)
+            # ログ出力：どのキーで、どんな値が届いているかを表示
+            print(f"--- [DEBUG] Form Received: {f} = {val} ---")
+            
+            # 型変換 (font_size と graph_dpi は整数、それ以外は小数)
+            if f in ['font_size', 'graph_dpi']:
+                user_settings[f] = int(float(val))
+            else:
+                user_settings[f] = float(val)
 
     session['design_params'] = user_settings
     session.modified = True
     
+    # 最終的なセッション内のDPIを確認
+    print(f"--- [DEBUG] Current Session DPI: {session['design_params'].get('graph_dpi')} ---")
+    
     return redirect(url_for('index', refresh='1', t=int(time.time())))
-
 
 # ======================================================================================
 # 42. 設定更新系サブルーチン (リセット)
@@ -1957,7 +1957,7 @@ def render_physical_dashboard_flask(df, marine_results, lat, lon, design_params)
 
 
 #======================================================================================
-# 84. グラフ描画エリア・パーツ生成サブルーチン (Flask連携版)
+# 84. グラフ描画エリア・パーツ生成サブルーチン (Flask連携版・PNG固定版)
 #======================================================================================
 def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
     """
@@ -1983,7 +1983,7 @@ def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
     left_b64, right_b64, ratio_info, start_idx, df_graph, split_px = res
     
     # デザイン設定の取得
-    dpi = design_params.get("graph_dpi", 200)
+    dpi = design_params.get("graph_dpi", CONFIG.get("DPI", 200))
     # 高さは30番の内部計算結果に合わせるため auto に設定
     
     # 横幅計算（30番の計算結果を利用）
@@ -1992,7 +1992,7 @@ def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
     # アイコンHTML生成（既存のサブルーチンを想定）
     header_h, body_h = generate_weather_icons_html(df_graph, ratio_info, w_right_px, start_idx, design_params)
     
-    # HTML構築：Jinja2に渡すための最終的な文字列（構文エラーを修正）
+    # HTML構築：Jinja2に渡すための最終的な文字列（PNG形式に完全対応）
     html_str = (
         f'<div id="graph-wrapper" style="display:flex; width:100%; background:white; border:1px solid #ddd; overflow:hidden;">'
         f'  <div id="graph-left" style="width:{split_px}px; min-width:{split_px}px; flex-shrink:0; overflow:hidden; border-right:1px solid #eee; background:white; z-index:10;">'
@@ -2008,7 +2008,6 @@ def render_graph_html_flask(danger_v, sel_dirs, design_params, now_jst):
         f'</div>'
     )
     return html_str
-
 
 
 # ======================================================================================
@@ -2064,7 +2063,7 @@ def index():
         "hspace_inch": float(user_settings.get('hspace_inch', 1.0)),
         "margin_left_inch": float(user_settings.get('margin_left_inch', 0.6)),
         "font_size": int(user_settings.get('font_size', 8)),
-        "graph_dpi": int(user_settings.get('graph_dpi', 200)),
+        "graph_dpi": int(user_settings.get('graph_dpi', CONFIG.get("DPI", 200))),
         "show_wind": user_settings.get('show_wind', True),
         "show_temp": user_settings.get('show_temp', True),
         "show_tide": user_settings.get('show_tide', True),
