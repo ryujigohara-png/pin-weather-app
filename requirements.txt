@@ -1,7 +1,2 @@
 Flask
-requests
-pandas
-matplotlib
-numpy
-pytz
 gunicorn

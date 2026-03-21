@@ -1,463 +1,666 @@
 <!DOCTYPE html>
-<html lang="{{ session.get('lang', 'ja') }}">
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>{{ lang_dict['⛵Pin_Weather!'] }}{{ config.title_suffix }}</title>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/icon-192.png') }}">
-    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    <meta name="theme-color" content="{{ config.header_color or '#0078ff' }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pin_Weather Pro - Windy Filter</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
-        /* スタイル定義（維持） */
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0; background-color: #f0f2f5; color: #31333f; overscroll-behavior-y: contain; }
-        .sidebar { height: 100%; width: 0; position: fixed; z-index: 300; top: 0; left: 0; background-color: #f8f9fb; overflow-x: hidden; overflow-y: auto; transition: 0.3s; padding-top: 60px; border-right: 1px solid #e6e9ef; }
-        .sidebar-content { padding-bottom: 80px; }
-        .sidebar button, .sidebar a { padding: 10px 20px; text-decoration: none; font-size: 14px; color: #31333f; display: block; border: 1px solid #dcdcdc; background: white; width: calc(100% - 40px); margin: 10px auto; text-align: left; cursor: pointer; border-radius: 8px; transition: all 0.2s; }
-        .sidebar button:hover { border-color: #ff4b4b; color: #ff4b4b; background-color: #fffafa; }
-        .sidebar .closebtn { position: absolute; top: 10px; right: 20px; font-size: 24px; color: #31333f; border: none; background: none; }
-        .sidebar-header { color: #555; padding: 10px 25px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
-        .sidebar-brand-area { display: flex; align-items: center; padding: 15px 20px; margin-bottom: 10px; border-bottom: 1px solid #eee; gap: 12px; }
-        .sidebar-brand-icon { width: 45px; height: 45px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); object-fit: cover; }
-        .sidebar-brand-name { font-size: 18px; font-weight: 800; color: #0078ff; letter-spacing: 0.5px; }
-        .wind-dir-container { padding: 0 20px; margin-bottom: 20px; }
-        .wind-dir-box { background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #dcdcdc; border-left: 4px solid #ff4b4b; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-        .wind-dir-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; width: 100%; }
-        .wind-dir-item { font-size: 11px; color: #555; cursor: pointer; display: flex; align-items: center; justify-content: flex-start; gap: 6px; }
-        .wind-dir-item input[type="checkbox"] { cursor: pointer; width: 14px; height: 14px; }
-        #main { padding: 10px; transition: margin-left .3s; }
-        .location-header { background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e6e9ef; }
-        .loc-top-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-        .loc-name-area { display: flex; align-items: center; gap: 10px; flex: 1; }
-        .loc-info { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
-        .loc-name-row { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-        .loc-name { font-size: 1.1rem; font-weight: 600; color: #31333f; text-overflow: ellipsis; overflow: hidden; }
-        .loc-coords { font-size: 0.85rem; color: #666; margin-top: 2px; font-family: monospace; }
-        .action-bar { display: flex; flex-wrap: wrap; gap: 8px; }
-        .spot-selector { flex: 1 1 100%; min-width: 200px; padding: 10px; border-radius: 8px; border: 1px solid #dcdcdc; font-size: 14px; background-color: white; color: #31333f; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 16px; }
-        .btn-action-group { display: flex; flex: 1 1 auto; gap: 8px; width: 100%; }
-        .btn-action { flex: 1; padding: 10px 5px; border-radius: 8px; border: 1px solid #dcdcdc; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; text-decoration: none; background-color: #f0f2f6; color: #31333f; white-space: nowrap; transition: background 0.2s; }
-        .btn-action:active { background-color: #e0e2e6; }
-        @media (min-width: 600px) { .spot-selector { flex: 2; } .btn-action-group { flex: 3; } }
-        .openbtn { background: #f0f2f6; border: 1px solid #dcdcdc; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 18px; }
-        .btn-refresh { background: #f0f2f6; border: 1px solid #dcdcdc; border-radius: 6px; padding: 6px 10px; font-size: 13px; font-weight: 500; color: #31333f; cursor: pointer; display: flex; align-items: center; gap: 4px; }
-        .btn-star { background: none; border: none; font-size: 1.3rem; cursor: pointer; padding: 0; line-height: 1; transition: transform 0.1s; }
-        .btn-star:active { transform: scale(1.2); }
-        .modal { display: none; position: fixed; z-index: 400; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); }
-        .modal-content { background: white; margin: 5% auto; padding: 25px; width: 90%; max-width: 450px; border-radius: 12px; max-height: 85vh; overflow-y: auto; position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
-        .modal-sticky-header { position: sticky; top: -25px; background: white; z-index: 10; padding-bottom: 15px; border-bottom: 1px solid #eee; margin-bottom: 20px; }
-        .modal-footer-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; }
-        .modal-footer-top button { padding: 10px 5px; border-radius: 6px; font-weight: bold; cursor: pointer; border: 1px solid #dcdcdc; background: #f0f2f6; font-size: 12px; height: 44px; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s; }
-        .modal-footer-top button:active { opacity: 0.7; }
-        .btn-reset-st { flex: 1.4; color: #666; } 
-        .btn-close-st { flex: 1; }
-        .btn-update-st { flex: 1; background: #0078ff !important; color: white !important; border: none !important; }
-        .st-slider-row { margin-bottom: 18px; }
-        .st-slider-label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-        .st-slider-label { font-size: 13px; color: #555; }
-        .st-slider-value { font-weight: bold; color: #0078ff; font-family: monospace; }
-        input[type=range] { width: 100%; height: 6px; border-radius: 3px; background: #dfe1e6; appearance: none; outline: none; }
-        input[type=range]::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #0078ff; cursor: pointer; }
-        #loading-overlay { display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.8); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; }
-        .spinner { width: 50px; height: 50px; border: 5px solid rgba(0, 120, 255, 0.1); border-top: 5px solid #0078ff; border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .pointer-none { pointer-events: none; opacity: 0.6; }
-        .graph-outer-container { background: white; border-radius: 10px; padding: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e6e9ef; min-height: 300px; }
+        :root { 
+            --hour-width: 32px; 
+            --total-width: calc(var(--hour-width) * 216); 
+            --label-box-width: 100px; 
+            --nav-height: 60px;
+        }
+        body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: calc(var(--nav-height) + 15px); }
+        
+        /* 1. ボタン配置とタブの上部固定・横スライド */
+        .control-wrapper {
+            position: fixed; top: 0; left: 0; right: 0; height: var(--nav-height);
+            background: white; border-bottom: 1px solid #ddd; padding: 0 10px;
+            display: flex; gap: 8px; align-items: center; z-index: 1000;
+            overflow: hidden; /* 子要素のスライドを阻害しないよう制御 */
+        }
+        .scroll-tabs {
+            display: flex; gap: 8px; overflow-x: auto; white-space: nowrap; padding: 5px 0;
+            flex-grow: 1; -webkit-overflow-scrolling: touch;
+            align-items: center;
+        }
+        /* スクロールバー非表示（任意） */
+        .scroll-tabs::-webkit-scrollbar { display: none; }
+
+        .btn {
+            padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+            font-weight: bold; font-size: 14px; transition: 0.2s; flex-shrink: 0;
+        }
+        .btn-gps { background: #28a745; color: white; }
+        .btn-map-view { background: #17a2b8; color: white; }
+        .btn-location { background: #e9ecef; color: #495057; border: 1px solid #ced4da; }
+        .btn-location.active { 
+            background: #007bff; color: white; border: 1px solid #0056b3;
+            box-shadow: 0 0 8px rgba(0,123,255,0.5);
+        }
+        .btn-add { background: #6c757d; color: white; font-size: 18px; padding: 4px 15px; }
+
+        /* 2. サイドバーメニュー関連 */
+        .menu-trigger {
+            font-size: 24px; background: none; border: none; cursor: pointer; padding: 0 10px; flex-shrink: 0;
+        }
+        .sidebar {
+            position: fixed; top: 0; left: -210px; width: 210px; height: 100%;
+            background: #343a40; color: white; transition: 0.3s; z-index: 2500;
+            padding: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+            box-sizing: border-box; overflow: hidden;
+        }
+        .sidebar.open { left: 0; }
+        .sidebar-header { font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #495057; padding-bottom: 10px; }
+        .sidebar .btn { width: 100%; margin-bottom: 15px; text-align: left; }
+        .sidebar-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 2400;
+        }
+
+        .btn-wind-config { background: #6f42c1; color: white; }
+        .btn-reset { background: #dc3545; color: white; }
+
+        .current-pos-label { font-size: 12px; color: #666; white-space: nowrap; margin-right: 5px; flex-shrink: 0; }
+
+        /* モーダル共通 */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 3000; justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: white; width: 95%; max-width: 900px; height: 85%; border-radius: 12px;
+            display: flex; flex-direction: column; overflow: hidden; position: relative;
+        }
+
+        /* 地図用：修正箇所 - 背景色を固定して露出を防ぐ */
+        .search-bar { padding: 10px; background: #fff; border-bottom: 1px solid #ddd; display: flex; gap: 8px; z-index: 2100; }
+        .search-input { flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        #map-canvas { flex-grow: 1; width: 100%; background-color: #f8f8f8 !important; }
+        .leaflet-tile { visibility: visible !important; }
+
+        /* 風向設定用コンパス */
+        .compass-container {
+            position: relative; width: 320px; height: 320px; margin: 40px auto;
+            background: #f8f9fa; border-radius: 50%; border: 2px solid #ddd;
+        }
+        .compass-label {
+            position: absolute; width: 60px; height: 30px; display: flex; align-items: center;
+            justify-content: center; font-size: 12px; font-weight: bold; cursor: pointer;
+            border-radius: 4px; background: #fff; border: 1px solid #ccc; transition: 0.2s;
+            user-select: none;
+        }
+        .compass-label.active { background: #6f42c1; color: white; border-color: #5a32a3; }
+        .compass-center {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; font-size: 14px; color: #666;
+        }
+
+        .modal-footer { padding: 15px; display: flex; justify-content: flex-end; gap: 10px; background: #eee; }
+
+        /* グラフエリア */
+        .main-card { 
+            max-width: 1500px; margin: auto; background: white; 
+            border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+            overflow: hidden;
+        }
+        .scroll-container { overflow-x: auto; position: relative; }
+        .chart-stage { width: var(--total-width); position: relative; padding: 20px 0 80px var(--label-box-width); }
+        .chart-section { margin-bottom: 50px; position: relative; background: #fff; border: 1px solid #ddd; border-radius: 4px; width: 100%; }
+        .section-weather { height: 80px; border: none; margin-bottom: 0px; }
+        .section-wind { height: 280px; }
+        .section-temp, .section-marine { height: 160px; }
+
+        .sticky-label {
+            position: sticky; left: 0; top: 0; width: var(--label-box-width);
+            height: 100%; background: rgba(255,255,255,0.8); z-index: 50;
+            pointer-events: none; float: left;
+            margin-right: calc(var(--label-box-width) * -1); margin-left: calc(var(--label-box-width) * -1); 
+        }
+        .y-axis-title { padding: 5px 8px; font-size: 14px; font-weight: bold; color: #111; line-height: 1.2; }
+
+        svg { width: 100%; display: block; overflow: visible; }
+        .grid-day { stroke: #666; stroke-width: 2; } 
+        .grid-3h { stroke: #ccc; stroke-width: 1; }  
+        .grid-y-sub { stroke: #e0e0e0; stroke-width: 1; } 
+        .label-time { font-size: 16px; fill: #333; font-weight: bold; }
+        
+        .date-container { position: absolute; height: 30px; bottom: -30px; left: 0; width: 100%; pointer-events: none; z-index: 10; }
+        .sticky-date { position: absolute; bottom: 0; font-size: 22px; font-weight: bold; background: rgba(255,255,255,0.8); padding: 0 10px; border-radius: 4px; color: #000; white-space: nowrap; }
+
+        .line-temp-air { stroke: #ff4500; stroke-width: 4; fill: none; }
+        .line-temp-sea { stroke: #00ced1; stroke-width: 4; fill: none; }
+        .line-wave { stroke: #2ca02c; stroke-width: 4; fill: none; }
+        .line-tide { stroke: #1e90ff; stroke-width: 3; fill: none; }
+        .wind-arrow { fill: #00d4ff; stroke: #008eb3; stroke-width: 1; }
+
+        /* ツールチップ */
+        .tooltip {
+            position: fixed; background: rgba(0,0,0,0.85); color: white;
+            padding: 12px 16px; border-radius: 8px; font-size: 14px;
+            pointer-events: none; display: none; z-index: 4000; line-height: 1.8;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3); backdrop-filter: blur(4px);
+            white-space: nowrap;
+        }
+        .tooltip b { display: block; margin-bottom: 6px; border-bottom: 1px solid #666; padding-bottom: 2px; }
+        .tooltip .spot-name-tip { color: #00d4ff; font-weight: bold; border-bottom: 1px dashed #666; margin-bottom: 4px; padding-bottom: 2px; display: block; }
+        .icon-box { display: inline-block; width: 20px; text-align: center; margin-right: 8px; vertical-align: middle; }
+        .legend-line { display: inline-block; width: 15px; height: 3px; vertical-align: middle; margin-right: 8px; }
+        .legend-bar { display: inline-block; width: 12px; height: 12px; vertical-align: middle; margin-right: 8px; }
+        
+        #hover-guide { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(255,0,0,0.3); display: none; pointer-events: none; z-index: 5; }
+
+        .footer-info { 
+            max-width: 1500px; margin: 15px auto; padding: 15px; font-size: 12px; 
+            color: #666; line-height: 1.6; border-top: 1px solid #ddd;
+        }
     </style>
 </head>
 <body>
 
-    <div id="loading-overlay">
-        <div class="spinner"></div>
-        <div id="loading-message" style="margin-top: 20px; font-weight: bold; color: #31333f; font-size: 16px;">
-            {{ lang_dict.get('LOADING_MSG', 'グラフを作成中...') }}
+<div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+<div id="sidebar" class="sidebar">
+    <div class="sidebar-header">⚙️ Menu</div>
+    <button class="btn btn-wind-config" id="wind-cfg-btn">🎐 風向色付設定</button>
+    <button class="btn btn-reset" id="reset-all-btn">♻️ 全リセット</button>
+</div>
+
+<div class="control-wrapper">
+    <button class="menu-trigger" onclick="toggleSidebar()">☰</button>
+    <button class="btn btn-gps" id="gps-btn">🛰️ 現在地</button>
+    <button class="btn btn-map-view" id="map-btn">🗺️ 地図</button>
+    <div class="scroll-tabs" id="spot-tabs"></div>
+    <button class="btn btn-add" id="add-btn">＋</button>
+    <span class="current-pos-label" id="pos-display">読込中...</span>
+</div>
+
+<div id="map-modal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="search-bar">
+            <input type="text" id="map-search-input" class="search-input" placeholder="地名・施設名を入力して検索...">
+            <button class="btn" style="background:#007bff; color:white;" id="map-search-btn">検索</button>
+        </div>
+        <div id="map-canvas"></div>
+        <div class="modal-footer">
+            <span id="map-status" style="margin-right:auto; font-size:12px; color:#666;">地点をクリックしてください</span>
+            <button class="btn" style="background:#6c757d; color:white;" onclick="closeModal('map-modal')">キャンセル</button>
+            <button class="btn" style="background:#28a745; color:white;" id="temp-view-btn" disabled>登録せずに表示</button>
+            <button class="btn" style="background:#007bff; color:white;" id="save-spot-btn" disabled>MySpotsに登録</button>
         </div>
     </div>
+</div>
 
-    <div id="mySidebar" class="sidebar">
-        <div class="sidebar-content">
-            <button class="closebtn" onclick="closeNav()">×</button>
-            <div class="sidebar-brand-area">
-                <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="Icon" class="sidebar-brand-icon">
-                <span class="sidebar-brand-name">Pin_Weather!</span>
-            </div>
-            <button onclick="showLoading(); location.href='/edit_spots'" style="background-color: #fff9e6; border-color: #ffd966; font-weight: bold;">📍 {{ lang_dict['EDIT_MYSPOTS'] or 'My Spots 編集' }}</button>
-
-            <div class="sidebar-header" style="margin-top: 10px;">{{ lang_dict['色付風向選択'] }}</div>
-            <form action="/update_display_toggle" method="POST" style="padding: 0 20px;" onsubmit="showLoading()">
-                <div class="wind-dir-container" style="padding: 0; margin-bottom: 10px;">
-                    <div class="wind-dir-box">
-                        <label class="wind-dir-item"><input type="checkbox" name="wind_dirs" value="{{ lang_dict['ALL_DIRECTIONS'][0] }}" {% if sel_dirs[0] %}checked{% endif %}>{{ lang_dict['ALL_DIRECTIONS'][0] }}</label>
-                        <div class="wind-dir-grid">
-                            {% set dir_indices = [15, 1, 14, 2, 13, 3, 12, 4, 11, 5, 10, 6, 9, 7] %}
-                            {% for idx in dir_indices %}
-                            <label class="wind-dir-item"><input type="checkbox" name="wind_dirs" value="{{ lang_dict['ALL_DIRECTIONS'][idx] }}" {% if sel_dirs[idx] %}checked{% endif %}>{{ lang_dict['ALL_DIRECTIONS'][idx] }}</label>
-                            {% endfor %}
-                        </div>
-                        <label class="wind-dir-item"><input type="checkbox" name="wind_dirs" value="{{ lang_dict['ALL_DIRECTIONS'][8] }}" {% if sel_dirs[8] %}checked{% endif %}>{{ lang_dict['ALL_DIRECTIONS'][8] }}</label>
-                    </div>
-                </div>
-                <button type="submit" style="background: #ff4b4b; color: white; border: none; text-align: center; width: 100%; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin: 0 auto 15px auto;">{{ lang_dict['BTN_UPDATE'] or lang_dict['更新'] }}</button>
-            </form>
-
-            <button onclick="openModal()">⚙ {{ lang_dict['詳細設定'] or '詳細設定' }}</button>
-            <button onclick="if(confirm('Switch language?\n言語を切り替えますか？')) { showLoading(); location.href='/change_lang'; }">🌐 Language / 言語</button>
-            <button onclick="confirmReset()" style="color: #ff6b6b;">🔄 {{ lang_dict['リセット'] }}</button>
-            <button onclick="showShareQR()">📲 {{ lang_dict['SHARE_APP'] or 'アプリを共有' }}</button>
+<div id="wind-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 450px; height: auto; min-height: 500px;">
+        <div style="padding:15px; border-bottom:1px solid #ddd; font-weight:bold;">色付けする風向を選択</div>
+        <div class="compass-container" id="compass-ui">
+            <div class="compass-center">中央をクリックで<br>全選択 / 解除</div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" style="background:#6c757d; color:white;" onclick="closeModal('wind-modal')">閉じる</button>
+            <button class="btn" style="background:#6f42c1; color:white;" id="apply-wind-btn">更新して適用</button>
         </div>
     </div>
+</div>
 
-    <div id="main">
-        <div class="location-header">
-            <div class="loc-top-row">
-                <div class="loc-name-area">
-                    <button class="openbtn" onclick="openNav()">☰</button>
-                    <div class="loc-info">
-                        <div class="loc-name-row">
-                            <span class="loc-name">{{ basho }}</span>
-                            <button id="btn-star" class="btn-star" onclick="registerMySpot()">
-                                {% set is_saved = namespace(found=false) %}
-                                {% for s in session.get('user_locations', []) %}
-                                    {% if (s.lat|float - design_params.lat|float)|abs < 0.0001 and (s.lon|float - design_params.lon|float)|abs < 0.0001 %}
-                                        {% set is_saved.found = true %}
-                                    {% endif %}
-                                {% endfor %}
-                                {% if is_saved.found %}🌟{% else %}☆{% endif %}
-                            </button>
-                        </div>
-                        <span class="loc-coords">({{ "%.4f"|format(design_params.lat) }}, {{ "%.4f"|format(design_params.lon) }})</span>
-                    </div>
-                </div>
-                <button onclick="reloadWithCache()" class="btn-refresh">
-                    🔄 {{ draw_time_str }}
-                </button>
+<div class="main-card">
+    <div class="scroll-container" id="scroll-root">
+        <div class="chart-stage" id="stage">
+            <div id="hover-guide"></div>
+            <div class="chart-section section-weather">
+                <div class="sticky-label"><div class="y-axis-title" style="margin-top:20px;">🌦️ 天気<br>降水量</div></div>
+                <svg id="svg-weather" viewBox="0 0 6912 80"></svg>
             </div>
-
-            <div class="action-bar">
-                <select class="spot-selector" id="spot-selector" onchange="if(this.value) { showLoading(); location.href='/select_spot?index=' + this.value; }">
-                    <option value="">{{ lang_dict['SELECT_PLACE'] }}</option>
-                    {% for spot in session.get('user_locations', []) %}
-                    <option value="{{ loop.index0 }}">{{ spot.name }}</option>
-                    {% endfor %}
-                </select>
-                <div class="btn-action-group">
-                    <button onclick="sync_current_location()" class="btn-action">{{ lang_dict['BTN_CURRENT_LOC_SHORT'] }}</button>
-                    <button onclick="showSearchPrompt()" class="btn-action">{{ lang_dict['BTN_SEARCH_CITY'] or '🔍 地名検索' }}</button>
-                    <a href="/map_select" class="btn-action" onclick="showLoading()">🗺️ {{ lang_dict['MAP_SELECT_LABEL'] or '地図選択' }}</a>
-                </div>
+            <div class="chart-section section-wind">
+                <div class="sticky-label"><div class="y-axis-title">🚩 風速<br>(m/s)</div></div>
+                <div class="date-container" id="date-wind"></div>
+                <svg id="svg-wind" viewBox="0 0 6912 280" preserveAspectRatio="none"></svg>
+            </div>
+            <div class="chart-section section-temp">
+                <div class="sticky-label"><div class="y-axis-title">🌡️ 気温<br>水温(℃)</div></div>
+                <div class="date-container" id="date-temp"></div>
+                <svg id="svg-temps" viewBox="0 0 6912 160" preserveAspectRatio="none"></svg>
+            </div>
+            <div class="chart-section section-marine">
+                <div class="sticky-label"><div class="y-axis-title">🌊 波高<br>潮位(m)</div></div>
+                <div class="date-container" id="date-marine"></div>
+                <svg id="svg-marine" viewBox="0 0 6912 160" preserveAspectRatio="none"></svg>
             </div>
         </div>
+    </div>
+</div>
 
-        <div class="graph-outer-container" id="graph-area">
-            {% if graph_html %}
-                {{ graph_html|safe }}
-            {% else %}
-                <div style="padding: 100px 20px; text-align: center; color: #888;">
-                    <div class="spinner" style="margin: 0 auto 20px;"></div>
-                    {{ lang_dict.get('LOADING_MSG', 'グラフを作成中...') }}<br>
-                    <small>※Renderサーバーでは初回に約45秒かかります</small>
-                </div>
-            {% endif %}
-        </div>
+<div class="footer-info">
+    Weather data by <a href="https://open-meteo.com/" target="_blank">Open-Meteo.com</a><br>
+    【免責事項】海上気象データは予測モデルに基づく「最寄りの海上地点」の数値であり、実際の局地的な地形や潮流による影響を反映しきれない場合があります。本情報の利用は自己責任とし、実際の航行やマリンスポーツに際しては、必ず気象庁の発表や現地状況を確認してください。
+</div>
 
-        {% if debug_info %}
-        <div style="font-size: 10px; color: #888; text-align: center; margin-top: 20px;">
-            DEBUG: {{ debug_info }}
-        </div>
-        {% endif %}
+<div id="tooltip" class="tooltip"></div>
+
+<script>
+let allData = {};
+const hScale = 32;
+const CACHE_DURATION = 4 * 60 * 60 * 1000; 
+
+const windDirs = ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"];
+const defaultSpots = [
+    {lat: 31.337, lon: 130.795, label: "高須沖(鹿児島県)"},
+    {lat: 35.30, lon: 139.48, label: "江の島沖(神奈川県)"}
+];
+
+let mySpots = JSON.parse(localStorage.getItem('pin_weather_spots')) || defaultSpots;
+let targetWindDirections = JSON.parse(localStorage.getItem('pin_weather_wind_filter')) || [...windDirs];
+
+let currentLat = mySpots[0].lat;
+let currentLon = mySpots[0].lon;
+let currentLabel = mySpots[0].label;
+
+let map, tempMarker;
+
+function initApp() {
+    renderTabs();
+    initCompassUI();
+    updateLocation(currentLat, currentLon, currentLabel);
+    
+    new Sortable(document.getElementById('spot-tabs'), {
+        animation: 150,
+        onEnd: () => { saveSpotsOrder(); }
+    });
+
+    document.getElementById('map-search-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') executeMapSearch();
+    });
+    document.getElementById('map-search-btn').onclick = executeMapSearch;
+    
+    // サイドバー内ボタンへの変更
+    document.getElementById('wind-cfg-btn').onclick = () => {
+        toggleSidebar();
+        openModal('wind-modal');
+    };
+    
+    document.getElementById('apply-wind-btn').onclick = () => {
+        localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
+        closeModal('wind-modal');
+        draw();
+    };
+}
+
+// サイドバー開閉
+function toggleSidebar() {
+    const sb = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const isOpen = sb.classList.contains('open');
+    if (isOpen) {
+        sb.classList.remove('open');
+        overlay.style.display = 'none';
+    } else {
+        sb.classList.add('open');
+        overlay.style.display = 'block';
+    }
+}
+
+function initCompassUI() {
+    const container = document.getElementById('compass-ui');
+    const radius = 130; 
+    const centerX = 160; 
+    const centerY = 160;
+
+    windDirs.forEach((dir, i) => {
+        const angle = (i * 22.5 - 90) * (Math.PI / 180);
+        const x = centerX + radius * Math.cos(angle) - 30;
+        const y = centerY + radius * Math.sin(angle) - 15;
+
+        const el = document.createElement('div');
+        el.className = 'compass-label' + (targetWindDirections.includes(dir) ? ' active' : '');
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+        el.innerText = dir;
+        el.onclick = () => {
+            if (targetWindDirections.includes(dir)) {
+                targetWindDirections = targetWindDirections.filter(d => d !== dir);
+                el.classList.remove('active');
+            } else {
+                targetWindDirections.push(dir);
+                el.classList.add('active');
+            }
+        };
+        container.appendChild(el);
+    });
+
+    container.querySelector('.compass-center').onclick = () => {
+        const labels = container.querySelectorAll('.compass-label');
+        if (targetWindDirections.length > 0) {
+            targetWindDirections = [];
+            labels.forEach(l => l.classList.remove('active'));
+        } else {
+            targetWindDirections = [...windDirs];
+            labels.forEach(l => l.classList.add('active'));
+        }
+    };
+}
+
+function renderTabs() {
+    const container = document.getElementById('spot-tabs');
+    container.innerHTML = "";
+    mySpots.forEach((spot, index) => {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-location';
+        if (spot.label === currentLabel) btn.classList.add('active'); 
+        btn.innerText = `📍 ${spot.label}`;
+        btn.onclick = () => updateLocation(spot.lat, spot.lon, spot.label);
         
-        <div class="footer-info-container" style="margin-top: 20px; padding: 15px; border-top: 1px solid #e6e9ef; background-color: #fff; border-radius: 0 0 10px 10px;">
-            <div class="legend-box" style="padding: 12px; border-radius: 8px; background-color: #f0f2f6; margin-bottom: 15px; line-height: 1.6; border: 1px solid #dcdcdc;">
-                <span style="font-weight: bold; font-size: 14px;">{{ lang_dict['LEGEND_TITLE'] }}</span><br>
-                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 5px; font-size: 13px;">
-                    <span><span style="color: #1f77b4;">■</span> {{ lang_dict['LEGEND_BLUE'] }}</span>
-                    <span><span style="color: #ff7f0e;">■</span> {{ lang_dict['LEGEND_ORANGE'] }}</span>
-                    <span><span style="color: #d62728;">■</span> {{ lang_dict['LEGEND_RED'] }}</span>
-                </div>
-                <div style="margin-top: 5px; font-size: 13px;">
-                    <span style="color: #d62728; font-weight: bold;">---</span> 
-                    <span style="color: #333;">{{ lang_dict['LEGEND_DANGER_LINE'].replace('{v}', design_params.danger_v|string) }}</span>
-                </div>
+        btn.oncontextmenu = (e) => { e.preventDefault(); confirmDelete(index); };
+        let timer;
+        btn.ontouchstart = () => { timer = setTimeout(() => confirmDelete(index), 800); };
+        btn.ontouchend = () => clearTimeout(timer);
 
-                <div style="margin-top: 5px; font-size: 13px;">
-                    <span style="color: blue; font-weight: bold;"> |</span> 
-                    <span style="color: #333;">{{ lang_dict['LEGEND_NOW_LINE'] }}</span>
-                </div>
-            </div>
-            <div class="api-links-row" style="margin-bottom: 20px; font-size: 12px;">
-                <span style="display: block; margin-bottom: 8px; color: gray;">
-                    Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" style="color: #0078ff; text-decoration: none;">Open-Meteo.com</a> (CC BY 4.0)
-                </span>
-                <a href="{{ w_url }}" target="_blank" class="api-link-item" style="color: #666;">[ {{ lang_dict['LINK_WEATHER'] }} ]</a> 
-                &nbsp;&nbsp;
-                <a href="{{ m_url }}" target="_blank" class="api-link-item" style="color: #666;">[ {{ lang_dict['LINK_MARINE'] }} ]</a>
-            </div>
-            <div style="border-top: 1px solid #e6e9ef; padding-top: 15px; text-align: left;">
-                <p style="font-size: 11px; color: #888; line-height: 1.6; margin-bottom: 15px;">
-                    {{ lang_dict.get("DISCLAIMER", "※本データは予測値であり、実際の天候と異なる場合があります。航海や活動の際は、必ず最新気象情報を確認し、自己責任でご利用ください。") }}
-                </p>
-                <p id="host-indicator" style="text-align: center; font-size: 10px; color: {{ config.header_color or '#ccc' }}; letter-spacing: 2px; font-weight: bold;">
-                    - PIN_WEATHER {{ config.env_name or 'BETA VERSION' }} -
-                </p>
-            </div>            
-        </div>
-    </div> 
+        container.appendChild(btn);
+    });
+}
 
-    <div id="configModal" class="modal">
-        <div class="modal-content">
-            <form action="/update_settings" method="post" onsubmit="showLoading()">
-                <div class="modal-sticky-header">
-                    <div class="modal-title">{{ lang_dict['詳細設定'] or '詳細設定' }}</div>
-                    <div class="modal-footer-top">
-                        <button type="button" class="btn-reset-st" onclick="showLoading(); location.href='/reset_settings'">{{ lang_dict['デフォルトに戻す'] }}</button>
-                        <button type="button" class="btn-close-st" onclick="closeModal()">{{ lang_dict['閉じる'] }}</button>
-                        <button type="submit" class="btn-update-st">{{ lang_dict['更新'] }}</button>
-                    </div>
-                </div>
-                <div style="background: #f8f9fb; border: 1px solid #dcdcdc; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
-                    {% for key, label in [('show_wind','風向・風速グラフ表示'),('show_temp','気温グラフ表示'),('show_wave','波高グラフ表示'),('show_ocean_temp','海面水温グラフ表示'),('show_tide','潮位グラフ表示'),('show_w_text','天気文字表示')] %}
-                    <label style="display: block; font-size: 14px; margin-bottom: 10px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                        <input type="checkbox" name="{{ key }}" {% if design_params[key] %}checked{% endif %} style="width: 16px; height: 16px;"> {{ lang_dict[label] }}
-                    </label>
-                    {% endfor %}
-                </div>
-                {% for field, label, unit in [('height_inch','グラフ縦幅','inch'),('top_margin_inch','上余白','inch'),('hspace_inch','上下間隔',''),('width_inch','グラフ横幅','inch'),('margin_left_inch','左余白','inch'),('font_size','フォントサイズ','')] %}
-                <div class="st-slider-row">
-                    <div class="st-slider-label-row">
-                        <span class="st-slider-label">{{ lang_dict[label] or label }}{% if unit %}({{ unit }}){% endif %}:</span>
-                        <span class="st-slider-value" id="val_{{ field }}">{{ design_params[field] }}</span>
-                    </div>
-                    <input type="range" name="{{ field }}" min="{{ -3.0 if field == 'top_margin_inch' else 0 }}" max="{{ 30 if 'width' in field else 20 if 'font' in field else 2.5 }}" step="0.1" value="{{ design_params[field] }}" oninput="document.getElementById('val_{{ field }}').innerText=this.value">
-                </div>
-                {% endfor %}
-                
-                <div class="st-slider-row" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;">
-                    <div class="st-slider-label-row">
-                        <span class="st-slider-label">{{ lang_dict['解像度'] or '解像度' }}(DPI):</span>
-                        <span class="st-slider-value">{{ design_params['graph_dpi'] }}</span>
-                    </div>
-                    <select name="graph_dpi" style="width: 100%; height: 35px; border-radius: 5px; border: 1px solid #ccc; background: white; font-size: 14px; padding: 0 10px;">
-                        {% for val in [50, 75, 100, 200] %}
-                        <option value="{{ val }}" {% if design_params['graph_dpi']|int == val %}selected{% endif %}>
-                            {{ val }} {% if val == 100 %}(推奨){% elif val == 200 %}(高精細/重い){% endif %}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </form>
-        </div>
-    </div>
+function saveSpotsOrder() {
+    const buttons = Array.from(document.getElementById('spot-tabs').children);
+    const newSpots = buttons.map(btn => {
+        const label = btn.innerText.replace('📍 ', '');
+        return mySpots.find(s => s.label === label);
+    }).filter(s => s);
+    mySpots = newSpots;
+    localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+}
 
-    <script>
-        /**
-         * サブルーチン：ホスト判別と表示更新
-         */
-        function updateHostIndicator() {
-            console.log("Environment: {{ config.env_name }}");
+function confirmDelete(index) {
+    if (confirm(`「${mySpots[index].label}」を削除しますか？`)) {
+        mySpots.splice(index, 1);
+        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+        renderTabs();
+    }
+}
+
+document.getElementById('reset-all-btn').onclick = () => {
+    if (confirm("登録地点と並び順、風向設定を初期状態に戻しますか？")) {
+        toggleSidebar();
+        mySpots = JSON.parse(JSON.stringify(defaultSpots));
+        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+        
+        targetWindDirections = [...windDirs];
+        localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
+        
+        // UI側の反映
+        document.querySelectorAll('.compass-label').forEach(l => l.classList.add('active'));
+        
+        renderTabs();
+        updateLocation(mySpots[0].lat, mySpots[0].lon, mySpots[0].label);
+    }
+};
+
+document.getElementById('add-btn').onclick = () => openMap();
+document.getElementById('map-btn').onclick = () => openMap();
+
+function openMap() {
+    openModal('map-modal');
+    if (!map) {
+        // タイル設定にerrorTileUrlを追加
+        const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { 
+            attribution: 'Esri',
+            errorTileUrl: 'https://www.openstreetmap.org/assets/blocked.png'
+        });
+        const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
+            attribution: 'Esri',
+            errorTileUrl: 'https://www.openstreetmap.org/assets/blocked.png'
+        });
+        const gsi = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', { 
+            attribution: '&copy; 国地理院',
+            errorTileUrl: 'https://www.openstreetmap.org/assets/blocked.png'
+        });
+
+        map = L.map('map-canvas', {
+            center: [currentLat, currentLon],
+            zoom: 14,
+            layers: [esri]
+        });
+
+        const baseMaps = { "標準地図(Esri)": esri, "衛星写真": satellite, "地理院地図": gsi };
+        L.control.layers(baseMaps).addTo(map);
+        map.on('click', onMapClick);
+    } else {
+        map.setView([currentLat, currentLon], 14);
+    }
+
+    if (tempMarker) map.removeLayer(tempMarker);
+    tempMarker = L.marker([currentLat, currentLon]).addTo(map);
+}
+
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+async function executeMapSearch() {
+    const query = document.getElementById('map-search-input').value;
+    if (!query) return;
+    document.getElementById('map-status').innerText = "検索中...";
+    try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&accept-language=ja`);
+        const results = await res.json();
+        if (results.length > 0) {
+            const { lat, lon } = results[0];
+            const latlng = [parseFloat(lat), parseFloat(lon)];
+            map.setView(latlng, 15);
+            if (tempMarker) map.removeLayer(tempMarker);
+            tempMarker = L.marker(latlng).addTo(map);
+            fetchAddressInfo(parseFloat(lat), parseFloat(lon));
+        } else {
+            alert("地点が見つかりませんでした。");
         }
+    } catch (err) { alert("検索エラー"); }
+}
 
-        /**
-         * サブルーチン：明示的なリロード（キャッシュ有効化）
-         */
-        function reloadWithCache() {
-            showLoading();
-            window.location.href = '/?refresh=1&do_cache=1&t=' + new Date().getTime();
-        }
+async function onMapClick(e) {
+    const { lat, lng } = e.latlng;
+    if (tempMarker) map.removeLayer(tempMarker);
+    tempMarker = L.marker([lat, lng]).addTo(map);
+    await fetchAddressInfo(lat, lng);
+}
 
-        /**
-         * サブルーチン：エラーメッセージの表示と自動リロード
-         */
-        function handleServerError(customMessage) {
-            const loadingMsg = document.getElementById('loading-message');
-            const defaultMsg = "{{ lang_dict.get('SERVER_RESTARTING', 'サーバーを再起動しています。15秒後に自動でリロードします...') }}";
-            
-            if (loadingMsg) {
-                loadingMsg.style.color = "#ff4b4b";
-                loadingMsg.innerText = customMessage || defaultMsg;
+async function fetchAddressInfo(lat, lng) {
+    document.getElementById('map-status').innerText = "地点情報を取得中...";
+    try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ja`);
+        const data = await res.json();
+        const addr = data.address;
+        const city = addr.city || addr.town || addr.village || "";
+        const district = addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district || "";
+        const defaultName = city + district || "新規地点";
+
+        document.getElementById('temp-view-btn').onclick = () => {
+            updateLocation(lat, lng, defaultName + "(未登録)");
+            closeModal('map-modal');
+        };
+        document.getElementById('temp-view-btn').disabled = false;
+
+        document.getElementById('save-spot-btn').onclick = () => {
+            const spotName = prompt("登録する地点名を確認・修正してください", defaultName);
+            if (spotName) {
+                mySpots.push({lat, lon: lng, label: spotName});
+                localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                renderTabs();
+                updateLocation(lat, lng, spotName);
+                closeModal('map-modal');
             }
-            showLoading(); 
-            setTimeout(() => {
-                window.location.href = '/?refresh=1&do_cache=1&t=' + new Date().getTime();
-            }, 15000);
+        };
+        document.getElementById('save-spot-btn').disabled = false;
+        document.getElementById('map-status').innerText = "選択中: " + defaultName;
+    } catch (err) { document.getElementById('map-status').innerText = "地点名取得失敗"; }
+}
+
+async function updateLocation(lat, lon, label) {
+    currentLat = lat; currentLon = lon; currentLabel = label;
+    document.getElementById('pos-display').innerText = `${label}`;
+    renderTabs(); 
+    await draw(); 
+}
+
+document.getElementById('gps-btn').onclick = () => {
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+            updateLocation(pos.coords.latitude, pos.coords.longitude, "現在地(GPS)");
+        });
+    }
+};
+
+const weatherIcons = { 0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️", 45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "🌦️", 61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "❄️", 73: "❄️", 75: "❄️", 80: "🌦️", 81: "🌦️", 82: "🌦️", 95: "⛈️" };
+function getWindDirText(deg) { return windDirs[Math.round(deg / 22.5) % 16]; }
+
+async function fetchWithCache(lat, lon) {
+    const cacheKey = `weather_cache_${lat.toFixed(3)}_${lon.toFixed(3)}`;
+    const cached = localStorage.getItem(cacheKey);
+    const now = Date.now();
+
+    if (cached) {
+        const parsed = JSON.parse(cached);
+        if (now - parsed.timestamp < CACHE_DURATION) return parsed.data;
+    }
+
+    const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&forecast_days=9`;
+    const mUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto&forecast_days=9&cell_selection=sea`;
+
+    const [wRes, mRes] = await Promise.all([fetch(wUrl).then(r => r.json()), fetch(mUrl).then(r => r.json())]);
+    const mergedData = { ...wRes.hourly, ...mRes.hourly };
+
+    localStorage.setItem(cacheKey, JSON.stringify({ timestamp: now, data: mergedData }));
+    return mergedData;
+}
+
+async function draw() {
+    try {
+        allData = await fetchWithCache(currentLat, currentLon);
+
+        const svgW = document.getElementById('svg-weather');
+        let wHtml = "";
+        for(let i=0; i<216; i++) {
+            const x = i * hScale + 16; 
+            const icon = weatherIcons[allData.weather_code[i]] || "❓";
+            wHtml += `<text x="${x}" y="32" font-size="28" text-anchor="middle">${icon}</text>`; 
+            const p = allData.precipitation ? allData.precipitation[i] : 0;
+            if (p > 0) wHtml += `<text x="${x}" y="70" font-size="14" font-weight="bold" fill="#0000FF" text-anchor="middle">${p.toFixed(1)}</text>`;
         }
+        svgW.innerHTML = wHtml;
 
-        /**
-         * サブルーチン：バックアップデータの保存
-         */
-        function saveBackupToLocal() {
-            const userLocs = {{ session.get('user_locations', [])|tojson }};
-            const currentBasho = "{{ basho }}";
+        function renderSection(svgId, dateContId, datasets, height, stepY, isWind = false) {
+            const svg = document.getElementById(svgId);
+            const dateCont = document.getElementById(dateContId);
+            dateCont.innerHTML = "";
+            const allVals = datasets.flatMap(ds => ds.data || []);
+            if (allVals.length === 0) return;
 
-            if (userLocs && userLocs.length > 0 && currentBasho !== "Error" && currentBasho !== "未設定" && currentBasho !== "") {
-                const backupData = {
-                    user_locations: userLocs,
-                    design_params: {{ design_params|tojson }},
-                    sel_dirs: {{ sel_dirs|tojson }},
-                    lang: "{{ session.get('lang', 'ja') }}",
-                    last_basho: currentBasho
-                };
-                localStorage.setItem('pin_weather_backup_v1', JSON.stringify(backupData));
-                console.log("LocalStorage: Backup saved.");
+            let max = Math.ceil(Math.max(...allVals) / stepY) * stepY;
+            let min = Math.floor(Math.min(...allVals) / stepY) * stepY;
+            if (isWind) min = 0;
+            const range = (max - min) || 1;
+            const plotHeight = height - 40; 
+
+            let html = "";
+            for (let v = min; v <= max; v += stepY) {
+                const yPosSvg = plotHeight - (((v - min) / range) * plotHeight);
+                html += `<line x1="0" y1="${yPosSvg}" x2="6912" y2="${yPosSvg}" class="grid-y-sub" />`;
             }
-        }
 
-        /**
-         * サブルーチン：バックアップデータからの復元
-         */
-        async function restoreFromLocalBackup() {
-            const stored = localStorage.getItem('pin_weather_backup_v1');
-            if (!stored) return false;
-            
-            const data = JSON.parse(stored);
-            const userLocsCount = {{ session.get('user_locations', [])|length }};
-            const currentBasho = "{{ basho }}";
+            for (let i = 0; i <= 216; i++) {
+                const x = i * hScale;
+                const d = new Date(allData.time[i]);
+                if (i % 24 === 0 && i < 216) {
+                    html += `<line x1="${x}" y1="-10" x2="${x}" y2="${plotHeight + 30}" class="grid-day" />`;
+                    const dateDiv = document.createElement('div');
+                    dateDiv.className = 'sticky-date';
+                    dateDiv.style.left = `${x}px`;
+                    dateDiv.dataset.x = x;
+                    dateDiv.innerText = `${d.getMonth()+1}/${d.getDate()}`;
+                    dateCont.appendChild(dateDiv);
+                } else if (i % 3 === 0 && i < 216) {
+                    html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight + 20}" class="grid-3h" />`;
+                    html += `<text x="${x}" y="${plotHeight + 25}" class="label-time" text-anchor="middle">${d.getHours()}</text>`;
+                }
+            }
 
-            if (userLocsCount === 0 || currentBasho === "Error" || currentBasho === "未設定" || currentBasho === "") {
-                console.log("LocalStorage: Detecting empty server session. Attempting restore...");
-                showLoading();
-                try {
-                    const response = await fetch('/restore_backup', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify(data)
+            datasets.forEach(ds => {
+                if (ds.type === 'bar') {
+                    ds.data.forEach((v, i) => {
+                        const val = v || 0;
+                        const h = ((val - min) / range) * plotHeight;
+                        const x = i * hScale;
+                        
+                        const deg = allData.wind_direction_10m[i];
+                        const dirText = getWindDirText(deg);
+                        let color = "#ccc"; 
+
+                        if (val >= 10.0) {
+                            color = '#dc143c'; 
+                        } else if (targetWindDirections.includes(dirText)) {
+                            color = val >= 5 ? '#ffa500' : '#87ceeb';
+                        }
+
+                        html += `<rect x="${x - (hScale*0.4)}" y="${plotHeight-h}" width="${hScale*0.8}" height="${h}" fill="${color}" />`;
+                        if (isWind) {
+                            const rot = (deg + 180) % 360;
+                            html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-25}) rotate(${rot}) scale(1.6)" class="wind-arrow" />`;
+                        }
                     });
-                    if (response.ok) {
-                        window.location.href = '/?refresh=1&do_cache=1';
-                        return true; 
-                    }
-                } catch (e) {
-                    console.error("Restore sync failed:", e);
-                }
-            }
-            
-            const selector = document.getElementById('spot-selector');
-            if (selector && selector.options.length <= 1 && data.user_locations.length > 0) {
-                data.user_locations.forEach((spot, index) => {
-                    const opt = document.createElement('option');
-                    opt.value = index;
-                    opt.text = spot.name;
-                    selector.add(opt);
-                });
-            }
-            return false;
-        }
-
-        /* UI操作サブルーチン */
-        function showLoading() { document.getElementById('loading-overlay').style.display = 'flex'; document.getElementById('main').classList.add('pointer-none'); }
-        function hideLoading() { document.getElementById('loading-overlay').style.display = 'none'; document.getElementById('main').classList.remove('pointer-none'); }
-        function openNav() { document.getElementById("mySidebar").style.width = "280px"; }
-        function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
-        function openModal() { document.getElementById("configModal").style.display = "block"; closeNav(); }
-        function closeModal() { document.getElementById("configModal").style.display = "none"; }
-        function confirmReset() { if (confirm("{{ lang_dict['CONFIRM_RESET'] or '表示設定をリセットしますか？' }}")) { showLoading(); window.location.href = '/reset_settings'; } }
-        function showSearchPrompt() { showLoading(); location.href = "/map_select?search_mode=1"; }
-
-        function sync_current_location() {
-            if (!navigator.geolocation) { alert("位置情報非対応です."); return; }
-            navigator.geolocation.getCurrentPosition(
-                function(position) {
-                    showLoading();
-                    window.location.href = `/set_location?lat=${position.coords.latitude}&lon=${position.coords.longitude}&name=現在地&do_cache=1`;
-                },
-                function(error) { alert("位置情報の取得に失敗しました。設定を確認してください。"); },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
-        }
-
-        // 初期化ロジック
-        (function() {
-            window.addEventListener('pageshow', function(event) { if (event.persisted) hideLoading(); });
-            
-            window.addEventListener('load', async () => {
-                updateHostIndicator();
-                const isRestoring = await restoreFromLocalBackup();
-                if (!isRestoring) {
-                    saveBackupToLocal();
-                    hideLoading();
-                }
-
-                const graphArea = document.getElementById('graph-area');
-                if (graphArea && !document.querySelector('.graph-container')) {
-                    console.log("Async: Starting graph generation...");
-                    const params = new URLSearchParams(window.location.search);
-                    params.set('async_draw', '1');
-                    
-                    fetch('/?' + params.toString())
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.html) {
-                                graphArea.innerHTML = data.html;
-                                const refreshBtn = document.querySelector('.btn-refresh');
-                                if (refreshBtn) refreshBtn.innerHTML = '🔄 ' + data.draw_time;
-                                console.log("Async: Graph generation complete.");
-                            }
-                        })
-                        .catch(err => console.error("Async error:", err));
+                } else {
+                    const pts = (ds.data || []).map((v, i) => `${i * hScale},${plotHeight - (((v || 0) - min) / range) * plotHeight}`).join(" ");
+                    html += `<polyline class="${ds.cls}" points="${pts}" />`;
                 }
             });
-            
-            let startY = 0;
-            window.addEventListener('touchstart', (e) => { startY = e.touches[0].pageY; }, {passive: true});
-            window.addEventListener('touchmove', (e) => {
-                const moveY = e.touches[0].pageY;
-                const diffY = moveY - startY;
-                if (window.scrollY === 0 && diffY > 120) {
-                    if (document.getElementById('loading-overlay').style.display !== 'flex') {
-                        reloadWithCache();
-                    }
-                }
-            }, {passive: true});
-        })();
+            svg.innerHTML = html;
+        }
 
-        async function registerMySpot() {
-            const currentName = "{{ basho }}";
-            const btn = document.getElementById('btn-star');
-            
-            if (btn.innerText.trim() === "🌟") return;
+        renderSection("svg-wind", "date-wind", [{ data: allData.wind_speed_10m, type: 'bar' }], 280, 5.0, true);
+        renderSection("svg-temps", "date-temp", [{ data: allData.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], 160, 5.0);
+        renderSection("svg-marine", "date-marine", [{ data: allData.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.sea_level_height_msl, type: 'line', cls: 'line-tide' }], 160, 0.5);
 
-            const newName = prompt("{{ lang_dict['この地点を My Spots に保存します。'] }}", currentName);
-            if (!newName) return;
+        const scrollRoot = document.getElementById('scroll-root');
+        scrollRoot.onscroll = () => {
+            const sl = scrollRoot.scrollLeft;
+            document.querySelectorAll('.sticky-date').forEach(el => {
+                const x = parseFloat(el.dataset.x);
+                const nextX = x + (24 * hScale);
+                el.style.left = (sl >= x && sl < nextX - 80) ? (sl - 100) + "px" : x + "px";
+            });
+        };
 
-            showLoading(); 
-            try {
-                const response = await fetch('/add_to_myspots', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        name: newName, 
-                        lat: {{ design_params.lat }}, 
-                        lon: {{ design_params.lon }} 
-                    })
-                });
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    if (result.status === "success") {
-                        const params = new URLSearchParams({
-                            lat: {{ design_params.lat }},
-                            lon: {{ design_params.lon }},
-                            name: result.name,
-                            do_cache: "1"
-                        });
-                        window.location.href = `/select_spot?${params.toString()}`;
-                    } else { 
-                        hideLoading(); 
-                        alert(result.message); 
-                    }
-                } else {
-                    handleServerError();
-                }
-            } catch (error) { 
-                handleServerError();
+        const stage = document.getElementById('stage');
+        const guide = document.getElementById('hover-guide');
+        const tooltip = document.getElementById('tooltip');
+
+        stage.onmousemove = (e) => {
+            const rect = stage.getBoundingClientRect();
+            const hourIdx = Math.round((e.clientX - rect.left - 100) / hScale);
+            if (hourIdx >= 0 && hourIdx < 216) {
+                guide.style.left = (hourIdx * hScale + 100) + "px"; guide.style.display = "block";
+                tooltip.style.display = "block"; tooltip.style.left = (e.clientX + 20) + "px"; tooltip.style.top = (e.clientY + 20) + "px";
+                const d = new Date(allData.time[hourIdx]); 
+                const deg = allData.wind_direction_10m[hourIdx];
+                const ws = allData.wind_speed_10m[hourIdx];
+
+                tooltip.innerHTML = `
+                    <span class="spot-name-tip">📍 ${currentLabel}</span>
+                    <b>${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:00</b>
+                    <div class="icon-box"><span class="legend-bar" style="background:#0000FF; margin-right:0;"></span></div>☔降水: ${allData.precipitation ? allData.precipitation[hourIdx]?.toFixed(1) : "0.0"}mm<br>
+                    <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${(deg+180)%360})"/></svg></div>風向: ${getWindDirText(deg)} (${deg}°)<br>
+                    <div class="icon-box">🚩</div>風速: ${ws?.toFixed(1) || "0.0"}m/s<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>🌡️気温: ${allData.temperature_2m[hourIdx]?.toFixed(1) || "0.0"}℃<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>💧水温: ${allData.sea_surface_temperature ? allData.sea_surface_temperature[hourIdx]?.toFixed(1) : "---"}℃<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>🌊波高: ${allData.wave_height ? allData.wave_height[hourIdx]?.toFixed(2) : "0.00"}m<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#1e90ff; margin-right:0;"></span></div>📏潮位: ${allData.sea_level_height_msl ? allData.sea_level_height_msl[hourIdx]?.toFixed(2) : "0.00"}m
+                `;
             }
-        }
+        };
+        stage.onmouseleave = () => { guide.style.display = "none"; tooltip.style.display = "none"; };
+    } catch (e) { console.error(e); }
+}
 
-        function showShareQR() {
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.origin)}`;
-            const shareModal = document.createElement('div');
-            shareModal.style = "position:fixed; z-index:500; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; flex-direction:column; color:white; backdrop-filter:blur(5px);";
-            shareModal.innerHTML = `<div style="background:white; padding:25px; border-radius:15px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,0.5);"><img src="${qrUrl}" alt="QR" style="width:200px; height:200px;"><div style="color:#333; font-weight:bold; margin-top:15px; font-size:16px;">Scan to Open App</div><button onclick="this.parentElement.parentElement.remove()" style="margin-top:20px; padding:10px 25px; border-radius:8px; border:none; background:#0078ff; color:white; cursor:pointer; font-weight:bold; width:100%;">Close</button></div>`;
-            document.body.appendChild(shareModal);
-        }
-    </script>
+initApp();
+</script>
 </body>
 </html>
