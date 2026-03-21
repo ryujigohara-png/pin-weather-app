@@ -58,7 +58,7 @@ function applyEnvVisuals() {
     } else if (hostname.includes("beta")) {
         config = {
             titleSuffix: " (B)",
-            headerColor: "#d8b39a", 
+            headerColor: "#f5dc1b", 
             envName: "Beta版"
         };
     } else {
