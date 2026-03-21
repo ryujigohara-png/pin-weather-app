@@ -17,10 +17,39 @@ let currentLabel = mySpots[0].label;
 
 let map, tempMarker;
 
+/**
+ * サブルーチン：QRコード生成
+ */
+function generateSidebarQRCode() {
+    const qrContainer = document.getElementById('sidebar-qrcode');
+    if (!qrContainer) return;
+
+    // 既存のQRコードがあればクリア
+    qrContainer.innerHTML = "";
+
+    // 外部ライブラリ qrcode.js を動的に読み込み
+    const script = document.createElement('script');
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+    script.onload = () => {
+        new QRCode(qrContainer, {
+            text: window.location.href,
+            width: 120,
+            height: 120,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+        });
+    };
+    document.head.appendChild(script);
+}
+
 function initApp() {
     renderTabs();
     initCompassUI();
     updateLocation(currentLat, currentLon, currentLabel);
+    
+    // サイドバーのQRコードを生成
+    generateSidebarQRCode();
 
     document.getElementById('map-search-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') executeMapSearch();
@@ -101,18 +130,12 @@ function initCompassUI() {
     }
 }
 
-/**
- * サブルーチン：タブ描画
- * 並び順：1.選択中の地点、2.GPS、3.Map、4.その他履歴(新しい順)
- */
 function renderTabs(activeOverrideLabel = null) {
     const container = document.getElementById('spot-tabs');
     if (!container) return;
     container.innerHTML = "";
 
     const activeLabel = activeOverrideLabel || currentLabel;
-
-    // mySpotsの中から現在選択中のものを特定
     const activeIdx = mySpots.findIndex(s => s.label === activeLabel);
     let displaySpots = [...mySpots];
     let activeSpot = null;
@@ -121,7 +144,6 @@ function renderTabs(activeOverrideLabel = null) {
         activeSpot = displaySpots.splice(activeIdx, 1)[0];
     }
 
-    // アイテム構成：[1位:選択地点(あれば)] + [2位:GPS, 3位:Map] + [4位〜:残りの地点]
     let items = [];
     if (activeSpot) {
         items.push({ id: activeSpot.label, label: `📍 ${activeSpot.label}`, lat: activeSpot.lat, lon: activeSpot.lon, rawLabel: activeSpot.label });
@@ -147,7 +169,6 @@ function renderTabs(activeOverrideLabel = null) {
 
         if (isSelected) {
             btn.classList.add('active');
-            // アクティブなボタンを視界（スクロールエリア内）に自動で移動させる処理を追加
             setTimeout(() => btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }), 100);
         }
         btn.innerText = item.label;
@@ -159,7 +180,6 @@ function renderTabs(activeOverrideLabel = null) {
                 openMap();
                 renderTabs("🗺️ Map");
             } else {
-                // 地点選択時：mySpots内での並びを最新（先頭）に更新して保存
                 const idx = mySpots.findIndex(s => s.label === item.rawLabel);
                 if (idx > -1) {
                     const selectedSpot = mySpots.splice(idx, 1)[0];
@@ -308,7 +328,9 @@ async function draw() {
         if (!svgW) return;
         let wHtml = "";
         for(let i=0; i<216; i++) {
-            const x = i * hScale + 16; 
+            // CSSで全体を16px右にずらしているため、JS側では0地点から描画することで
+            // アイコンの中心をグリッド線(16pxずれた位置)に合わせる
+            const x = i * hScale; 
             const icon = weatherIcons[allData.weather_code[i]] || "❓";
             wHtml += `<text x="${x}" y="32" font-size="28" text-anchor="middle">${icon}</text>`; 
             const p = allData.precipitation ? allData.precipitation[i] : 0;
@@ -411,7 +433,7 @@ async function draw() {
                         <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${(deg+180)%360})"/></svg></div>風向: ${getWindDirText(deg)} (${deg}°)<br>
                         <div class="icon-box">🚩</div>風速: ${ws?.toFixed(1) || "0.0"}m/s<br>
                         <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>🌡️気温: ${allData.temperature_2m[hourIdx]?.toFixed(1) || "0.0"}℃<br>
-                        <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>💧水温: ${allData.sea_surface_temperature ? allData.sea_surface_temperature[hourIdx]?.toFixed(1) : "---"}℃<br>
+                        <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>💧海水: ${allData.sea_surface_temperature ? allData.sea_surface_temperature[hourIdx]?.toFixed(1) : "---"}℃<br>
                         <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>🌊波高: ${allData.wave_height ? allData.wave_height[hourIdx]?.toFixed(2) : "0.00"}m<br>
                         <div class="icon-box"><span class="legend-line" style="background:#1e90ff; margin-right:0;"></span></div>📏潮位: ${allData.sea_level_height_msl ? allData.sea_level_height_msl[hourIdx]?.toFixed(2) : "0.00"}m
                     `;

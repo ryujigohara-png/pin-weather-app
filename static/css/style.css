@@ -44,23 +44,55 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     font-size: 18px; padding: 4px 15px; 
 }
 
-/* サイドバー */
+/* サイドバー（はみ出し防止修正版） */
 .menu-trigger {
     font-size: 24px; background: none; border: none; cursor: pointer; padding: 0 10px; flex-shrink: 0;
 }
 .sidebar {
-    position: fixed; top: 0; left: -210px; width: 210px; height: 100%;
-    background: #343a40; color: white; transition: 0.3s; z-index: 2500;
-    padding: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.3);
-    box-sizing: border-box; overflow: hidden;
+    position: fixed; top: 0; 
+    left: -250px; /* 余裕を持って深く隠す */
+    width: 210px; height: 100%;
+    background: #ffffff; color: #333333; transition: 0.3s; z-index: 2500; /* 背景を白、文字を濃い色に変更 */
+    padding: 20px; 
+    box-shadow: none; /* 閉じている時は影も消す */
+    box-sizing: border-box; 
+    display: flex;
+    flex-direction: column; /* QRコードを下に配置するため */
 }
-.sidebar.open { left: 0; }
-.sidebar-header { font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #495057; padding-bottom: 10px; }
+.sidebar.open { 
+    left: 0; 
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1); /* 白背景に合わせて影を微調整 */
+}
+.sidebar-header { font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #eeeeee; padding-bottom: 10px; flex-shrink: 0; }
+.sidebar-content { flex-grow: 1; overflow-y: auto; } /* メニュー部分はスクロール可能に */
 .sidebar .btn { width: 100%; margin-bottom: 15px; text-align: left; }
+
+/* 背景の霞（オーバーレイ）を白系に変更 */
 .sidebar-overlay {
     display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.5); z-index: 2400;
+    background: rgba(255, 255, 255, 0.6); /* 黒から白に変更 */
+    backdrop-filter: blur(2px); /* 視認性向上のため軽くぼかしを追加 */
+    z-index: 2400;
 }
+
+/* QRコード表示エリア */
+.sidebar-qr-area {
+    margin-top: auto;
+    padding: 15px 0;
+    text-align: center;
+    border-top: 1px solid #eeeeee;
+    flex-shrink: 0;
+}
+/* 文字色を白背景で見えやすい濃いグレーに変更 */
+.sidebar-qr-area p { font-size: 11px; color: #555555; margin-bottom: 8px; font-weight: bold; }
+#sidebar-qrcode { 
+    display: inline-block; 
+    background: white; 
+    padding: 8px; 
+    border-radius: 4px;
+    border: 1px solid #dddddd; /* 白背景内でQRの領域を明確にするため枠を追加 */
+}
+#sidebar-qrcode img { display: block; width: 120px; height: 120px; }
 
 .btn-wind-config { background: #6f42c1 !important; color: white !important; }
 .btn-reset { background: #dc3545 !important; color: white !important; }
@@ -68,13 +100,17 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
 .current-pos-label { display: none; }
 
 /* モーダル */
+/* 背景の霞（オーバーレイ）を白系に変更 */
 .modal-overlay {
     display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.7); z-index: 3000; justify-content: center; align-items: center;
+    background: rgba(255, 255, 255, 0.7); /* 黒から白に変更 */
+    backdrop-filter: blur(3px); /* 背景をぼかして白系でも中身を目立たせる */
+    z-index: 3000; justify-content: center; align-items: center;
 }
 .modal-content {
     background: white; width: 95%; max-width: 900px; height: 85%; border-radius: 12px;
     display: flex; flex-direction: column; overflow: hidden; position: relative;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2); /* 背景が白いので影を強くして境界を明確化 */
 }
 
 .search-bar { padding: 10px; background: #fff; border-bottom: 1px solid #ddd; display: flex; gap: 8px; z-index: 2100; }
@@ -114,7 +150,7 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
 .modal-footer .guide-text {
     font-size: 11px;
     color: #888;
-    width: 100%;          /* 1枚の板として上に置く */
+    width: 100%;           /* 1枚の板として上に置く */
     text-align: left;
     margin-bottom: 2px;
     padding-left: 4px;
@@ -125,9 +161,9 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     padding: 8px 2px;     /* 上下を詰め、横の余白を最小に */
     height: auto;
     min-height: 0;
-    flex: 1;              /* 3つのボタンで全幅を分け合う */
-    font-size: 12px;      /* スマホの横幅で3つ並べるためのサイズ */
-    white-space: nowrap;  /* 改行禁止 */
+    flex: 1;               /* 3つのボタンで全幅を分け合う */
+    font-size: 12px;       /* スマホの横幅で3つ並べるためのサイズ */
+    white-space: nowrap;   /* 改行禁止 */
     text-align: center;
 }
 
@@ -139,6 +175,12 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
 }
 .scroll-container { overflow-x: auto; position: relative; }
 .chart-stage { width: var(--total-width); position: relative; padding: 20px 0 80px var(--label-box-width); }
+
+/* 案A：グラフの描画要素全体を1時間幅の半分右にずらす */
+/* .chart-section, svg, .date-container {
+    transform: translateX(calc(var(--hour-width) / 2));
+} */
+
 .chart-section { margin-bottom: 50px; position: relative; background: #fff; border: 1px solid #ddd; border-radius: 4px; width: 100%; }
 .section-weather { height: 80px; border: none; margin-bottom: 0px; }
 .section-wind { height: 280px; }
@@ -167,7 +209,7 @@ svg { width: 100%; display: block; overflow: visible; }
 .line-tide { stroke: #1e90ff; stroke-width: 3; fill: none; }
 .wind-arrow { fill: #00d4ff; stroke: #008eb3; stroke-width: 1; }
 
-/* ツールチップ（実線表示のための修正追加） */
+/* ツールチップ */
 .tooltip {
     position: fixed; background: rgba(0,0,0,0.85); color: white;
     padding: 12px 16px; border-radius: 8px; font-size: 14px;
@@ -178,7 +220,7 @@ svg { width: 100%; display: block; overflow: visible; }
 .tooltip b { display: block; margin-bottom: 6px; border-bottom: 1px solid #666; padding-bottom: 2px; }
 .tooltip .spot-name-tip { color: #00d4ff; font-weight: bold; border-bottom: 1px dashed #666; margin-bottom: 4px; padding-bottom: 2px; display: block; }
 
-/* 凡例アイコン用ボックス（幅を揃える） */
+/* 凡例アイコン用ボックス */
 .icon-box {
     display: inline-block;
     width: 24px;
@@ -187,7 +229,7 @@ svg { width: 100%; display: block; overflow: visible; }
     margin-right: 4px;
 }
 
-/* 棒グラフ凡例（実線） */
+/* 棒グラフ凡例 */
 .legend-bar {
     display: inline-block;
     width: 12px;
@@ -195,7 +237,7 @@ svg { width: 100%; display: block; overflow: visible; }
     vertical-align: middle;
 }
 
-/* 折れ線グラフ凡例（実線） */
+/* 折れ線グラフ凡例 */
 .legend-line {
     display: inline-block;
     width: 16px;
