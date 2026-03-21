@@ -49,48 +49,45 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     font-weight: bold; 
     margin-bottom: 20px; 
     border-bottom: 1px solid #eeeeee; 
-    padding-bottom: 15px; /* 余白を少し広めに */
+    padding-bottom: 15px; 
     flex-shrink: 0; 
 }
 
 /* 閉じるボタンのホバー */
 .close-sidebar:hover {
-    color: #dc3545; /* ホバー時に赤色に */
+    color: #dc3545; 
     transition: 0.2s;
 }
 
-/* サイドバー（はみ出し防止修正版） */
+/* サイドバー */
 .menu-trigger {
     font-size: 24px; background: none; border: none; cursor: pointer; padding: 0 10px; flex-shrink: 0;
 }
 .sidebar {
     position: fixed; top: 0; 
-    left: -250px; /* 余裕を持って深く隠す */
+    left: -250px; 
     width: 210px; height: 100%;
-    background: #ffffff; color: #333333; transition: 0.3s; z-index: 2500; /* 背景を白、文字を濃い色に変更 */
+    background: #ffffff; color: #333333; transition: 0.3s; z-index: 2500; 
     padding: 20px; 
-    box-shadow: none; /* 閉じている時は影も消す */
+    box-shadow: none; 
     box-sizing: border-box; 
     display: flex;
-    flex-direction: column; /* QRコードを下に配置するため */
+    flex-direction: column; 
 }
 .sidebar.open { 
     left: 0; 
-    box-shadow: 2px 0 10px rgba(0,0,0,0.1); /* 白背景に合わせて影を微調整 */
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1); 
 }
-.sidebar-header { font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #eeeeee; padding-bottom: 10px; flex-shrink: 0; }
-.sidebar-content { flex-grow: 1; overflow-y: auto; } /* メニュー部分はスクロール可能に */
+.sidebar-content { flex-grow: 1; overflow-y: auto; } 
 .sidebar .btn { width: 100%; margin-bottom: 15px; text-align: left; }
 
-/* 背景の霞（オーバーレイ）を白系に変更 */
 .sidebar-overlay {
     display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(255, 255, 255, 0.6); /* 黒から白に変更 */
-    backdrop-filter: blur(2px); /* 視認性向上のため軽くぼかしを追加 */
+    background: rgba(255, 255, 255, 0.6); 
+    backdrop-filter: blur(2px); 
     z-index: 2400;
 }
 
-/* QRコード表示エリア */
 .sidebar-qr-area {
     margin-top: auto;
     padding: 15px 0;
@@ -98,14 +95,13 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     border-top: 1px solid #eeeeee;
     flex-shrink: 0;
 }
-/* 文字色を白背景で見えやすい濃いグレーに変更 */
 .sidebar-qr-area p { font-size: 11px; color: #555555; margin-bottom: 8px; font-weight: bold; }
 #sidebar-qrcode { 
     display: inline-block; 
     background: white; 
     padding: 8px; 
     border-radius: 4px;
-    border: 1px solid #dddddd; /* 白背景内でQRの領域を明確にするため枠を追加 */
+    border: 1px solid #dddddd; 
 }
 #sidebar-qrcode img { display: block; width: 120px; height: 120px; }
 
@@ -115,17 +111,16 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
 .current-pos-label { display: none; }
 
 /* モーダル */
-/* 背景の霞（オーバーレイ）を白系に変更 */
 .modal-overlay {
     display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(255, 255, 255, 0.7); /* 黒から白に変更 */
-    backdrop-filter: blur(3px); /* 背景をぼかして白系でも中身を目立たせる */
+    background: rgba(255, 255, 255, 0.7); 
+    backdrop-filter: blur(3px); 
     z-index: 3000; justify-content: center; align-items: center;
 }
 .modal-content {
     background: white; width: 95%; max-width: 900px; height: 85%; border-radius: 12px;
     display: flex; flex-direction: column; overflow: hidden; position: relative;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2); /* 背景が白いので影を強くして境界を明確化 */
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2); 
 }
 
 .search-bar { padding: 10px; background: #fff; border-bottom: 1px solid #ddd; display: flex; gap: 8px; z-index: 2100; }
@@ -149,40 +144,36 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     text-align: center; font-size: 14px; color: #666;
 }
 
-/* 地図最大化のためのフッター調整（横3列配置） */
+/* 地図最大化のためのフッター調整 */
 .modal-footer { 
     padding: 6px 8px; 
     display: flex; 
-    flex-wrap: wrap;       /* ガイドテキストとボタンエリアの分離用 */
+    flex-wrap: wrap; 
     justify-content: space-between; 
     align-items: center;
     gap: 4px; 
     background: #f8f9fa; 
     border-top: 1px solid #ddd;
 }
-
-/* 「地点をクリックしてください」のガイドライン（最上部に薄く配置） */
 .modal-footer .guide-text {
     font-size: 11px;
     color: #888;
-    width: 100%;           /* 1枚の板として上に置く */
+    width: 100%; 
     text-align: left;
     margin-bottom: 2px;
     padding-left: 4px;
 }
-
-/* ボタン3つを横一列に均等配置 */
 .modal-footer .btn {
-    padding: 8px 2px;     /* 上下を詰め、横の余白を最小に */
+    padding: 8px 2px; 
     height: auto;
     min-height: 0;
-    flex: 1;               /* 3つのボタンで全幅を分け合う */
-    font-size: 12px;       /* スマホの横幅で3つ並べるためのサイズ */
-    white-space: nowrap;   /* 改行禁止 */
+    flex: 1; 
+    font-size: 12px; 
+    white-space: nowrap; 
     text-align: center;
 }
 
-/* グラフ */
+/* グラフ（余白修正版） */
 .main-card { 
     max-width: 1500px; margin: auto; background: white; 
     border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
@@ -191,15 +182,17 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
 .scroll-container { overflow-x: auto; position: relative; }
 .chart-stage { width: var(--total-width); position: relative; padding: 20px 0 80px var(--label-box-width); }
 
-/* 案A：グラフの描画要素全体を1時間幅の半分右にずらす */
-/* .chart-section, svg, .date-container {
-    transform: translateX(calc(var(--hour-width) / 2));
-} */
-
-.chart-section { margin-bottom: 50px; position: relative; background: #fff; border: 1px solid #ddd; border-radius: 4px; width: 100%; }
+.chart-section { 
+    margin-bottom: -1px; /* 50pxから変更：枠線を重ねて隙間を排除 */
+    position: relative; 
+    background: #fff; 
+    border: 1px solid #ddd; 
+    border-radius: 0; /* 隙間をなくすため角丸を解除 */
+    width: 100%; 
+}
 .section-weather { height: 80px; border: none; margin-bottom: 0px; }
-.section-wind { height: 280px; }
-.section-temp, .section-marine { height: 160px; }
+.section-wind { height: 280px; margin-bottom: 0px; }
+.section-temp, .section-marine { height: 160px; margin-bottom: 0px; }
 
 .sticky-label {
     position: sticky; left: 0; top: 0; width: var(--label-box-width);
@@ -235,30 +228,9 @@ svg { width: 100%; display: block; overflow: visible; }
 .tooltip b { display: block; margin-bottom: 6px; border-bottom: 1px solid #666; padding-bottom: 2px; }
 .tooltip .spot-name-tip { color: #00d4ff; font-weight: bold; border-bottom: 1px dashed #666; margin-bottom: 4px; padding-bottom: 2px; display: block; }
 
-/* 凡例アイコン用ボックス */
-.icon-box {
-    display: inline-block;
-    width: 24px;
-    text-align: center;
-    vertical-align: middle;
-    margin-right: 4px;
-}
-
-/* 棒グラフ凡例 */
-.legend-bar {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    vertical-align: middle;
-}
-
-/* 折れ線グラフ凡例 */
-.legend-line {
-    display: inline-block;
-    width: 16px;
-    height: 3px;
-    vertical-align: middle;
-}
+.icon-box { display: inline-block; width: 24px; text-align: center; vertical-align: middle; margin-right: 4px; }
+.legend-bar { display: inline-block; width: 12px; height: 12px; vertical-align: middle; }
+.legend-line { display: inline-block; width: 16px; height: 3px; vertical-align: middle; }
 
 #hover-guide { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(255,0,0,0.3); display: none; pointer-events: none; z-index: 5; }
 .footer-info { 

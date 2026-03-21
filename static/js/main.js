@@ -416,6 +416,10 @@ async function fetchWithCache(lat, lon) {
     return mergedData;
 }
 
+/**
+ * サブルーチン：メイン描画処理
+ * グラフ余白、現在時刻線、およびターゲット外強風の「霞がかった赤」を反映した完全版
+ */
 async function draw() {
     try {
         allData = await fetchWithCache(currentLat, currentLon);
@@ -431,7 +435,11 @@ async function draw() {
         }
         svgW.innerHTML = wHtml;
 
-        function renderSection(svgId, dateContId, datasets, height, stepY, isWind = false) {
+        // 現在時刻のインデックスを計算
+        const now = new Date();
+        const nowIdx = allData.time.findIndex(t => new Date(t) > now) - 1;
+
+        function renderSection(svgId, dateContId, datasets, height, stepY, isWind = false, isLast = false) {
             const svg = document.getElementById(svgId);
             const dateCont = document.getElementById(dateContId);
             if (!svg || !dateCont) return;
@@ -442,28 +450,53 @@ async function draw() {
             let min = Math.floor(Math.min(...allVals) / stepY) * stepY;
             if (isWind) min = 0;
             const range = (max - min) || 1;
-            const plotHeight = height - 40; 
+            const plotHeight = height - 20; // 1文字分の余白を確保
             let html = "";
+
+            // グリッド線（横）
             for (let v = min; v <= max; v += stepY) {
                 const yPosSvg = plotHeight - (((v - min) / range) * plotHeight);
                 html += `<line x1="0" y1="${yPosSvg}" x2="6912" y2="${yPosSvg}" class="grid-y-sub" />`;
             }
+
+            // 軸・ラベル（縦）
             for (let i = 0; i <= 216; i++) {
                 const x = i * hScale;
                 const d = new Date(allData.time[i]);
                 if (i % 24 === 0 && i < 216) {
-                    html += `<line x1="${x}" y1="-10" x2="${x}" y2="${plotHeight + 30}" class="grid-day" />`;
+                    html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight}" class="grid-day" />`;
                     const dateDiv = document.createElement('div');
                     dateDiv.className = 'sticky-date';
                     dateDiv.style.left = `${x}px`;
                     dateDiv.dataset.x = x;
-                    dateDiv.innerText = `${d.getMonth()+1}/${d.getDate()}`;
+                    
+                    const weekDays = ["日", "月", "火", "水", "木", "金", "土"];
+                    const dayIdx = d.getDay();
+                    const dayStr = weekDays[dayIdx];
+                    let dayColor = "#000000"; 
+                    if (dayIdx === 0) dayColor = "#FF0000"; 
+                    else if (dayIdx === 6) dayColor = "#0000FF"; 
+
+                    if (isLast) {
+                        dateDiv.innerHTML = `<span style="color:${dayColor}">${d.getMonth()+1}/${d.getDate()}(${dayStr})</span>`;
+                    } else {
+                        dateDiv.innerText = ""; 
+                    }
                     dateCont.appendChild(dateDiv);
                 } else if (i % 3 === 0 && i < 216) {
-                    html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight + 20}" class="grid-3h" />`;
-                    html += `<text x="${x}" y="${plotHeight + 25}" class="label-time" text-anchor="middle">${d.getHours()}</text>`;
+                    html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight}" class="grid-3h" />`;
+                    if (isLast) {
+                        html += `<text x="${x}" y="${plotHeight + 15}" class="label-time" text-anchor="middle">${d.getHours()}</text>`;
+                    }
                 }
             }
+
+            // 現在時刻の縦線
+            if (nowIdx >= 0 && nowIdx < 216) {
+                const nowX = nowIdx * hScale;
+                html += `<line x1="${nowX}" y1="0" x2="${nowX}" y2="${plotHeight}" class="grid-now" stroke="#0000FF" stroke-width="2" />`;
+            }
+
             datasets.forEach(ds => {
                 if (ds.type === 'bar') {
                     ds.data.forEach((v, i) => {
@@ -472,10 +505,28 @@ async function draw() {
                         const x = i * hScale;
                         const deg = allData.wind_direction_10m[i];
                         const dirText = getWindDirText(deg);
+                        
                         let color = "#ccc"; 
-                        if (val >= 10.0) color = '#dc143c'; 
-                        else if (targetWindDirections.includes(dirText)) color = val >= 5 ? '#ffa500' : '#87ceeb';
+                        const isTargetDir = targetWindDirections.includes(dirText);
+                        
+                        if (isTargetDir) {
+                            // 1. 選んだ風向（ターゲット）の場合
+                            if (val >= 10.0) {
+                                color = '#dc143c'; // ターゲットかつ10m/s以上は「はっきりした赤」
+                            } else {
+                                color = val >= 5 ? '#ffa500' : '#87ceeb';
+                            }
+                        } else {
+                            // 2. 選んでいない風向の場合
+                            if (val >= 10.0) {
+                                color = 'rgba(220, 20, 60, 0.4)'; // ターゲット外かつ10m/s以上は「霞がかった赤」
+                            } else {
+                                color = '#ccc'; // それ以外はグレー
+                            }
+                        }
+                        
                         html += `<rect x="${x - (hScale*0.4)}" y="${plotHeight-h}" width="${hScale*0.8}" height="${h}" fill="${color}" />`;
+                        
                         if (isWind) {
                             const rot = (deg + 180) % 360;
                             html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-25}) rotate(${rot}) scale(1.6)" class="wind-arrow" />`;
@@ -489,9 +540,9 @@ async function draw() {
             svg.innerHTML = html;
         }
 
-        renderSection("svg-wind", "date-wind", [{ data: allData.wind_speed_10m, type: 'bar' }], 280, 5.0, true);
-        renderSection("svg-temps", "date-temp", [{ data: allData.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], 160, 5.0);
-        renderSection("svg-marine", "date-marine", [{ data: allData.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.sea_level_height_msl, type: 'line', cls: 'line-tide' }], 160, 0.5);
+        renderSection("svg-wind", "date-wind", [{ data: allData.wind_speed_10m, type: 'bar' }], 280, 5.0, true, false);
+        renderSection("svg-temps", "date-temp", [{ data: allData.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], 160, 5.0, false, false);
+        renderSection("svg-marine", "date-marine", [{ data: allData.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.sea_level_height_msl, type: 'line', cls: 'line-tide' }], 160, 0.5, false, true);
 
         const scrollRoot = document.getElementById('scroll-root');
         if (scrollRoot) {
@@ -536,5 +587,4 @@ async function draw() {
         }
     } catch (e) { console.error(e); }
 }
-
 initApp();
