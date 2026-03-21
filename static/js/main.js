@@ -418,18 +418,24 @@ async function fetchWithCache(lat, lon) {
 
 /**
  * サブルーチン：メイン描画処理
- * スクロール量の二重加算（ダブルカウント）を解消し、表示とデータのズレを修正したコード。
+ * 6時間前からの表示に対応し、マウス位置計算も同期させた完全版。
  */
 async function draw() {
     try {
         allData = await fetchWithCache(currentLat, currentLon);
         const svgW = document.getElementById('svg-weather');
         if (!svgW) return;
-        
-        // --- 天気アイコン描画 ---
+
+        // --- 1. 基準インデックスの計算 ---
+        const now = new Date();
+        const nowIdx = allData.time.findIndex(t => new Date(t) > now) - 1;
+        // 6時間前をスタート地点にする（0未満にならないよう補正）
+        const startIdx = Math.max(0, nowIdx - 6);
+
+        // --- 2. 天気アイコン・降水量描画（startIdxから開始） ---
         let wHtml = "";
-        for(let i=0; i<216; i++) {
-            const x = i * hScale; 
+        for(let i = startIdx; i < 216; i++) {
+            const x = (i - startIdx) * hScale; 
             const icon = weatherIcons[allData.weather_code[i]] || "❓";
             wHtml += `<text x="${x}" y="32" font-size="28" text-anchor="middle">${icon}</text>`; 
             const p = allData.precipitation ? allData.precipitation[i] : 0;
@@ -437,10 +443,6 @@ async function draw() {
         }
         svgW.innerHTML = wHtml;
 
-        const now = new Date();
-        const nowIdx = allData.time.findIndex(t => new Date(t) > now) - 1;
-
-        // --- 各セクション描画関数 ---
         function renderSection(svgId, dateContId, datasets, height, stepY, isWind = false, isLast = false) {
             const svg = document.getElementById(svgId);
             const dateCont = document.getElementById(dateContId);
@@ -461,8 +463,8 @@ async function draw() {
                 html += `<line x1="0" y1="${yPosSvg}" x2="6912" y2="${yPosSvg}" class="grid-y-sub" />`;
             }
 
-            for (let i = 0; i <= 216; i++) {
-                const x = i * hScale;
+            for (let i = startIdx; i <= 216; i++) {
+                const x = (i - startIdx) * hScale;
                 const d = new Date(allData.time[i]);
                 if (i % 24 === 0 && i < 216) {
                     html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight}" class="grid-day" />`;
@@ -480,8 +482,6 @@ async function draw() {
 
                     if (isLast) {
                         dateDiv.innerHTML = `<span style="color:${dayColor}">${d.getMonth()+1}/${d.getDate()}(${dayStr})</span>`;
-                    } else {
-                        dateDiv.innerText = ""; 
                     }
                     dateCont.appendChild(dateDiv);
                 } else if (i % 3 === 0 && i < 216) {
@@ -492,17 +492,19 @@ async function draw() {
                 }
             }
 
-            if (nowIdx >= 0 && nowIdx < 216) {
-                const nowX = nowIdx * hScale;
+            // 現在時刻線
+            if (nowIdx >= startIdx) {
+                const nowX = (nowIdx - startIdx) * hScale;
                 html += `<line x1="${nowX}" y1="0" x2="${nowX}" y2="${plotHeight}" class="grid-now" stroke="#0000FF" stroke-width="2" />`;
             }
 
             datasets.forEach(ds => {
                 if (ds.type === 'bar') {
                     ds.data.forEach((v, i) => {
+                        if (i < startIdx) return;
                         const val = v || 0;
                         const h = ((val - min) / range) * plotHeight;
-                        const x = i * hScale;
+                        const x = (i - startIdx) * hScale;
                         const deg = allData.wind_direction_10m[i];
                         const dirText = getWindDirText(deg);
                         let color = "#ccc"; 
@@ -518,61 +520,47 @@ async function draw() {
                         }
                     });
                 } else {
-                    const pts = (ds.data || []).map((v, i) => `${i * hScale},${plotHeight - (((v || 0) - min) / range) * plotHeight}`).join(" ");
-                    html += `<polyline class="${ds.cls}" points="${pts}" />`;
+                    const pts = [];
+                    for(let i = startIdx; i < (ds.data || []).length; i++) {
+                        const v = ds.data[i] || 0;
+                        pts.push(`${(i - startIdx) * hScale},${plotHeight - (((v - min) / range) * plotHeight)}`);
+                    }
+                    html += `<polyline class="${ds.cls}" points="${pts.join(" ")}" />`;
                 }
             });
             svg.innerHTML = html;
         }
 
-        // --- 全セクション描画実行 ---
         renderSection("svg-wind", "date-wind", [{ data: allData.wind_speed_10m, type: 'bar' }], 280, 5.0, true, false);
         renderSection("svg-temps", "date-temp", [{ data: allData.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], 160, 5.0, false, false);
         renderSection("svg-marine", "date-marine", [{ data: allData.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.sea_level_height_msl, type: 'line', cls: 'line-tide' }], 160, 0.5, false, true);
 
-        // --- インタラクション制御 ---
+        // --- 3. インタラクション ---
         const scrollRoot = document.getElementById('scroll-root');
         const stage = document.getElementById('stage');
         const guide = document.getElementById('hover-guide');
         const tooltip = document.getElementById('tooltip');
 
-        if (scrollRoot) {
-            scrollRoot.onscroll = () => {
-                const sl = scrollRoot.scrollLeft;
-                document.querySelectorAll('.sticky-date').forEach(el => {
-                    const x = parseFloat(el.dataset.x);
-                    const nextX = x + (24 * hScale);
-                    el.style.left = (sl >= x && sl < nextX - 80) ? (sl - 100) + "px" : x + "px";
-                });
-            };
-        }
-
         if (stage && guide && tooltip) {
             stage.onmousemove = (e) => {
                 const rect = stage.getBoundingClientRect();
-                
-                // e.clientX - rect.left の時点ですでに「stage内の絶対座標」になります。
-                // scrollLeft の二重加算を削除し、純粋にラベル幅(100)だけを引きます。
                 const graphX = (e.clientX - rect.left) - 100;
-
                 if (graphX < 0) {
                     guide.style.display = "none";
                     tooltip.style.display = "none";
                     return;
                 }
 
-                let hourIdx = Math.round(graphX / hScale);
-                if (hourIdx < 0) hourIdx = 0;
+                // startIdx 分を足して正しいデータインデックスを参照
+                let hourIdx = Math.round(graphX / hScale) + startIdx;
+                if (hourIdx < startIdx) hourIdx = startIdx;
                 if (hourIdx >= 216) hourIdx = 215;
 
-                // ガイド線の位置（stage内の絶対座標）
-                const snapX = (hourIdx * hScale) + 100;
+                const snapX = ((hourIdx - startIdx) * hScale) + 100;
                 guide.style.left = snapX + "px"; 
                 guide.style.display = "block";
                 
                 tooltip.style.display = "block";
-                
-                // ツールチップ位置（画面上の座標）
                 let tx = e.clientX + 20;
                 if (tx + 220 > window.innerWidth) tx = e.clientX - 240;
                 tooltip.style.left = tx + "px";
@@ -592,12 +580,31 @@ async function draw() {
                     <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>💧海水: ${allData.sea_surface_temperature ? allData.sea_surface_temperature[hourIdx]?.toFixed(1) : "---"}℃<br>
                     <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>🌊波高: ${allData.wave_height ? allData.wave_height[hourIdx]?.toFixed(2) : "0.00"}m<br>
                     <div class="icon-box"><span class="legend-line" style="background:#1e90ff; margin-right:0;"></span></div>📏潮位: ${allData.sea_level_height_msl ? allData.sea_level_height_msl[hourIdx]?.toFixed(2) : "0.00"}m
-                    `;
+               `;
             };
             stage.onmouseleave = () => { guide.style.display = "none"; tooltip.style.display = "none"; };
         }
     } catch (e) { console.error(e); }
 }
+
+/**
+ * 監視リスナー：4時間経過判定
+ * ブラウザがアクティブになった際、キャッシュが古い場合は再描画します。
+ */
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        const keys = Object.keys(localStorage).filter(k => k.startsWith('weather_cache_'));
+        if (keys.length === 0) return;
+        
+        const cached = JSON.parse(localStorage.getItem(keys[0]));
+        const now = Date.now();
+        // 4時間 = 14,400,000ミリ秒
+        if (now - cached.timestamp > 4 * 60 * 60 * 1000) {
+            console.log("4時間以上経過したため、再描画を実行します");
+            draw();
+        }
+    }
+});
 
 
 
