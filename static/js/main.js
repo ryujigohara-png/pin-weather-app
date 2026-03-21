@@ -418,7 +418,7 @@ async function fetchWithCache(lat, lon) {
 
 /**
  * サブルーチン：メイン描画処理
- * グラフ余白、現在時刻線、およびターゲット外強風の「霞がかった赤」を反映した完全版
+ * グラフ余白、現在時刻線、強風色分け、およびスマホ対応ツールチップ（追従・反転）を反映
  */
 async function draw() {
     try {
@@ -435,7 +435,6 @@ async function draw() {
         }
         svgW.innerHTML = wHtml;
 
-        // 現在時刻のインデックスを計算
         const now = new Date();
         const nowIdx = allData.time.findIndex(t => new Date(t) > now) - 1;
 
@@ -450,16 +449,14 @@ async function draw() {
             let min = Math.floor(Math.min(...allVals) / stepY) * stepY;
             if (isWind) min = 0;
             const range = (max - min) || 1;
-            const plotHeight = height - 20; // 1文字分の余白を確保
+            const plotHeight = height - 20; 
             let html = "";
 
-            // グリッド線（横）
             for (let v = min; v <= max; v += stepY) {
                 const yPosSvg = plotHeight - (((v - min) / range) * plotHeight);
                 html += `<line x1="0" y1="${yPosSvg}" x2="6912" y2="${yPosSvg}" class="grid-y-sub" />`;
             }
 
-            // 軸・ラベル（縦）
             for (let i = 0; i <= 216; i++) {
                 const x = i * hScale;
                 const d = new Date(allData.time[i]);
@@ -491,7 +488,6 @@ async function draw() {
                 }
             }
 
-            // 現在時刻の縦線
             if (nowIdx >= 0 && nowIdx < 216) {
                 const nowX = nowIdx * hScale;
                 html += `<line x1="${nowX}" y1="0" x2="${nowX}" y2="${plotHeight}" class="grid-now" stroke="#0000FF" stroke-width="2" />`;
@@ -510,19 +506,11 @@ async function draw() {
                         const isTargetDir = targetWindDirections.includes(dirText);
                         
                         if (isTargetDir) {
-                            // 1. 選んだ風向（ターゲット）の場合
-                            if (val >= 10.0) {
-                                color = '#dc143c'; // ターゲットかつ10m/s以上は「はっきりした赤」
-                            } else {
-                                color = val >= 5 ? '#ffa500' : '#87ceeb';
-                            }
+                            if (val >= 10.0) color = '#dc143c';
+                            else color = val >= 5 ? '#ffa500' : '#87ceeb';
                         } else {
-                            // 2. 選んでいない風向の場合
-                            if (val >= 10.0) {
-                                color = 'rgba(220, 20, 60, 0.4)'; // ターゲット外かつ10m/s以上は「霞がかった赤」
-                            } else {
-                                color = '#ccc'; // それ以外はグレー
-                            }
+                            if (val >= 10.0) color = 'rgba(220, 20, 60, 0.4)';
+                            else color = '#ccc';
                         }
                         
                         html += `<rect x="${x - (hScale*0.4)}" y="${plotHeight-h}" width="${hScale*0.8}" height="${h}" fill="${color}" />`;
@@ -545,6 +533,10 @@ async function draw() {
         renderSection("svg-marine", "date-marine", [{ data: allData.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.sea_level_height_msl, type: 'line', cls: 'line-tide' }], 160, 0.5, false, true);
 
         const scrollRoot = document.getElementById('scroll-root');
+        const stage = document.getElementById('stage');
+        const guide = document.getElementById('hover-guide');
+        const tooltip = document.getElementById('tooltip');
+
         if (scrollRoot) {
             scrollRoot.onscroll = () => {
                 const sl = scrollRoot.scrollLeft;
@@ -553,19 +545,49 @@ async function draw() {
                     const nextX = x + (24 * hScale);
                     el.style.left = (sl >= x && sl < nextX - 80) ? (sl - 100) + "px" : x + "px";
                 });
+                // スクロール中もツールチップの位置を更新
+                if (tooltip && tooltip.style.display === "block" && lastMouseX !== undefined) {
+                    updateTooltipPos(lastMouseX, lastMouseY);
+                }
             };
         }
 
-        const stage = document.getElementById('stage');
-        const guide = document.getElementById('hover-guide');
-        const tooltip = document.getElementById('tooltip');
+        let lastMouseX, lastMouseY;
+        function updateTooltipPos(clientX, clientY) {
+            if (!tooltip || !scrollRoot) return;
+            const tw = tooltip.offsetWidth;
+            const winW = window.innerWidth;
+            
+            // 1. 左右反転ロジック: 画面右半分に指があるなら左に表示
+            let posX = clientX + 20;
+            if (clientX > winW / 2) {
+                posX = clientX - tw - 20;
+            }
+
+            // 2. クランプ処理: 画面外にはみ出さないように制限
+            posX = Math.max(10, Math.min(posX, winW - tw - 10));
+
+            tooltip.style.left = posX + "px";
+            tooltip.style.top = (clientY + 20) + "px";
+        }
+
         if (stage && guide && tooltip) {
             stage.onmousemove = (e) => {
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
                 const rect = stage.getBoundingClientRect();
-                const hourIdx = Math.round((e.clientX - rect.left - 100) / hScale);
+                const sl = scrollRoot ? scrollRoot.scrollLeft : 0;
+                // スクロール量を加味してインデックスを計算
+                const hourIdx = Math.round((e.clientX - rect.left + sl - 100) / hScale);
+
                 if (hourIdx >= 0 && hourIdx < 216) {
-                    guide.style.left = (hourIdx * hScale + 100) + "px"; guide.style.display = "block";
-                    tooltip.style.display = "block"; tooltip.style.left = (e.clientX + 20) + "px"; tooltip.style.top = (e.clientY + 20) + "px";
+                    // 時刻線(guide)の位置設定（スクロール追従のため sl を引く）
+                    guide.style.left = (hourIdx * hScale + 100 - sl) + "px"; 
+                    guide.style.display = "block";
+                    
+                    tooltip.style.display = "block";
+                    updateTooltipPos(e.clientX, e.clientY);
+
                     const d = new Date(allData.time[hourIdx]); 
                     const deg = allData.wind_direction_10m[hourIdx];
                     const ws = allData.wind_speed_10m[hourIdx];
@@ -587,4 +609,5 @@ async function draw() {
         }
     } catch (e) { console.error(e); }
 }
+
 initApp();
