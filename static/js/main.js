@@ -43,39 +43,120 @@ function generateSidebarQRCode() {
     document.head.appendChild(script);
 }
 
+/**
+ * サブルーチン：環境判定とUIへの反映 (折衷案)
+ * 1. ヘッダー背景色を変更 (案2)
+ * 2. フッター免責事項の下に環境名を表示 (案1)
+ */
+function applyEnvVisuals() {
+    const hostname = window.location.hostname;
+    let config = {};
+
+    // 1. 環境判定ロジック
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.includes("192.168.")) {
+        config = {
+            titleSuffix: " [Local]",
+            headerColor: "#27ae60", // 安心の「緑」
+            envName: "PC Localhost"
+        };
+    } else if (hostname.includes("beta")) {
+        config = {
+            titleSuffix: " (B)",
+            headerColor: "#d35400", // 注意の「オレンジ」
+            envName: "Beta版"
+        };
+    } else {
+        config = {
+            titleSuffix: "",
+            headerColor: "#2c3e50", // 信頼の「ネイビー」
+            envName: "Main版"
+        };
+    }
+
+    // 2. ヘッダー背景色の反映 (案2)
+    const headerEl = document.querySelector('.header-bar') || document.querySelector('header');
+    if (headerEl) {
+        headerEl.style.backgroundColor = config.headerColor;
+        headerEl.style.transition = "background-color 0.3s ease";
+    }
+
+    // 3. フッター免責事項の下にバッジを表示 (案1)
+    const footerDisclaimer = document.querySelector('.disclaimer') || document.querySelector('footer p');
+    if (footerDisclaimer) {
+        const oldBadge = document.getElementById('footer-env-badge');
+        if (oldBadge) oldBadge.remove();
+
+        const badge = document.createElement('div');
+        badge.id = 'footer-env-badge';
+        badge.style.marginTop = "8px";
+        badge.style.fontSize = "10px";
+        badge.style.color = "#888";
+        badge.style.textAlign = "center";
+        badge.innerText = `Running on: ${config.envName}`;
+        
+        footerDisclaimer.parentNode.insertBefore(badge, footerDisclaimer.nextSibling);
+    }
+
+    // ブラウザタブ名の更新
+    if (!document.title.includes(config.titleSuffix)) {
+        document.title += config.titleSuffix;
+    }
+}
+
+/**
+ * サブルーチン：アプリ初期化
+ */
 function initApp() {
+    applyEnvVisuals(); 
     renderTabs();
     initCompassUI();
     updateLocation(currentLat, currentLon, currentLabel);
     
-    // サイドバーのQRコードを生成
     generateSidebarQRCode();
 
-    document.getElementById('map-search-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') executeMapSearch();
-    });
-    document.getElementById('map-search-btn').onclick = executeMapSearch;
+    const searchInput = document.getElementById('map-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') executeMapSearch();
+        });
+    }
     
-    document.getElementById('wind-cfg-btn').onclick = () => {
-        toggleSidebar();
-        openModal('wind-modal');
-    };
+    const searchBtn = document.getElementById('map-search-btn');
+    if (searchBtn) searchBtn.onclick = executeMapSearch;
     
-    document.getElementById('apply-wind-btn').onclick = () => {
-        localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
-        closeModal('wind-modal');
-        draw();
-    };
+    const windCfgBtn = document.getElementById('wind-cfg-btn');
+    if (windCfgBtn) {
+        windCfgBtn.onclick = () => {
+            toggleSidebar();
+            openModal('wind-modal');
+        };
+    }
+    
+    const applyWindBtn = document.getElementById('apply-wind-btn');
+    if (applyWindBtn) {
+        applyWindBtn.onclick = () => {
+            localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
+            closeModal('wind-modal');
+            draw();
+        };
+    }
 
     const gpsBtn = document.getElementById('gps-btn');
     if (gpsBtn) gpsBtn.onclick = () => handleGPSClick();
+    
     const mapBtn = document.getElementById('map-btn');
-    if (mapBtn) mapBtn.onclick = () => { openMap(); renderTabs("🗺️ Map"); };
+    if (mapBtn) {
+        mapBtn.onclick = () => { 
+            openMap(); 
+            renderTabs("🗺️ Map"); 
+        };
+    }
 }
 
 function toggleSidebar() {
     const sb = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
+    if (!sb || !overlay) return;
     const isOpen = sb.classList.contains('open');
     if (isOpen) {
         sb.classList.remove('open');
@@ -92,6 +173,8 @@ function initCompassUI() {
     const radius = 130; 
     const centerX = 160; 
     const centerY = 160;
+
+    container.innerHTML = '<div class="compass-center">ALL</div>';
 
     windDirs.forEach((dir, i) => {
         const angle = (i * 22.5 - 90) * (Math.PI / 180);
@@ -211,18 +294,22 @@ function confirmDelete(index) {
     }
 }
 
-document.getElementById('reset-all-btn').onclick = () => {
-    if (confirm("初期化しますか？")) {
-        toggleSidebar();
-        mySpots = JSON.parse(JSON.stringify(defaultSpots));
-        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-        targetWindDirections = [...windDirs];
-        localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
-        updateLocation(mySpots[0].lat, mySpots[0].lon, mySpots[0].label);
-    }
-};
+const resetBtn = document.getElementById('reset-all-btn');
+if (resetBtn) {
+    resetBtn.onclick = () => {
+        if (confirm("初期化しますか？")) {
+            toggleSidebar();
+            mySpots = JSON.parse(JSON.stringify(defaultSpots));
+            localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+            targetWindDirections = [...windDirs];
+            localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
+            updateLocation(mySpots[0].lat, mySpots[0].lon, mySpots[0].label);
+        }
+    };
+}
 
-document.getElementById('add-btn').onclick = () => openMap();
+const addBtn = document.getElementById('add-btn');
+if (addBtn) addBtn.onclick = () => openMap();
 
 function openMap() {
     openModal('map-modal');
@@ -240,11 +327,19 @@ function openMap() {
     tempMarker = L.marker([currentLat, currentLon]).addTo(map);
 }
 
-function openModal(id) { document.getElementById(id).style.display = 'flex'; }
-function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+function openModal(id) { 
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'flex'; 
+}
+function closeModal(id) { 
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none'; 
+}
 
 async function executeMapSearch() {
-    const query = document.getElementById('map-search-input').value;
+    const input = document.getElementById('map-search-input');
+    if (!input) return;
+    const query = input.value;
     if (!query) return;
     try {
         const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&accept-language=ja`);
@@ -273,18 +368,26 @@ async function fetchAddressInfo(lat, lng) {
         const data = await res.json();
         const addr = data.address;
         const name = addr.city || addr.town || addr.village || "新規地点";
-        document.getElementById('temp-view-btn').onclick = () => { updateLocation(lat, lng, name + "(未)"); closeModal('map-modal'); };
-        document.getElementById('temp-view-btn').disabled = false;
-        document.getElementById('save-spot-btn').onclick = () => {
-            const spotName = prompt("地点名", name);
-            if (spotName) {
-                mySpots.push({lat, lon: lng, label: spotName});
-                localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-                updateLocation(lat, lng, spotName);
-                closeModal('map-modal');
-            }
-        };
-        document.getElementById('save-spot-btn').disabled = false;
+        
+        const tempBtn = document.getElementById('temp-view-btn');
+        if (tempBtn) {
+            tempBtn.onclick = () => { updateLocation(lat, lng, name + "(未)"); closeModal('map-modal'); };
+            tempBtn.disabled = false;
+        }
+        
+        const saveBtn = document.getElementById('save-spot-btn');
+        if (saveBtn) {
+            saveBtn.onclick = () => {
+                const spotName = prompt("地点名", name);
+                if (spotName) {
+                    mySpots.push({lat, lon: lng, label: spotName});
+                    localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                    updateLocation(lat, lng, spotName);
+                    closeModal('map-modal');
+                }
+            };
+            saveBtn.disabled = false;
+        }
     } catch (err) { console.error(err); }
 }
 
@@ -328,8 +431,6 @@ async function draw() {
         if (!svgW) return;
         let wHtml = "";
         for(let i=0; i<216; i++) {
-            // CSSで全体を16px右にずらしているため、JS側では0地点から描画することで
-            // アイコンの中心をグリッド線(16pxずれた位置)に合わせる
             const x = i * hScale; 
             const icon = weatherIcons[allData.weather_code[i]] || "❓";
             wHtml += `<text x="${x}" y="32" font-size="28" text-anchor="middle">${icon}</text>`; 
