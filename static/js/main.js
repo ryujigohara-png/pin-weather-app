@@ -1,0 +1,451 @@
+let allData = {};
+const hScale = 32;
+const CACHE_DURATION = 4 * 60 * 60 * 1000; 
+
+const windDirs = ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"];
+const defaultSpots = [
+    {lat: 31.337, lon: 130.795, label: "高須沖(鹿児島県)"},
+    {lat: 35.30, lon: 139.48, label: "江の島沖(神奈川県)"}
+];
+
+let mySpots = JSON.parse(localStorage.getItem('pin_weather_spots')) || defaultSpots;
+let targetWindDirections = JSON.parse(localStorage.getItem('pin_weather_wind_filter')) || [...windDirs];
+
+let currentLat = mySpots[0].lat;
+let currentLon = mySpots[0].lon;
+let currentLabel = mySpots[0].label;
+
+let map, tempMarker;
+
+function initApp() {
+    renderTabs();
+    initCompassUI();
+    updateLocation(currentLat, currentLon, currentLabel);
+    
+    new Sortable(document.getElementById('spot-tabs'), {
+        animation: 150,
+        onEnd: () => { saveSpotsOrder(); }
+    });
+
+    document.getElementById('map-search-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') executeMapSearch();
+    });
+    document.getElementById('map-search-btn').onclick = executeMapSearch;
+    
+    document.getElementById('wind-cfg-btn').onclick = () => {
+        toggleSidebar();
+        openModal('wind-modal');
+    };
+    
+    document.getElementById('apply-wind-btn').onclick = () => {
+        localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
+        closeModal('wind-modal');
+        draw();
+    };
+
+    // 既存のGPS/Mapボタンの挙動を新しい描画ロジックに紐付け
+    document.getElementById('gps-btn').onclick = () => handleGPSClick();
+    document.getElementById('map-btn').onclick = () => {
+        openMap();
+        renderTabs("🗺️ Map");
+    };
+}
+
+function toggleSidebar() {
+    const sb = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const isOpen = sb.classList.contains('open');
+    if (isOpen) {
+        sb.classList.remove('open');
+        overlay.style.display = 'none';
+    } else {
+        sb.classList.add('open');
+        overlay.style.display = 'block';
+    }
+}
+
+function initCompassUI() {
+    const container = document.getElementById('compass-ui');
+    const radius = 130; 
+    const centerX = 160; 
+    const centerY = 160;
+
+    windDirs.forEach((dir, i) => {
+        const angle = (i * 22.5 - 90) * (Math.PI / 180);
+        const x = centerX + radius * Math.cos(angle) - 30;
+        const y = centerY + radius * Math.sin(angle) - 15;
+
+        const el = document.createElement('div');
+        el.className = 'compass-label' + (targetWindDirections.includes(dir) ? ' active' : '');
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+        el.innerText = dir;
+        el.onclick = () => {
+            if (targetWindDirections.includes(dir)) {
+                targetWindDirections = targetWindDirections.filter(d => d !== dir);
+                el.classList.remove('active');
+            } else {
+                targetWindDirections.push(dir);
+                el.classList.add('active');
+            }
+        };
+        container.appendChild(el);
+    });
+
+    container.querySelector('.compass-center').onclick = () => {
+        const labels = container.querySelectorAll('.compass-label');
+        if (targetWindDirections.length > 0) {
+            targetWindDirections = [];
+            labels.forEach(l => l.classList.remove('active'));
+        } else {
+            targetWindDirections = [...windDirs];
+            labels.forEach(l => l.classList.add('active'));
+        }
+    };
+}
+
+/**
+ * 改修版：タブ描画サブルーチン
+ * アクティブ要素を先頭にし、GPS/Mapを3位以内に維持する
+ */
+function renderTabs(activeOverrideLabel = null) {
+    const container = document.getElementById('spot-tabs');
+    if (!container) return;
+    container.innerHTML = "";
+
+    const activeLabel = activeOverrideLabel || currentLabel;
+
+    // 1. 全ての要素をリスト化
+    let items = [
+        { id: 'gps', label: '🛰️ GPS', isSpecial: true },
+        { id: 'map', label: '🗺️ Map', isSpecial: true },
+        ...mySpots.map(s => ({ id: s.label, label: `📍 ${s.label}`, lat: s.lat, lon: s.lon, rawLabel: s.label }))
+    ];
+
+    // 2. アクティブなものを先頭へ
+    const activeIdx = items.findIndex(item => (item.id === activeLabel || item.label === activeLabel || item.rawLabel === activeLabel));
+    if (activeIdx > -1) {
+        const [activeItem] = items.splice(activeIdx, 1);
+        items.unshift(activeItem);
+    }
+
+    // 3. GPSとMapを3位以内にねじ込む（4位以下に落ちている場合）
+    ['gps', 'map'].forEach(specialId => {
+        const currentPos = items.findIndex(item => item.id === specialId);
+        if (currentPos > 2) {
+            const [specialItem] = items.splice(currentPos, 1);
+            items.splice(2, 0, specialItem); 
+        }
+    });
+
+    // 4. HTML生成
+    items.forEach((item) => {
+        const btn = document.createElement('button');
+        const isSelected = (item.id === activeLabel || item.label === activeLabel || item.rawLabel === activeLabel);
+        
+        btn.className = 'btn';
+        if (item.id === 'gps') btn.classList.add('btn-gps');
+        else if (item.id === 'map') btn.classList.add('btn-map-view');
+        else btn.classList.add('btn-location');
+
+        if (isSelected) btn.classList.add('active');
+        btn.innerText = item.label;
+
+        btn.onclick = () => {
+            if (item.id === 'gps') handleGPSClick();
+            else if (item.id === 'map') { openMap(); renderTabs(item.label); }
+            else updateLocation(item.lat, item.lon, item.rawLabel);
+        };
+
+        // MySpots（📍付き）のみ右クリック削除を有効に
+        if (!item.isSpecial) {
+            const spotIdx = mySpots.findIndex(s => s.label === item.rawLabel);
+            btn.oncontextmenu = (e) => { e.preventDefault(); confirmDelete(spotIdx); };
+            let timer;
+            btn.ontouchstart = () => { timer = setTimeout(() => confirmDelete(spotIdx), 800); };
+            btn.ontouchend = () => clearTimeout(timer);
+        }
+
+        container.appendChild(btn);
+    });
+}
+
+function saveSpotsOrder() {
+    const buttons = Array.from(document.getElementById('spot-tabs').children);
+    const newSpots = buttons.map(btn => {
+        const label = btn.innerText.replace('📍 ', '');
+        return mySpots.find(s => s.label === label);
+    }).filter(s => s);
+    mySpots = newSpots;
+    localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+}
+
+function confirmDelete(index) {
+    if (index === -1) return;
+    if (confirm(`「${mySpots[index].label}」を削除しますか？`)) {
+        mySpots.splice(index, 1);
+        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+        renderTabs();
+    }
+}
+
+document.getElementById('reset-all-btn').onclick = () => {
+    if (confirm("登録地点と並び順、風向設定を初期状態に戻しますか？")) {
+        toggleSidebar();
+        mySpots = JSON.parse(JSON.stringify(defaultSpots));
+        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+        targetWindDirections = [...windDirs];
+        localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
+        document.querySelectorAll('.compass-label').forEach(l => l.classList.add('active'));
+        renderTabs();
+        updateLocation(mySpots[0].lat, mySpots[0].lon, mySpots[0].label);
+    }
+};
+
+document.getElementById('add-btn').onclick = () => openMap();
+
+function openMap() {
+    openModal('map-modal');
+    if (!map) {
+        const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { 
+            attribution: 'Esri',
+            errorTileUrl: 'https://www.openstreetmap.org/assets/blocked.png'
+        });
+        const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
+            attribution: 'Esri',
+            errorTileUrl: 'https://www.openstreetmap.org/assets/blocked.png'
+        });
+        const gsi = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', { 
+            attribution: '&copy; 国地理院',
+            errorTileUrl: 'https://www.openstreetmap.org/assets/blocked.png'
+        });
+
+        map = L.map('map-canvas', {
+            center: [currentLat, currentLon],
+            zoom: 14,
+            layers: [esri]
+        });
+
+        const baseMaps = { "標準地図(Esri)": esri, "衛星写真": satellite, "地理院地図": gsi };
+        L.control.layers(baseMaps).addTo(map);
+        map.on('click', onMapClick);
+    } else {
+        map.setView([currentLat, currentLon], 14);
+    }
+
+    if (tempMarker) map.removeLayer(tempMarker);
+    tempMarker = L.marker([currentLat, currentLon]).addTo(map);
+}
+
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+async function executeMapSearch() {
+    const query = document.getElementById('map-search-input').value;
+    if (!query) return;
+    document.getElementById('map-status').innerText = "検索中...";
+    try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&accept-language=ja`);
+        const results = await res.json();
+        if (results.length > 0) {
+            const { lat, lon } = results[0];
+            const latlng = [parseFloat(lat), parseFloat(lon)];
+            map.setView(latlng, 15);
+            if (tempMarker) map.removeLayer(tempMarker);
+            tempMarker = L.marker(latlng).addTo(map);
+            fetchAddressInfo(parseFloat(lat), parseFloat(lon));
+        } else {
+            alert("地点が見つかりませんでした。");
+        }
+    } catch (err) { alert("検索エラー"); }
+}
+
+async function onMapClick(e) {
+    const { lat, lng } = e.latlng;
+    if (tempMarker) map.removeLayer(tempMarker);
+    tempMarker = L.marker([lat, lng]).addTo(map);
+    await fetchAddressInfo(lat, lng);
+}
+
+async function fetchAddressInfo(lat, lng) {
+    document.getElementById('map-status').innerText = "地点情報を取得中...";
+    try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ja`);
+        const data = await res.json();
+        const addr = data.address;
+        const city = addr.city || addr.town || addr.village || "";
+        const district = addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district || "";
+        const defaultName = city + district || "新規地点";
+
+        document.getElementById('temp-view-btn').onclick = () => {
+            updateLocation(lat, lng, defaultName + "(未登録)");
+            closeModal('map-modal');
+        };
+        document.getElementById('temp-view-btn').disabled = false;
+
+        document.getElementById('save-spot-btn').onclick = () => {
+            const spotName = prompt("登録する地点名を確認・修正してください", defaultName);
+            if (spotName) {
+                mySpots.push({lat, lon: lng, label: spotName});
+                localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                updateLocation(lat, lng, spotName);
+                closeModal('map-modal');
+            }
+        };
+        document.getElementById('save-spot-btn').disabled = false;
+        document.getElementById('map-status').innerText = "選択中: " + defaultName;
+    } catch (err) { document.getElementById('map-status').innerText = "地点名取得失敗"; }
+}
+
+async function updateLocation(lat, lon, label) {
+    currentLat = lat; currentLon = lon; currentLabel = label;
+    // 場所表示ラベルの更新（CSSで非表示にすることを推奨）
+    const posDisp = document.getElementById('pos-display');
+    if (posDisp) posDisp.innerText = `${label}`;
+    
+    renderTabs(); 
+    await draw(); 
+}
+
+function handleGPSClick() {
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+            updateLocation(pos.coords.latitude, pos.coords.longitude, "🛰️ GPS");
+        });
+    }
+}
+
+const weatherIcons = { 0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️", 45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "🌦️", 61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "❄️", 73: "❄️", 75: "❄️", 80: "🌦️", 81: "🌦️", 82: "🌦️", 95: "⛈️" };
+function getWindDirText(deg) { return windDirs[Math.round(deg / 22.5) % 16]; }
+
+async function fetchWithCache(lat, lon) {
+    const cacheKey = `weather_cache_${lat.toFixed(3)}_${lon.toFixed(3)}`;
+    const cached = localStorage.getItem(cacheKey);
+    const now = Date.now();
+    if (cached) {
+        const parsed = JSON.parse(cached);
+        if (now - parsed.timestamp < CACHE_DURATION) return parsed.data;
+    }
+    const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&forecast_days=9`;
+    const mUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto&forecast_days=9&cell_selection=sea`;
+    const [wRes, mRes] = await Promise.all([fetch(wUrl).then(r => r.json()), fetch(mUrl).then(r => r.json())]);
+    const mergedData = { ...wRes.hourly, ...mRes.hourly };
+    localStorage.setItem(cacheKey, JSON.stringify({ timestamp: now, data: mergedData }));
+    return mergedData;
+}
+
+async function draw() {
+    try {
+        allData = await fetchWithCache(currentLat, currentLon);
+        const svgW = document.getElementById('svg-weather');
+        let wHtml = "";
+        for(let i=0; i<216; i++) {
+            const x = i * hScale + 16; 
+            const icon = weatherIcons[allData.weather_code[i]] || "❓";
+            wHtml += `<text x="${x}" y="32" font-size="28" text-anchor="middle">${icon}</text>`; 
+            const p = allData.precipitation ? allData.precipitation[i] : 0;
+            if (p > 0) wHtml += `<text x="${x}" y="70" font-size="14" font-weight="bold" fill="#0000FF" text-anchor="middle">${p.toFixed(1)}</text>`;
+        }
+        svgW.innerHTML = wHtml;
+
+        function renderSection(svgId, dateContId, datasets, height, stepY, isWind = false) {
+            const svg = document.getElementById(svgId);
+            const dateCont = document.getElementById(dateContId);
+            dateCont.innerHTML = "";
+            const allVals = datasets.flatMap(ds => ds.data || []);
+            if (allVals.length === 0) return;
+            let max = Math.ceil(Math.max(...allVals) / stepY) * stepY;
+            let min = Math.floor(Math.min(...allVals) / stepY) * stepY;
+            if (isWind) min = 0;
+            const range = (max - min) || 1;
+            const plotHeight = height - 40; 
+            let html = "";
+            for (let v = min; v <= max; v += stepY) {
+                const yPosSvg = plotHeight - (((v - min) / range) * plotHeight);
+                html += `<line x1="0" y1="${yPosSvg}" x2="6912" y2="${yPosSvg}" class="grid-y-sub" />`;
+            }
+            for (let i = 0; i <= 216; i++) {
+                const x = i * hScale;
+                const d = new Date(allData.time[i]);
+                if (i % 24 === 0 && i < 216) {
+                    html += `<line x1="${x}" y1="-10" x2="${x}" y2="${plotHeight + 30}" class="grid-day" />`;
+                    const dateDiv = document.createElement('div');
+                    dateDiv.className = 'sticky-date';
+                    dateDiv.style.left = `${x}px`;
+                    dateDiv.dataset.x = x;
+                    dateDiv.innerText = `${d.getMonth()+1}/${d.getDate()}`;
+                    dateCont.appendChild(dateDiv);
+                } else if (i % 3 === 0 && i < 216) {
+                    html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight + 20}" class="grid-3h" />`;
+                    html += `<text x="${x}" y="${plotHeight + 25}" class="label-time" text-anchor="middle">${d.getHours()}</text>`;
+                }
+            }
+            datasets.forEach(ds => {
+                if (ds.type === 'bar') {
+                    ds.data.forEach((v, i) => {
+                        const val = v || 0;
+                        const h = ((val - min) / range) * plotHeight;
+                        const x = i * hScale;
+                        const deg = allData.wind_direction_10m[i];
+                        const dirText = getWindDirText(deg);
+                        let color = "#ccc"; 
+                        if (val >= 10.0) color = '#dc143c'; 
+                        else if (targetWindDirections.includes(dirText)) color = val >= 5 ? '#ffa500' : '#87ceeb';
+                        html += `<rect x="${x - (hScale*0.4)}" y="${plotHeight-h}" width="${hScale*0.8}" height="${h}" fill="${color}" />`;
+                        if (isWind) {
+                            const rot = (deg + 180) % 360;
+                            html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-25}) rotate(${rot}) scale(1.6)" class="wind-arrow" />`;
+                        }
+                    });
+                } else {
+                    const pts = (ds.data || []).map((v, i) => `${i * hScale},${plotHeight - (((v || 0) - min) / range) * plotHeight}`).join(" ");
+                    html += `<polyline class="${ds.cls}" points="${pts}" />`;
+                }
+            });
+            svg.innerHTML = html;
+        }
+
+        renderSection("svg-wind", "date-wind", [{ data: allData.wind_speed_10m, type: 'bar' }], 280, 5.0, true);
+        renderSection("svg-temps", "date-temp", [{ data: allData.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], 160, 5.0);
+        renderSection("svg-marine", "date-marine", [{ data: allData.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.sea_level_height_msl, type: 'line', cls: 'line-tide' }], 160, 0.5);
+
+        const scrollRoot = document.getElementById('scroll-root');
+        scrollRoot.onscroll = () => {
+            const sl = scrollRoot.scrollLeft;
+            document.querySelectorAll('.sticky-date').forEach(el => {
+                const x = parseFloat(el.dataset.x);
+                const nextX = x + (24 * hScale);
+                el.style.left = (sl >= x && sl < nextX - 80) ? (sl - 100) + "px" : x + "px";
+            });
+        };
+
+        const stage = document.getElementById('stage');
+        const guide = document.getElementById('hover-guide');
+        const tooltip = document.getElementById('tooltip');
+        stage.onmousemove = (e) => {
+            const rect = stage.getBoundingClientRect();
+            const hourIdx = Math.round((e.clientX - rect.left - 100) / hScale);
+            if (hourIdx >= 0 && hourIdx < 216) {
+                guide.style.left = (hourIdx * hScale + 100) + "px"; guide.style.display = "block";
+                tooltip.style.display = "block"; tooltip.style.left = (e.clientX + 20) + "px"; tooltip.style.top = (e.clientY + 20) + "px";
+                const d = new Date(allData.time[hourIdx]); 
+                const deg = allData.wind_direction_10m[hourIdx];
+                const ws = allData.wind_speed_10m[hourIdx];
+                tooltip.innerHTML = `
+                    <span class="spot-name-tip">📍 ${currentLabel}</span>
+                    <b>${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:00</b>
+                    <div class="icon-box"><span class="legend-bar" style="background:#0000FF; margin-right:0;"></span></div>☔降水: ${allData.precipitation ? allData.precipitation[hourIdx]?.toFixed(1) : "0.0"}mm<br>
+                    <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${(deg+180)%360})"/></svg></div>風向: ${getWindDirText(deg)} (${deg}°)<br>
+                    <div class="icon-box">🚩</div>風速: ${ws?.toFixed(1) || "0.0"}m/s<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>🌡️気温: ${allData.temperature_2m[hourIdx]?.toFixed(1) || "0.0"}℃<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>💧水温: ${allData.sea_surface_temperature ? allData.sea_surface_temperature[hourIdx]?.toFixed(1) : "---"}℃<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>🌊波高: ${allData.wave_height ? allData.wave_height[hourIdx]?.toFixed(2) : "0.00"}m<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#1e90ff; margin-right:0;"></span></div>📏潮位: ${allData.sea_level_height_msl ? allData.sea_level_height_msl[hourIdx]?.toFixed(2) : "0.00"}m
+                `;
+            }
+        };
+        stage.onmouseleave = () => { guide.style.display = "none"; tooltip.style.display = "none"; };
+    } catch (e) { console.error(e); }
+}
+
+initApp();

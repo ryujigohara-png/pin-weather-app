@@ -1,0 +1,146 @@
+:root { 
+    --hour-width: 32px; 
+    --total-width: calc(var(--hour-width) * 216); 
+    --label-box-width: 100px; 
+    --nav-height: 60px;
+}
+body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: calc(var(--nav-height) + 15px); }
+
+/* ボタン配置とタブ */
+.control-wrapper {
+    position: fixed; top: 0; left: 0; right: 0; height: var(--nav-height);
+    background: white; border-bottom: 1px solid #ddd; padding: 0 10px;
+    display: flex; gap: 8px; align-items: center; z-index: 1000;
+    overflow: hidden;
+}
+.scroll-tabs {
+    display: flex; gap: 8px; overflow-x: auto; white-space: nowrap; padding: 5px 0;
+    flex-grow: 1; -webkit-overflow-scrolling: touch;
+    align-items: center;
+}
+.scroll-tabs::-webkit-scrollbar { display: none; }
+
+.btn {
+    padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+    font-weight: bold; font-size: 14px; transition: 0.2s; flex-shrink: 0;
+}
+.btn-gps { background: #28a745; color: white; }
+.btn-map-view { background: #17a2b8; color: white; }
+.btn-location { background: #e9ecef; color: #495057; border: 1px solid #ced4da; }
+.btn-location.active { 
+    background: #007bff; color: white; border: 1px solid #0056b3;
+    box-shadow: 0 0 8px rgba(0,123,255,0.5);
+}
+.btn-add { background: #6c757d; color: white; font-size: 18px; padding: 4px 15px; }
+
+/* サイドバー */
+.menu-trigger {
+    font-size: 24px; background: none; border: none; cursor: pointer; padding: 0 10px; flex-shrink: 0;
+}
+.sidebar {
+    position: fixed; top: 0; left: -210px; width: 210px; height: 100%;
+    background: #343a40; color: white; transition: 0.3s; z-index: 2500;
+    padding: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+    box-sizing: border-box; overflow: hidden;
+}
+.sidebar.open { left: 0; }
+.sidebar-header { font-weight: bold; margin-bottom: 20px; border-bottom: 1px solid #495057; padding-bottom: 10px; }
+.sidebar .btn { width: 100%; margin-bottom: 15px; text-align: left; }
+.sidebar-overlay {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5); z-index: 2400;
+}
+
+.btn-wind-config { background: #6f42c1; color: white; }
+.btn-reset { background: #dc3545; color: white; }
+.current-pos-label { font-size: 12px; color: #666; white-space: nowrap; margin-right: 5px; flex-shrink: 0; }
+
+/* モーダル */
+.modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.7); z-index: 3000; justify-content: center; align-items: center;
+}
+.modal-content {
+    background: white; width: 95%; max-width: 900px; height: 85%; border-radius: 12px;
+    display: flex; flex-direction: column; overflow: hidden; position: relative;
+}
+
+.search-bar { padding: 10px; background: #fff; border-bottom: 1px solid #ddd; display: flex; gap: 8px; z-index: 2100; }
+.search-input { flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+#map-canvas { flex-grow: 1; width: 100%; background-color: #f8f8f8 !important; }
+.leaflet-tile { visibility: visible !important; }
+
+/* コンパス */
+.compass-container {
+    position: relative; width: 320px; height: 320px; margin: 40px auto;
+    background: #f8f9fa; border-radius: 50%; border: 2px solid #ddd;
+}
+.compass-label {
+    position: absolute; width: 60px; height: 30px; display: flex; align-items: center;
+    justify-content: center; font-size: 12px; font-weight: bold; cursor: pointer;
+    border-radius: 4px; background: #fff; border: 1px solid #ccc; transition: 0.2s;
+    user-select: none;
+}
+.compass-label.active { background: #6f42c1; color: white; border-color: #5a32a3; }
+.compass-center {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center; font-size: 14px; color: #666;
+}
+
+.modal-footer { padding: 15px; display: flex; justify-content: flex-end; gap: 10px; background: #eee; }
+
+/* グラフ */
+.main-card { 
+    max-width: 1500px; margin: auto; background: white; 
+    border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+    overflow: hidden;
+}
+.scroll-container { overflow-x: auto; position: relative; }
+.chart-stage { width: var(--total-width); position: relative; padding: 20px 0 80px var(--label-box-width); }
+.chart-section { margin-bottom: 50px; position: relative; background: #fff; border: 1px solid #ddd; border-radius: 4px; width: 100%; }
+.section-weather { height: 80px; border: none; margin-bottom: 0px; }
+.section-wind { height: 280px; }
+.section-temp, .section-marine { height: 160px; }
+
+.sticky-label {
+    position: sticky; left: 0; top: 0; width: var(--label-box-width);
+    height: 100%; background: rgba(255,255,255,0.8); z-index: 50;
+    pointer-events: none; float: left;
+    margin-right: calc(var(--label-box-width) * -1); margin-left: calc(var(--label-box-width) * -1); 
+}
+.y-axis-title { padding: 5px 8px; font-size: 14px; font-weight: bold; color: #111; line-height: 1.2; }
+
+svg { width: 100%; display: block; overflow: visible; }
+.grid-day { stroke: #666; stroke-width: 2; } 
+.grid-3h { stroke: #ccc; stroke-width: 1; }  
+.grid-y-sub { stroke: #e0e0e0; stroke-width: 1; } 
+.label-time { font-size: 16px; fill: #333; font-weight: bold; }
+
+.date-container { position: absolute; height: 30px; bottom: -30px; left: 0; width: 100%; pointer-events: none; z-index: 10; }
+.sticky-date { position: absolute; bottom: 0; font-size: 22px; font-weight: bold; background: rgba(255,255,255,0.8); padding: 0 10px; border-radius: 4px; color: #000; white-space: nowrap; }
+
+.line-temp-air { stroke: #ff4500; stroke-width: 4; fill: none; }
+.line-temp-sea { stroke: #00ced1; stroke-width: 4; fill: none; }
+.line-wave { stroke: #2ca02c; stroke-width: 4; fill: none; }
+.line-tide { stroke: #1e90ff; stroke-width: 3; fill: none; }
+.wind-arrow { fill: #00d4ff; stroke: #008eb3; stroke-width: 1; }
+
+/* ツールチップ */
+.tooltip {
+    position: fixed; background: rgba(0,0,0,0.85); color: white;
+    padding: 12px 16px; border-radius: 8px; font-size: 14px;
+    pointer-events: none; display: none; z-index: 4000; line-height: 1.8;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3); backdrop-filter: blur(4px);
+    white-space: nowrap;
+}
+.tooltip b { display: block; margin-bottom: 6px; border-bottom: 1px solid #666; padding-bottom: 2px; }
+.tooltip .spot-name-tip { color: #00d4ff; font-weight: bold; border-bottom: 1px dashed #666; margin-bottom: 4px; padding-bottom: 2px; display: block; }
+.icon-box { display: inline-block; width: 20px; text-align: center; margin-right: 8px; vertical-align: middle; }
+.legend-line { display: inline-block; width: 15px; height: 3px; vertical-align: middle; margin-right: 8px; }
+.legend-bar { display: inline-block; width: 12px; height: 12px; vertical-align: middle; margin-right: 8px; }
+
+#hover-guide { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(255,0,0,0.3); display: none; pointer-events: none; z-index: 5; }
+.footer-info { 
+    max-width: 1500px; margin: 15px auto; padding: 15px; font-size: 12px; 
+    color: #666; line-height: 1.6; border-top: 1px solid #ddd;
+}
