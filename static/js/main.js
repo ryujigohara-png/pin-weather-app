@@ -145,7 +145,11 @@ function renderTabs(activeOverrideLabel = null) {
             btn.setAttribute('data-raw-label', item.rawLabel);
         }
 
-        if (isSelected) btn.classList.add('active');
+        if (isSelected) {
+            btn.classList.add('active');
+            // アクティブなボタンを視界（スクロールエリア内）に自動で移動させる処理を追加
+            setTimeout(() => btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }), 100);
+        }
         btn.innerText = item.label;
 
         btn.onclick = () => {
