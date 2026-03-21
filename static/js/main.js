@@ -418,13 +418,15 @@ async function fetchWithCache(lat, lon) {
 
 /**
  * サブルーチン：メイン描画処理
- * グラフ余白、現在時刻線、強風色分け、およびスマホ対応ツールチップ（追従・反転）を反映
+ * スクロール量の二重加算（ダブルカウント）を解消し、表示とデータのズレを修正したコード。
  */
 async function draw() {
     try {
         allData = await fetchWithCache(currentLat, currentLon);
         const svgW = document.getElementById('svg-weather');
         if (!svgW) return;
+        
+        // --- 天気アイコン描画 ---
         let wHtml = "";
         for(let i=0; i<216; i++) {
             const x = i * hScale; 
@@ -438,6 +440,7 @@ async function draw() {
         const now = new Date();
         const nowIdx = allData.time.findIndex(t => new Date(t) > now) - 1;
 
+        // --- 各セクション描画関数 ---
         function renderSection(svgId, dateContId, datasets, height, stepY, isWind = false, isLast = false) {
             const svg = document.getElementById(svgId);
             const dateCont = document.getElementById(dateContId);
@@ -445,6 +448,7 @@ async function draw() {
             dateCont.innerHTML = "";
             const allVals = datasets.flatMap(ds => ds.data || []);
             if (allVals.length === 0) return;
+            
             let max = Math.ceil(Math.max(...allVals) / stepY) * stepY;
             let min = Math.floor(Math.min(...allVals) / stepY) * stepY;
             if (isWind) min = 0;
@@ -501,20 +505,13 @@ async function draw() {
                         const x = i * hScale;
                         const deg = allData.wind_direction_10m[i];
                         const dirText = getWindDirText(deg);
-                        
                         let color = "#ccc"; 
-                        const isTargetDir = targetWindDirections.includes(dirText);
-                        
-                        if (isTargetDir) {
-                            if (val >= 10.0) color = '#dc143c';
-                            else color = val >= 5 ? '#ffa500' : '#87ceeb';
+                        if (targetWindDirections.includes(dirText)) {
+                            color = val >= 10.0 ? '#dc143c' : (val >= 5 ? '#ffa500' : '#87ceeb');
                         } else {
-                            if (val >= 10.0) color = 'rgba(220, 20, 60, 0.4)';
-                            else color = '#ccc';
+                            color = val >= 10.0 ? 'rgba(220, 20, 60, 0.4)' : '#ccc';
                         }
-                        
                         html += `<rect x="${x - (hScale*0.4)}" y="${plotHeight-h}" width="${hScale*0.8}" height="${h}" fill="${color}" />`;
-                        
                         if (isWind) {
                             const rot = (deg + 180) % 360;
                             html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-25}) rotate(${rot}) scale(1.6)" class="wind-arrow" />`;
@@ -528,10 +525,12 @@ async function draw() {
             svg.innerHTML = html;
         }
 
+        // --- 全セクション描画実行 ---
         renderSection("svg-wind", "date-wind", [{ data: allData.wind_speed_10m, type: 'bar' }], 280, 5.0, true, false);
         renderSection("svg-temps", "date-temp", [{ data: allData.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], 160, 5.0, false, false);
         renderSection("svg-marine", "date-marine", [{ data: allData.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.sea_level_height_msl, type: 'line', cls: 'line-tide' }], 160, 0.5, false, true);
 
+        // --- インタラクション制御 ---
         const scrollRoot = document.getElementById('scroll-root');
         const stage = document.getElementById('stage');
         const guide = document.getElementById('hover-guide');
@@ -545,69 +544,61 @@ async function draw() {
                     const nextX = x + (24 * hScale);
                     el.style.left = (sl >= x && sl < nextX - 80) ? (sl - 100) + "px" : x + "px";
                 });
-                // スクロール中もツールチップの位置を更新
-                if (tooltip && tooltip.style.display === "block" && lastMouseX !== undefined) {
-                    updateTooltipPos(lastMouseX, lastMouseY);
-                }
             };
-        }
-
-        let lastMouseX, lastMouseY;
-        function updateTooltipPos(clientX, clientY) {
-            if (!tooltip || !scrollRoot) return;
-            const tw = tooltip.offsetWidth;
-            const winW = window.innerWidth;
-            
-            // 1. 左右反転ロジック: 画面右半分に指があるなら左に表示
-            let posX = clientX + 20;
-            if (clientX > winW / 2) {
-                posX = clientX - tw - 20;
-            }
-
-            // 2. クランプ処理: 画面外にはみ出さないように制限
-            posX = Math.max(10, Math.min(posX, winW - tw - 10));
-
-            tooltip.style.left = posX + "px";
-            tooltip.style.top = (clientY + 20) + "px";
         }
 
         if (stage && guide && tooltip) {
             stage.onmousemove = (e) => {
-                lastMouseX = e.clientX;
-                lastMouseY = e.clientY;
                 const rect = stage.getBoundingClientRect();
-                const sl = scrollRoot ? scrollRoot.scrollLeft : 0;
-                // スクロール量を加味してインデックスを計算
-                const hourIdx = Math.round((e.clientX - rect.left + sl - 100) / hScale);
+                
+                // e.clientX - rect.left の時点ですでに「stage内の絶対座標」になります。
+                // scrollLeft の二重加算を削除し、純粋にラベル幅(100)だけを引きます。
+                const graphX = (e.clientX - rect.left) - 100;
 
-                if (hourIdx >= 0 && hourIdx < 216) {
-                    // 時刻線(guide)の位置設定（スクロール追従のため sl を引く）
-                    guide.style.left = (hourIdx * hScale + 100 - sl) + "px"; 
-                    guide.style.display = "block";
-                    
-                    tooltip.style.display = "block";
-                    updateTooltipPos(e.clientX, e.clientY);
-
-                    const d = new Date(allData.time[hourIdx]); 
-                    const deg = allData.wind_direction_10m[hourIdx];
-                    const ws = allData.wind_speed_10m[hourIdx];
-
-                    tooltip.innerHTML = `
-                        <span class="spot-name-tip">📍 ${currentLabel}</span>
-                        <b>${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:00</b>
-                        <div class="icon-box"><span class="legend-bar" style="background:#0000FF; margin-right:0;"></span></div>☔降水: ${allData.precipitation ? allData.precipitation[hourIdx]?.toFixed(1) : "0.0"}mm<br>
-                        <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${(deg+180)%360})"/></svg></div>風向: ${getWindDirText(deg)} (${deg}°)<br>
-                        <div class="icon-box">🚩</div>風速: ${ws?.toFixed(1) || "0.0"}m/s<br>
-                        <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>🌡️気温: ${allData.temperature_2m[hourIdx]?.toFixed(1) || "0.0"}℃<br>
-                        <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>💧海水: ${allData.sea_surface_temperature ? allData.sea_surface_temperature[hourIdx]?.toFixed(1) : "---"}℃<br>
-                        <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>🌊波高: ${allData.wave_height ? allData.wave_height[hourIdx]?.toFixed(2) : "0.00"}m<br>
-                        <div class="icon-box"><span class="legend-line" style="background:#1e90ff; margin-right:0;"></span></div>📏潮位: ${allData.sea_level_height_msl ? allData.sea_level_height_msl[hourIdx]?.toFixed(2) : "0.00"}m
-                    `;
+                if (graphX < 0) {
+                    guide.style.display = "none";
+                    tooltip.style.display = "none";
+                    return;
                 }
+
+                let hourIdx = Math.round(graphX / hScale);
+                if (hourIdx < 0) hourIdx = 0;
+                if (hourIdx >= 216) hourIdx = 215;
+
+                // ガイド線の位置（stage内の絶対座標）
+                const snapX = (hourIdx * hScale) + 100;
+                guide.style.left = snapX + "px"; 
+                guide.style.display = "block";
+                
+                tooltip.style.display = "block";
+                
+                // ツールチップ位置（画面上の座標）
+                let tx = e.clientX + 20;
+                if (tx + 220 > window.innerWidth) tx = e.clientX - 240;
+                tooltip.style.left = tx + "px";
+                tooltip.style.top = (e.clientY + 20) + "px";
+
+                const d = new Date(allData.time[hourIdx]); 
+                const deg = allData.wind_direction_10m[hourIdx];
+                const ws = allData.wind_speed_10m[hourIdx];
+
+                tooltip.innerHTML = `
+                    <span class="spot-name-tip">📍 ${currentLabel}</span>
+                    <b>${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:00</b>
+                    <div class="icon-box"><span class="legend-bar" style="background:#0000FF; margin-right:0;"></span></div>☔降水: ${allData.precipitation ? allData.precipitation[hourIdx]?.toFixed(1) : "0.0"}mm<br>
+                    <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${(deg+180)%360})"/></svg></div>風向: ${getWindDirText(deg)} (${deg}°)<br>
+                    <div class="icon-box">🚩</div>風速: ${ws?.toFixed(1) || "0.0"}m/s<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>🌡️気温: ${allData.temperature_2m[hourIdx]?.toFixed(1) || "0.0"}℃<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>💧海水: ${allData.sea_surface_temperature ? allData.sea_surface_temperature[hourIdx]?.toFixed(1) : "---"}℃<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>🌊波高: ${allData.wave_height ? allData.wave_height[hourIdx]?.toFixed(2) : "0.00"}m<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#1e90ff; margin-right:0;"></span></div>📏潮位: ${allData.sea_level_height_msl ? allData.sea_level_height_msl[hourIdx]?.toFixed(2) : "0.00"}m
+                    `;
             };
             stage.onmouseleave = () => { guide.style.display = "none"; tooltip.style.display = "none"; };
         }
     } catch (e) { console.error(e); }
 }
+
+
 
 initApp();
