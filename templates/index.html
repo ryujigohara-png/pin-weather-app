@@ -13,8 +13,13 @@
 <body>
 
 <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
 <div id="sidebar" class="sidebar">
-    <div class="sidebar-header">⚙️ Menu</div>
+    <div class="sidebar-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="color: #007bff; font-size: 18px;">⛵ Pin_Weather!</span>
+        <span class="close-sidebar" onclick="toggleSidebar()" style="cursor: pointer; font-size: 24px; padding: 0 5px;">&times;</span>
+    </div>
+    
     <button class="btn btn-wind-config" id="wind-cfg-btn">🎐 風向色付設定</button>
     <button class="btn btn-reset" id="reset-all-btn">♻️ 全リセット</button>
     

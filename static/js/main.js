@@ -24,10 +24,8 @@ function generateSidebarQRCode() {
     const qrContainer = document.getElementById('sidebar-qrcode');
     if (!qrContainer) return;
 
-    // 既存のQRコードがあればクリア
     qrContainer.innerHTML = "";
 
-    // 外部ライブラリ qrcode.js を動的に読み込み
     const script = document.createElement('script');
     script.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
     script.onload = () => {
@@ -44,44 +42,42 @@ function generateSidebarQRCode() {
 }
 
 /**
- * サブルーチン：環境判定とUIへの反映 (折衷案)
- * 1. ヘッダー背景色を変更 (案2)
- * 2. フッター免責事項の下に環境名を表示 (案1)
+ * サブルーチン：環境判定とUIへの反映
+ * index.htmlの構造に合わせてセレクタを修正
  */
 function applyEnvVisuals() {
     const hostname = window.location.hostname;
     let config = {};
 
-    // 1. 環境判定ロジック
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.includes("192.168.")) {
         config = {
             titleSuffix: " [Local]",
-            headerColor: "#27ae60", // 安心の「緑」
+            headerColor: "#b0fbcf", 
             envName: "PC Localhost"
         };
     } else if (hostname.includes("beta")) {
         config = {
             titleSuffix: " (B)",
-            headerColor: "#d35400", // 注意の「オレンジ」
+            headerColor: "#d8b39a", 
             envName: "Beta版"
         };
     } else {
         config = {
             titleSuffix: "",
-            headerColor: "#2c3e50", // 信頼の「ネイビー」
+            headerColor: "#7681ba", 
             envName: "Main版"
         };
     }
 
-    // 2. ヘッダー背景色の反映 (案2)
-    const headerEl = document.querySelector('.header-bar') || document.querySelector('header');
+    // 2. ヘッダー（control-wrapper）背景色の反映
+    const headerEl = document.querySelector('.control-wrapper');
     if (headerEl) {
         headerEl.style.backgroundColor = config.headerColor;
         headerEl.style.transition = "background-color 0.3s ease";
     }
 
-    // 3. フッター免責事項の下にバッジを表示 (案1)
-    const footerDisclaimer = document.querySelector('.disclaimer') || document.querySelector('footer p');
+    // 3. フッター（footer-info）の下に環境名を表示
+    const footerDisclaimer = document.querySelector('.footer-info');
     if (footerDisclaimer) {
         const oldBadge = document.getElementById('footer-env-badge');
         if (oldBadge) oldBadge.remove();
@@ -94,18 +90,14 @@ function applyEnvVisuals() {
         badge.style.textAlign = "center";
         badge.innerText = `Running on: ${config.envName}`;
         
-        footerDisclaimer.parentNode.insertBefore(badge, footerDisclaimer.nextSibling);
+        footerDisclaimer.appendChild(badge);
     }
 
-    // ブラウザタブ名の更新
     if (!document.title.includes(config.titleSuffix)) {
         document.title += config.titleSuffix;
     }
 }
 
-/**
- * サブルーチン：アプリ初期化
- */
 function initApp() {
     applyEnvVisuals(); 
     renderTabs();
