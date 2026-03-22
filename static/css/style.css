@@ -181,14 +181,21 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     overflow: hidden;
 }
 .scroll-container { overflow-x: auto; position: relative; }
-.chart-stage { width: var(--total-width); position: relative; padding: 20px 0 80px var(--label-box-width); }
 
+/* 修正箇所：width削除、display変更で余白を自動解消 */
+.chart-stage { 
+    display: inline-block; 
+    position: relative; 
+    padding: 20px 0 80px var(--label-box-width); 
+    pointer-events: auto; 
+    min-width: 100%;
+}
 .chart-section { 
-    margin-bottom: -1px; /* 50pxから変更：枠線を重ねて隙間を排除 */
+    margin-bottom: -1px; 
     position: relative; 
     background: #fff; 
     border: 1px solid #ddd; 
-    border-radius: 0; /* 隙間をなくすため角丸を解除 */
+    border-radius: 0; 
     width: 100%; 
 }
 .section-weather { height: 80px; border: none; margin-bottom: 0px; }
@@ -274,7 +281,7 @@ svg { width: 100%; display: block; overflow: visible; }
 .config-value {
     font-size: 14px;
     font-family: monospace;
-    color: #6f42c1; /* 既存の風向設定ボタンの色と統一 */
+    color: #6f42c1;
     font-weight: bold;
 }
 
@@ -303,5 +310,5 @@ svg { width: 100%; display: block; overflow: visible; }
 .modal-footer .btn-apply {
     background: #6f42c1 !important;
     color: white !important;
-    flex: 2; /* 保存ボタンを少し長めに */
+    flex: 2; 
 }
