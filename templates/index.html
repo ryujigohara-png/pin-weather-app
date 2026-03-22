@@ -21,6 +21,7 @@
     </div>
     
     <button class="btn btn-wind-config" id="wind-cfg-btn">🎐 風向色付設定</button>
+    <button class="btn btn-detailSettings" id="openSettingsBtn">⚙ 表示詳細設定</button>
     <button class="btn btn-reset" id="reset-all-btn">♻️ 全リセット</button>
     
     <div class="sidebar-qr-container" style="margin-top: 30px; padding: 10px; text-align: center; border-top: 1px solid #eee;">
@@ -61,6 +62,71 @@
         <div class="modal-footer">
             <button class="btn" style="background:#6c757d; color:white;" onclick="closeModal('wind-modal')">閉じる</button>
             <button class="btn" style="background:#6f42c1; color:white;" id="apply-wind-btn">更新して適用</button>
+        </div>
+    </div>
+</div>
+
+<div id="viewSettingsModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 500px; height: auto; max-height: 90%;">
+        <div class="search-bar">
+            <span style="font-weight: bold; padding: 5px;">グラフ表示詳細設定</span>
+        </div>
+        
+        <div class="view-settings-body">
+            <div class="config-group">
+                <div class="config-label-area">
+                    <span class="config-title">1時間の幅 (hScale)</span>
+                    <span id="val-hourWidth" class="config-value">32px</span>
+                </div>
+                <input type="range" id="input-hourWidth" class="config-slider" min="10" max="100" value="32">
+            </div>
+
+            <div class="config-group">
+                <div class="config-label-area">
+                    <span class="config-title">風速グラフの高さ</span>
+                    <span id="val-windHeight" class="config-value">280px</span>
+                </div>
+                <input type="range" id="input-windHeight" class="config-slider" min="150" max="500" step="10" value="280">
+            </div>
+
+            <div class="config-group">
+                <div class="config-label-area">
+                    <span class="config-title">気温・海象グラフの高さ</span>
+                    <span id="val-subHeight" class="config-value">160px</span>
+                </div>
+                <input type="range" id="input-subHeight" class="config-slider" min="80" max="300" step="10" value="160">
+            </div>
+
+            <div class="config-group">
+                <div class="config-label-area">
+                    <span class="config-title">グラフ間の余白</span>
+                    <span id="val-margin" class="config-value">15px</span>
+                </div>
+                <input type="range" id="input-margin" class="config-slider" min="0" max="50" step="1" value="15">
+            </div>
+
+            <div class="config-group">
+                <div class="config-label-area">
+                    <span class="config-title">ラベル文字サイズ</span>
+                    <span id="val-fontSize" class="config-value">12px</span>
+                </div>
+                <input type="range" id="input-fontSize" class="config-slider" min="8" max="24" step="1" value="12">
+            </div>
+
+            <div class="config-group">
+                <div class="config-label-area">
+                    <span class="config-title">風向アイコン倍率</span>
+                    <span id="val-iconScale" class="config-value">0.8</span>
+                </div>
+                <input type="range" id="input-iconScale" class="config-slider" min="0.5" max="1.5" step="0.1" value="0.8">
+            </div>
+
+        </div>
+
+        <div class="modal-footer">
+            <div class="guide-text">※保存するとページが再読み込みされ、設定が反映されます。</div>
+            <button id="closeViewSettings" class="btn">閉じる</button>
+            <button id="saveViewSettings" class="btn btn-apply">設定を保存</button>
         </div>
     </div>
 </div>
