@@ -471,32 +471,34 @@ async function onMapClick(e) {
 }
 
 async function fetchAddressInfo(lat, lng) {
+    document.getElementById('map-status').innerText = "地点情報を取得中...";
     try {
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ja`);
         const data = await res.json();
         const addr = data.address;
-        const name = addr.city || addr.town || addr.village || "新規地点";
-        
-        const tempBtn = document.getElementById('temp-view-btn');
-        if (tempBtn) {
-            tempBtn.onclick = () => { updateLocation(lat, lng, name + "(未)"); closeModal('map-modal'); };
-            tempBtn.disabled = false;
-        }
-        
-        const saveBtn = document.getElementById('save-spot-btn');
-        if (saveBtn) {
-            saveBtn.onclick = () => {
-                const spotName = prompt("地点名", name);
-                if (spotName) {
-                    mySpots.push({lat, lon: lng, label: spotName});
-                    localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-                    updateLocation(lat, lng, spotName);
-                    closeModal('map-modal');
-                }
-            };
-            saveBtn.disabled = false;
-        }
-    } catch (err) { console.error(err); }
+        const city = addr.city || addr.town || addr.village || "";
+        const district = addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district || "";
+        const defaultName = city + district || "新規地点";
+
+        document.getElementById('temp-view-btn').onclick = () => {
+            updateLocation(lat, lng, defaultName + "(未登録)");
+            closeModal('map-modal');
+        };
+        document.getElementById('temp-view-btn').disabled = false;
+
+        document.getElementById('save-spot-btn').onclick = () => {
+            const spotName = prompt("登録する地点名を確認・修正してください", defaultName);
+            if (spotName) {
+                mySpots.push({lat, lon: lng, label: spotName});
+                localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                renderTabs();
+                updateLocation(lat, lng, spotName);
+                closeModal('map-modal');
+            }
+        };
+        document.getElementById('save-spot-btn').disabled = false;
+        document.getElementById('map-status').innerText = "選択中: " + defaultName;
+    } catch (err) { document.getElementById('map-status').innerText = "地点名取得失敗"; }
 }
 
 async function updateLocation(lat, lon, label) {
@@ -765,7 +767,7 @@ async function draw() {
                     <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>🌊波高: ${allData.data.wave_height ? allData.data.wave_height[hourIdx]?.toFixed(2) : "0.00"}m<br>
                     <div class="icon-box"><span class="legend-line" style="background:#1e90ff; margin-right:0;"></span></div>📏潮位: ${allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl[hourIdx]?.toFixed(2) : "0.00"}m
                     <div style="margin-top:6px; border-top:1px solid #444; padding-top:4px; font-size:10px; color:#ccc; line-height:1.4;">
-                        <span style="display:inline-block; width:15px; border-top:4px dashed #0000FF; vertical-align:middle; margin-right:4px;"></span>現在時刻 ${nStr}<br>
+                        <span style="display:inline-block; width:15px; border-top:4px dotted #0000FF; vertical-align:middle; margin-right:4px;"></span>現在時刻 ${nStr}<br>
                         <span style="display:inline-block; width:15px; border-top:4px dotted #228b22; vertical-align:middle; margin-right:4px;"></span>データ取得 ${ftStr}
 
                     </div>
