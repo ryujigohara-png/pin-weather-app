@@ -706,14 +706,14 @@ async function draw() {
                 tooltip.style.display = "block";
                 
                 // ツールチップの位置判定（マウスが画面中央より右なら左側に表示）
-                const tooltipWidth = 240;
+                const tooltipWidth = 160;
                 let tx;
                 if (e.clientX > window.innerWidth / 2) {
                     // 左側に表示
-                    tx = e.clientX - tooltipWidth - 20;
+                    tx = e.clientX - tooltipWidth - 10;
                 } else {
                     // 右側に表示
-                    tx = e.clientX + 20;
+                    tx = e.clientX + 10;
                 }
 
                 tooltip.style.left = tx + "px";
