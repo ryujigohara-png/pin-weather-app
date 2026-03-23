@@ -522,14 +522,15 @@ async function fetchWithCache(lat, lon) {
     const now = Date.now();
     if (cached) {
         const parsed = JSON.parse(cached);
-        if (now - parsed.timestamp < CACHE_DURATION) return parsed.data;
+        if (now - parsed.timestamp < CACHE_DURATION) return { timestamp: parsed.timestamp, data: parsed.data };
     }
     const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&forecast_days=9&wind_speed_unit=ms`;
     const mUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto&forecast_days=9&cell_selection=sea`;
     const [wRes, mRes] = await Promise.all([fetch(wUrl).then(r => r.json()), fetch(mUrl).then(r => r.json())]);
     const mergedData = { ...wRes.hourly, ...mRes.hourly };
-    localStorage.setItem(cacheKey, JSON.stringify({ timestamp: now, data: mergedData }));
-    return mergedData;
+    const cacheData = { timestamp: now, data: mergedData };
+    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    return cacheData;
 }
 
 /**
@@ -545,7 +546,7 @@ async function draw() {
 
         // --- 表示開始位置の計算（現在時刻の4時間前から） ---
         const now = new Date();
-        const fullIdx = allData.time.findIndex(t => new Date(t) > now) - 1;
+        const fullIdx = allData.data.time.findIndex(t => new Date(t) > now) - 1;
         const startIdx = Math.max(0, fullIdx - 4);
         const displayCount = 216 - startIdx;
 
@@ -574,9 +575,9 @@ async function draw() {
         let wHtml = "";
         for(let i = startIdx; i < 216; i++) {
             const x = (i - startIdx) * hScale; 
-            const icon = weatherIcons[allData.weather_code[i]] || "❓";
+            const icon = weatherIcons[allData.data.weather_code[i]] || "❓";
             wHtml += `<text x="${x}" y="32" font-size="28" text-anchor="middle">${icon}</text>`; 
-            const p = allData.precipitation ? allData.precipitation[i] : 0;
+            const p = allData.data.precipitation ? allData.data.precipitation[i] : 0;
             if (p > 0) wHtml += `<text x="${x}" y="70" font-size="${labelFS + 2}" font-weight="bold" fill="#0000FF" text-anchor="middle">${p.toFixed(1)}</text>`;
         }
         svgW.innerHTML = wHtml;
@@ -605,7 +606,7 @@ async function draw() {
             const weekDays = ["日", "月", "火", "水", "木", "金", "土"];
             for (let i = startIdx; i < 216; i++) {
                 const x = (i - startIdx) * hScale;
-                const d = new Date(allData.time[i]);
+                const d = new Date(allData.data.time[i]);
                 
                 // 日付ラベル生成（hScaleに基づいた配置）
                 if (i % 24 === 0 || i === startIdx) {
@@ -633,7 +634,7 @@ async function draw() {
             // --- 縦線描画（現在時刻：青、データ取得時刻：緑）精密座標版 ---
             
             // 基準となる開始時刻（startIdx時点の時刻）を取得
-            const startTime = new Date(allData.time[startIdx]).getTime();
+            const startTime = new Date(allData.data.time[startIdx]).getTime();
 
             // 1. 現在時刻線 (青) - 分単位まで正確に描画
             const nowTime = new Date().getTime();
@@ -645,8 +646,8 @@ async function draw() {
             }
 
             // 2. データ取得時刻線 (緑) - キャッシュ時刻を正確に描画
-            if (allData.fetchedAt) {
-                const fetchedTime = new Date(allData.fetchedAt).getTime();
+            if (allData.timestamp) {
+                const fetchedTime = new Date(allData.timestamp).getTime();
                 const diffHoursFetch = (fetchedTime - startTime) / (1000 * 60 * 60); // 開始点からの経過時間(h)
                 
                 if (diffHoursFetch >= 0 && diffHoursFetch < (216 - startIdx)) {
@@ -662,7 +663,7 @@ async function draw() {
                         const val = ds.data[i] || 0;
                         const h = ((val - min) / range) * plotHeight;
                         const x = (i - startIdx) * hScale;
-                        const deg = allData.wind_direction_10m[i];
+                        const deg = allData.data.wind_direction_10m[i];
                         const dirText = getWindDirText(deg);
                         let color = targetWindDirections.includes(dirText) ? (val >= 10.0 ? '#dc143c' : (val >= 5 ? '#ffa500' : '#87ceeb')) : (val >= 10.0 ? 'rgba(220, 20, 60, 0.4)' : '#ccc');
                         html += `<rect x="${x - (hScale*0.4)}" y="${plotHeight-h}" width="${hScale*0.8}" height="${h}" fill="${color}" />`;
@@ -684,9 +685,9 @@ async function draw() {
             svg.innerHTML = html;
         }
 
-        renderSection("svg-wind", "date-wind", [{ data: allData.wind_speed_10m, type: 'bar' }], viewConfig.windHeight, 5.0, true, false);
-        renderSection("svg-temps", "date-temp", [{ data: allData.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, false);
-        renderSection("svg-marine", "date-marine", [{ data: allData.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.sea_level_height_msl, type: 'line', cls: 'line-tide' }], viewConfig.subHeight, 0.5, false, true);
+        renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], viewConfig.windHeight, 5.0, true, false);
+        renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, false);
+        renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], viewConfig.subHeight, 0.5, false, true);
 
         const scrollRoot = document.getElementById('scroll-root');
         const stage = document.getElementById('stage');
@@ -739,31 +740,36 @@ async function draw() {
                 tooltip.style.left = tx + "px";
                 tooltip.style.top = (e.clientY + 20) + "px";
 
-                const d = new Date(allData.time[hourIdx]); 
+                const d = new Date(allData.data.time[hourIdx]); 
                 const weekDays = ["日", "月", "火", "水", "木", "金", "土"];
                 const dayStr = weekDays[d.getDay()];
-                const deg = allData.wind_direction_10m[hourIdx];
-                const ft = new Date();
-                const ftStr = `${ft.getHours()}:${ft.getMinutes().toString().padStart(2, '0')}`;
+                const deg = allData.data.wind_direction_10m[hourIdx];
+                
+                // データ取得時刻の書式整形
+                let ftStr = "--/--(曜) --:--";
+                if (allData.timestamp) {
+                    const ft = new Date(allData.timestamp);
+                    const ftDayStr = weekDays[ft.getDay()];
+                    ftStr = `${ft.getMonth()+1}/${ft.getDate()}(${ftDayStr}) ${ft.getHours()}:${ft.getMinutes().toString().padStart(2, '0')}`;
+                }
 
                 tooltip.innerHTML = `
                     <span class="spot-name-tip">📍 ${currentLabel}</span>
                     <b>${d.getMonth()+1}/${d.getDate()}(${dayStr}) ${d.getHours()}:00</b>
-                    <div style="font-size:11px; color:#aaa; margin-bottom:5px;">取得: ${ftStr}</div>
-                    <div class="icon-box"><span class="legend-bar" style="background:#0000FF; margin-right:0;"></span></div>☔降水: ${allData.precipitation ? allData.precipitation[hourIdx]?.toFixed(1) : "0.0"}mm<br>
+                    <div class="icon-box"><span class="legend-bar" style="background:#0000FF; margin-right:0;"></span></div>☔降水: ${allData.data.precipitation ? allData.data.precipitation[hourIdx]?.toFixed(1) : "0.0"}mm<br>
                     <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${(deg+180)%360})"/></svg></div>風向: ${getWindDirText(deg)} (${deg}°)<br>
-                    <div class="icon-box">🚩</div>風速: ${allData.wind_speed_10m[hourIdx]?.toFixed(1) || "0.0"}m/s<br>
-                    <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>🌡️気温: ${allData.temperature_2m[hourIdx]?.toFixed(1) || "0.0"}℃<br>
-                    <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>💧海水: ${allData.sea_surface_temperature ? allData.sea_surface_temperature[hourIdx]?.toFixed(1) : "---"}℃<br>
-                    <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>🌊波高: ${allData.wave_height ? allData.wave_height[hourIdx]?.toFixed(2) : "0.00"}m<br>
-                    <div class="icon-box"><span class="legend-line" style="background:#1e90ff; margin-right:0;"></span></div>📏潮位: ${allData.sea_level_height_msl ? allData.sea_level_height_msl[hourIdx]?.toFixed(2) : "0.00"}m
+                    <div class="icon-box">🚩</div>風速: ${allData.data.wind_speed_10m[hourIdx]?.toFixed(1) || "0.0"}m/s<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>🌡️気温: ${allData.data.temperature_2m[hourIdx]?.toFixed(1) || "0.0"}℃<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>💧海水: ${allData.data.sea_surface_temperature ? allData.data.sea_surface_temperature[hourIdx]?.toFixed(1) : "---"}℃<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>🌊波高: ${allData.data.wave_height ? allData.data.wave_height[hourIdx]?.toFixed(2) : "0.00"}m<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#1e90ff; margin-right:0;"></span></div>📏潮位: ${allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl[hourIdx]?.toFixed(2) : "0.00"}m
+                    <div style="font-size:11px; color:#aaa; margin-top:5px; border-top:1px solid #444; padding-top:2px;">取得: ${ftStr}</div>
                 `;
             };
             stage.onmouseleave = () => { guide.style.display = "none"; tooltip.style.display = "none"; };
         }
     } catch (e) { console.error(e); }
 }
-
 
 /**
  * 監視リスナー：4時間経過判定
