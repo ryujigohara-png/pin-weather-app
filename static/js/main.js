@@ -544,6 +544,18 @@ async function draw() {
         const svgW = document.getElementById('svg-weather');
         if (!svgW) return;
 
+        // --- 基準となる風向アイコン（北向き） ---
+        const baseWindIcon = `<svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle; margin-right:2px;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" /></svg>`;
+
+        // --- Y軸ラベルのアイコン設置 ---
+        const titles = document.querySelectorAll('.y-axis-title');
+        if (titles.length >= 4) {
+            titles[0].innerHTML = `🌦️ 天気<br>降水量mm`;
+            titles[1].innerHTML = `${baseWindIcon}風向<br>🚩 風速(m/s)`;
+            titles[2].innerHTML = `🌡️ 気温(℃)<br>💧 海水(℃)`;
+            titles[3].innerHTML = `🌊 波高<br>📏 潮位(m)`;
+        }
+
         // --- 表示開始位置の計算（現在時刻の4時間前から） ---
         const now = new Date();
         const fullIdx = allData.data.time.findIndex(t => new Date(t) > now) - 1;
@@ -631,29 +643,28 @@ async function draw() {
                     }
                 }
             }
-            // --- 縦線描画（現在時刻：青、データ取得時刻：緑）精密座標版 ---
+            // --- 縦線描画（現在時刻：青破線、データ取得時刻：緑破線）精密座標版 ---
             
             // 基準となる開始時刻（startIdx時点の時刻）を取得
             const startTime = new Date(allData.data.time[startIdx]).getTime();
 
-            // 1. 現在時刻線 (青) - 分単位まで正確に描画
+            // 1. 現在時刻線 (青) - 破線化と太さ変更
             const nowTime = new Date().getTime();
-            const diffHoursNow = (nowTime - startTime) / (1000 * 60 * 60); // 開始点からの経過時間(h)
+            const diffHoursNow = (nowTime - startTime) / (1000 * 60 * 60); 
             
             if (diffHoursNow >= 0 && diffHoursNow < (216 - startIdx)) {
                 const nowX = diffHoursNow * hScale;
-                html += `<line x1="${nowX}" y1="0" x2="${nowX}" y2="${plotHeight}" stroke="#0000FF" stroke-width="2" />`;
+                html += `<line x1="${nowX}" y1="0" x2="${nowX}" y2="${plotHeight}" stroke="#0000FF" stroke-width="2.5" stroke-dasharray="4 3" />`;
             }
 
-            // 2. データ取得時刻線 (緑) - キャッシュ時刻を正確に描画
+            // 2. データ取得時刻線 (緑) - 太さ変更
             if (allData.timestamp) {
                 const fetchedTime = new Date(allData.timestamp).getTime();
-                const diffHoursFetch = (fetchedTime - startTime) / (1000 * 60 * 60); // 開始点からの経過時間(h)
+                const diffHoursFetch = (fetchedTime - startTime) / (1000 * 60 * 60); 
                 
                 if (diffHoursFetch >= 0 && diffHoursFetch < (216 - startIdx)) {
                     const fetchX = diffHoursFetch * hScale;
-                    // 視認性のため、取得時刻は少し細めの実線または点線にする
-                    html += `<line x1="${fetchX}" y1="0" x2="${fetchX}" y2="${plotHeight}" stroke="#228b22" stroke-width="1.5" stroke-dasharray="3 2" />`;
+                    html += `<line x1="${fetchX}" y1="0" x2="${fetchX}" y2="${plotHeight}" stroke="#228b22" stroke-width="2.5" stroke-dasharray="3 2" />`;
                 }
             }
 
@@ -699,7 +710,6 @@ async function draw() {
                 const sl = scrollRoot.scrollLeft;
                 document.querySelectorAll('.sticky-date').forEach(el => {
                     const x = parseFloat(el.dataset.x);
-                    // 次の日付線(24時間後)までの範囲をhScaleで計算
                     const nextX = x + (24 * hScale);
                     el.style.left = (sl >= x && sl < nextX - 100) ? (sl - 100) + "px" : x + "px";
                 });
@@ -711,32 +721,20 @@ async function draw() {
             stage.onmousemove = (e) => {
                 const rect = stage.getBoundingClientRect();
                 const graphX = (e.clientX - rect.left) - 100; 
-                
                 if (graphX < 0 || graphX > totalW) {
                     guide.style.display = "none"; tooltip.style.display = "none"; return;
                 }
 
-                // hScaleに基づいた正確なインデックス計算
                 let hourIdx = Math.round(graphX / hScale) + startIdx;
                 hourIdx = Math.min(Math.max(hourIdx, startIdx), 215);
 
                 const snapX = (hourIdx - startIdx) * hScale + 100;
                 guide.style.left = snapX + "px"; 
                 guide.style.display = "block";
-                
                 tooltip.style.display = "block";
                 
-                // ツールチップの位置判定（マウスが画面中央より右なら左側に表示）
                 const tooltipWidth = 160;
-                let tx;
-                if (e.clientX > window.innerWidth / 2) {
-                    // 左側に表示
-                    tx = e.clientX - tooltipWidth - 10;
-                } else {
-                    // 右側に表示
-                    tx = e.clientX + 10;
-                }
-
+                let tx = (e.clientX > window.innerWidth / 2) ? e.clientX - tooltipWidth - 10 : e.clientX + 10;
                 tooltip.style.left = tx + "px";
                 tooltip.style.top = (e.clientY + 20) + "px";
 
@@ -745,12 +743,15 @@ async function draw() {
                 const dayStr = weekDays[d.getDay()];
                 const deg = allData.data.wind_direction_10m[hourIdx];
                 
-                // データ取得時刻の書式整形
+                // 現在時刻凡例用
+                const n = new Date();
+                const nStr = `${n.getMonth()+1}/${n.getDate()}(${weekDays[n.getDay()]}) ${n.getHours()}:${n.getMinutes().toString().padStart(2, '0')}`;
+
+                // データ取得時刻凡例用
                 let ftStr = "--/--(曜) --:--";
                 if (allData.timestamp) {
                     const ft = new Date(allData.timestamp);
-                    const ftDayStr = weekDays[ft.getDay()];
-                    ftStr = `${ft.getMonth()+1}/${ft.getDate()}(${ftDayStr}) ${ft.getHours()}:${ft.getMinutes().toString().padStart(2, '0')}`;
+                    ftStr = `${ft.getMonth()+1}/${ft.getDate()}(${weekDays[ft.getDay()]}) ${ft.getHours()}:${ft.getMinutes().toString().padStart(2, '0')}`;
                 }
 
                 tooltip.innerHTML = `
@@ -763,7 +764,11 @@ async function draw() {
                     <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>💧海水: ${allData.data.sea_surface_temperature ? allData.data.sea_surface_temperature[hourIdx]?.toFixed(1) : "---"}℃<br>
                     <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>🌊波高: ${allData.data.wave_height ? allData.data.wave_height[hourIdx]?.toFixed(2) : "0.00"}m<br>
                     <div class="icon-box"><span class="legend-line" style="background:#1e90ff; margin-right:0;"></span></div>📏潮位: ${allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl[hourIdx]?.toFixed(2) : "0.00"}m
-                    <div style="font-size:11px; color:#aaa; margin-top:5px; border-top:1px solid #444; padding-top:2px;">取得: ${ftStr}</div>
+                    <div style="margin-top:6px; border-top:1px solid #444; padding-top:4px; font-size:10px; color:#ccc; line-height:1.4;">
+                        <span style="display:inline-block; width:15px; border-top:4px dashed #0000FF; vertical-align:middle; margin-right:4px;"></span>現在時刻 ${nStr}<br>
+                        <span style="display:inline-block; width:15px; border-top:4px dotted #228b22; vertical-align:middle; margin-right:4px;"></span>データ取得 ${ftStr}
+
+                    </div>
                 `;
             };
             stage.onmouseleave = () => { guide.style.display = "none"; tooltip.style.display = "none"; };
