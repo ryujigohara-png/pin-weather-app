@@ -544,14 +544,14 @@ async function draw() {
         const svgW = document.getElementById('svg-weather');
         if (!svgW) return;
 
-        // --- 基準となる風向アイコン（北向き） ---
-        const baseWindIcon = `<svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle; margin-right:2px;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" /></svg>`;
+        // 風向アイコンを西(左)に向け、文字と1行に収まるように調整
+        const baseWindIcon = `<svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle; margin-right:2px; display:inline-block;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(-90)"/></svg>`;
 
         // --- Y軸ラベルのアイコン設置 ---
         const titles = document.querySelectorAll('.y-axis-title');
         if (titles.length >= 4) {
             titles[0].innerHTML = `🌦️ 天気<br>降水量mm`;
-            titles[1].innerHTML = `${baseWindIcon}風向<br>🚩 風速(m/s)`;
+            titles[1].innerHTML = `${baseWindIcon}風向<br>🚩風速(m/s)`;
             titles[2].innerHTML = `🌡️ 気温(℃)<br>💧 海水(℃)`;
             titles[3].innerHTML = `🌊 波高<br>📏 潮位(m)`;
         }
