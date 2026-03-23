@@ -524,7 +524,7 @@ async function fetchWithCache(lat, lon) {
         const parsed = JSON.parse(cached);
         if (now - parsed.timestamp < CACHE_DURATION) return parsed.data;
     }
-    const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&forecast_days=9`;
+    const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&forecast_days=9&wind_speed_unit=ms`;
     const mUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto&forecast_days=9&cell_selection=sea`;
     const [wRes, mRes] = await Promise.all([fetch(wUrl).then(r => r.json()), fetch(mUrl).then(r => r.json())]);
     const mergedData = { ...wRes.hourly, ...mRes.hourly };
@@ -630,10 +630,30 @@ async function draw() {
                     }
                 }
             }
+            // --- 縦線描画（現在時刻：青、データ取得時刻：緑）精密座標版 ---
+            
+            // 基準となる開始時刻（startIdx時点の時刻）を取得
+            const startTime = new Date(allData.time[startIdx]).getTime();
 
-            if (fullIdx >= startIdx && fullIdx < 216) {
-                const nowX = (fullIdx - startIdx) * hScale;
-                html += `<line x1="${nowX}" y1="0" x2="${nowX}" y2="${plotHeight}" class="grid-now" stroke="#0000FF" stroke-width="2" />`;
+            // 1. 現在時刻線 (青) - 分単位まで正確に描画
+            const nowTime = new Date().getTime();
+            const diffHoursNow = (nowTime - startTime) / (1000 * 60 * 60); // 開始点からの経過時間(h)
+            
+            if (diffHoursNow >= 0 && diffHoursNow < (216 - startIdx)) {
+                const nowX = diffHoursNow * hScale;
+                html += `<line x1="${nowX}" y1="0" x2="${nowX}" y2="${plotHeight}" stroke="#0000FF" stroke-width="2" />`;
+            }
+
+            // 2. データ取得時刻線 (緑) - キャッシュ時刻を正確に描画
+            if (allData.fetchedAt) {
+                const fetchedTime = new Date(allData.fetchedAt).getTime();
+                const diffHoursFetch = (fetchedTime - startTime) / (1000 * 60 * 60); // 開始点からの経過時間(h)
+                
+                if (diffHoursFetch >= 0 && diffHoursFetch < (216 - startIdx)) {
+                    const fetchX = diffHoursFetch * hScale;
+                    // 視認性のため、取得時刻は少し細めの実線または点線にする
+                    html += `<line x1="${fetchX}" y1="0" x2="${fetchX}" y2="${plotHeight}" stroke="#228b22" stroke-width="1.5" stroke-dasharray="3 2" />`;
+                }
             }
 
             datasets.forEach(ds => {
