@@ -1,12 +1,12 @@
 let allData = {};
 // --- [追加] 詳細設定の初期値と保存・読込ロジック ---
 const defaultViewConfig = {
-    hourWidth: 32,      // 旧 hScale
-    windHeight: 280,    // 風速グラフ高さ
-    subHeight: 160,     // 気温・海象グラフ高さ
-    graphMargin: 15,    // グラフ間余白
+    hourWidth: 20,      // 旧 hScale
+    windHeight: 180,    // 風速グラフ高さ
+    subHeight: 100,     // 気温・海象グラフ高さ
+    graphMargin: 0,    // グラフ間余白
     fontSize: 12,       // ラベルフォントサイズ
-    iconScale: 0.8      // 風向アイコン倍率
+    iconScale: 0.7      // 風向アイコン倍率
 };
 
 // localStorageから読み込み、なければデフォルトを適用
@@ -735,7 +735,7 @@ async function draw() {
                 guide.style.display = "block";
                 tooltip.style.display = "block";
                 
-                const tooltipWidth = 160;
+                const tooltipWidth = 180;
                 let tx = (e.clientX > window.innerWidth / 2) ? e.clientX - tooltipWidth - 10 : e.clientX + 10;
                 tooltip.style.left = tx + "px";
                 tooltip.style.top = (e.clientY + 20) + "px";
