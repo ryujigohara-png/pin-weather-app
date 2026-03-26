@@ -169,7 +169,7 @@ function applyEnvVisuals() {
     } else {
         config = {
             titleSuffix: "",
-            headerColor: "#7681ba", 
+            headerColor: "#007bff", 
             envName: "Main版"
         };
     }
@@ -247,7 +247,7 @@ function initApp() {
     if (mapBtn) {
         mapBtn.onclick = () => { 
             openMap(); 
-            renderTabs("🗺️ Map"); 
+            renderTabs("Map"); 
         };
     }
 }
@@ -330,8 +330,8 @@ function renderTabs(activeOverrideLabel = null) {
     if (activeSpot) {
         items.push({ id: activeSpot.label, label: `📍 ${activeSpot.label}`, lat: activeSpot.lat, lon: activeSpot.lon, rawLabel: activeSpot.label });
     }
-    items.push({ id: 'gps', label: '🛰️ GPS', isSpecial: true });
-    items.push({ id: 'map', label: '🗺️ Map', isSpecial: true });
+    items.push({ id: 'gps', label: 'GPS', isSpecial: true });
+    items.push({ id: 'map', label: 'Map', isSpecial: true });
     
     displaySpots.forEach(s => {
         items.push({ id: s.label, label: `📍 ${s.label}`, lat: s.lat, lon: s.lon, rawLabel: s.label });
@@ -360,7 +360,7 @@ function renderTabs(activeOverrideLabel = null) {
                 handleGPSClick();
             } else if (item.id === 'map') {
                 openMap();
-                renderTabs("🗺️ Map");
+                renderTabs("Map");
             } else {
                 const idx = mySpots.findIndex(s => s.label === item.rawLabel);
                 if (idx > -1) {
@@ -510,7 +510,7 @@ async function updateLocation(lat, lon, label) {
 function handleGPSClick() {
     if ("geolocation" in navigator) {
         navigator.geolocation.getCurrentPosition((pos) => {
-            updateLocation(pos.coords.latitude, pos.coords.longitude, "🛰️ GPS");
+            updateLocation(pos.coords.latitude, pos.coords.longitude, "GPS");
         });
     }
 }
