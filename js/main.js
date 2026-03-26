@@ -552,10 +552,10 @@ async function draw() {
         // --- Y軸ラベルのアイコン設置 ---
         const titles = document.querySelectorAll('.y-axis-title');
         if (titles.length >= 4) {
-            titles[0].innerHTML = `🌦️ 天気<br>降水量mm`;
-            titles[1].innerHTML = `${baseWindIcon}風向<br>🚩風速(m/s)`;
-            titles[2].innerHTML = `🌡️ 気温(℃)<br>💧 海水(℃)`;
-            titles[3].innerHTML = `🌊 波高(m)<br>📏 潮位(m)`;
+            titles[0].innerHTML = `天気<br>降水量mm`;
+            titles[1].innerHTML = `${baseWindIcon}風向<br>風速(m/s)`;
+            titles[2].innerHTML = `気温(℃)<br>海水(℃)`;
+            titles[3].innerHTML = `波高(m)<br>潮位(m)`;
         }
 
         // --- 表示開始位置の計算（現在時刻の4時間前から） ---
@@ -764,6 +764,8 @@ async function draw() {
                 const weekDays = ["日", "月", "火", "水", "木", "金", "土"];
                 const dayStr = weekDays[d.getDay()];
                 const deg = allData.data.wind_direction_10m[hourIdx];
+                // 追加：天気アイコンの取得
+                const wIcon = weatherIcons[allData.data.weather_code[hourIdx]] || "❓";
                 const n = new Date();
                 const nStr = `${n.getMonth()+1}/${n.getDate()}(${weekDays[n.getDay()]}) ${n.getHours()}:${n.getMinutes().toString().padStart(2, '0')}`;
                 let ftStr = "--/--(曜) --:--";
@@ -774,14 +776,14 @@ async function draw() {
 
                 tooltip.innerHTML = `
                     <span class="spot-name-tip">📍 ${currentLabel}</span>
-                    <b>${d.getMonth()+1}/${d.getDate()}(${dayStr}) ${d.getHours()}:00</b>
-                    <div class="icon-box"><span class="legend-bar" style="background:#0000FF; margin-right:0;"></span></div>☔降水: ${allData.data.precipitation ? allData.data.precipitation[hourIdx]?.toFixed(1) : "0.0"}mm<br>
+                    <b>${d.getMonth()+1}/${d.getDate()}(${dayStr}) ${d.getHours()}:00 ${wIcon}</b>
+                    <div class="icon-box"><span class="legend-bar" style="background:#0000FF; margin-right:0;"></span></div>降水: ${allData.data.precipitation ? allData.data.precipitation[hourIdx]?.toFixed(1) : "0.0"}mm<br>
                     <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${(deg+180)%360})"/></svg></div>風向: ${getWindDirText(deg)} (${deg}°)<br>
                     <div class="icon-box">🚩</div>風速: ${allData.data.wind_speed_10m[hourIdx]?.toFixed(1) || "0.0"}m/s<br>
-                    <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>🌡️気温: ${allData.data.temperature_2m[hourIdx]?.toFixed(1) || "0.0"}℃<br>
-                    <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>💧海水: ${allData.data.sea_surface_temperature ? allData.data.sea_surface_temperature[hourIdx]?.toFixed(1) : "---"}℃<br>
-                    <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>🌊波高: ${allData.data.wave_height ? allData.data.wave_height[hourIdx]?.toFixed(2) : "0.00"}m<br>
-                    <div class="icon-box"><span class="legend-line" style="background:#1e90ff; margin-right:0;"></span></div>📏潮位: ${allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl[hourIdx]?.toFixed(2) : "0.00"}m
+                    <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>気温: ${allData.data.temperature_2m[hourIdx]?.toFixed(1) || "0.0"}℃<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>海水: ${allData.data.sea_surface_temperature ? allData.data.sea_surface_temperature[hourIdx]?.toFixed(1) : "---"}℃<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>波高: ${allData.data.wave_height ? allData.data.wave_height[hourIdx]?.toFixed(2) : "0.00"}m<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#1e90ff; margin-right:0;"></span></div>潮位: ${allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl[hourIdx]?.toFixed(2) : "0.00"}m
                     <div style="margin-top:6px; border-top:1px solid #444; padding-top:4px; font-size:10px; color:#ccc; line-height:1.4;">
                         <span style="display:inline-block; width:15px; border-top:4px dotted #0000FF; vertical-align:middle; margin-right:4px;"></span>現在時刻 ${nStr}<br>
                         <span style="display:inline-block; width:15px; border-top:4px dotted #228b22; vertical-align:middle; margin-right:4px;"></span>データ取得 ${ftStr}
