@@ -312,39 +312,75 @@ function initCompassUI() {
     }
 }
 
+/**
+ * タブのレンダリング処理
+ * 未登録地点（GPS/Map/ブラウザ保持情報）を左端に表示し、新しい地点で塗り替える。
+ */
 function renderTabs(activeOverrideLabel = null) {
     const container = document.getElementById('spot-tabs');
     if (!container) return;
     container.innerHTML = "";
 
+    // 優先順位：引数の指定ラベル > 現在保持しているラベル(currentLabel)
     const activeLabel = activeOverrideLabel || currentLabel;
+    
+    // mySpotsの中にアクティブなラベルがあるか確認
     const activeIdx = mySpots.findIndex(s => s.label === activeLabel);
     let displaySpots = [...mySpots];
     let activeSpot = null;
+    let isExternalSpot = false;
 
     if (activeIdx > -1) {
+        // 1. 登録済みの地点がアクティブな場合
         activeSpot = displaySpots.splice(activeIdx, 1)[0];
+    } else if (activeLabel && activeLabel !== 'GPS' && activeLabel !== 'Map') {
+        // 2. 未登録地点（GPS/Map/ブラウザ保持）がアクティブな場合
+        isExternalSpot = true;
+        activeSpot = {
+            label: activeLabel,
+            lat: currentLat,
+            lon: currentLon
+        };
     }
 
     let items = [];
+
+    // --- タブ配列の組み立て ---
+
+    // アクティブな地点を最優先（左端）に配置
     if (activeSpot) {
-        items.push({ id: activeSpot.label, label: `📍 ${activeSpot.label}`, lat: activeSpot.lat, lon: activeSpot.lon, rawLabel: activeSpot.label });
+        items.push({ 
+            id: activeSpot.label, 
+            // 未登録なら📍なし、登録済みなら📍付き（判別用）
+            label: isExternalSpot ? activeSpot.label : `📍 ${activeSpot.label}`, 
+            lat: activeSpot.lat, 
+            lon: activeSpot.lon, 
+            rawLabel: activeSpot.label,
+            isExternal: isExternalSpot 
+        });
     }
+
+    // 特殊ボタン（GPS, Map）
     items.push({ id: 'gps', label: 'GPS', isSpecial: true });
     items.push({ id: 'map', label: 'Map', isSpecial: true });
     
+    // 残りの登録済み地点
     displaySpots.forEach(s => {
         items.push({ id: s.label, label: `📍 ${s.label}`, lat: s.lat, lon: s.lon, rawLabel: s.label });
     });
+
+    // --- ボタンの生成 ---
 
     items.forEach((item) => {
         const btn = document.createElement('button');
         const isSelected = (item.id === activeLabel || item.label === activeLabel || item.rawLabel === activeLabel);
         
         btn.className = 'btn';
-        if (item.id === 'gps') btn.classList.add('btn-gps');
-        else if (item.id === 'map') btn.classList.add('btn-map-view');
-        else {
+        if (item.id === 'gps') {
+            btn.classList.add('btn-gps');
+        } else if (item.id === 'map') {
+            btn.classList.add('btn-map-view');
+        } else {
             btn.classList.add('btn-location');
             btn.setAttribute('data-raw-label', item.rawLabel);
         }
@@ -362,17 +398,21 @@ function renderTabs(activeOverrideLabel = null) {
                 openMap();
                 renderTabs("Map");
             } else {
-                const idx = mySpots.findIndex(s => s.label === item.rawLabel);
-                if (idx > -1) {
-                    const selectedSpot = mySpots.splice(idx, 1)[0];
-                    mySpots.unshift(selectedSpot);
-                    localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                // 登録済み地点(📍あり)のみ、お気に入り順序を入れ替える
+                if (!item.isExternal) {
+                    const idx = mySpots.findIndex(s => s.label === item.rawLabel);
+                    if (idx > -1) {
+                        const selectedSpot = mySpots.splice(idx, 1)[0];
+                        mySpots.unshift(selectedSpot);
+                        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                    }
                 }
                 updateLocation(item.lat, item.lon, item.rawLabel);
             }
         };
 
-        if (!item.isSpecial) {
+        // 登録済み地点のみ削除可能
+        if (!item.isSpecial && !item.isExternal) {
             const spotIdx = mySpots.findIndex(s => s.label === item.rawLabel);
             btn.oncontextmenu = (e) => { e.preventDefault(); confirmDelete(spotIdx); };
             let timer;
@@ -497,7 +537,7 @@ async function fetchAddressInfo(lat, lng) {
             }
         };
         document.getElementById('save-spot-btn').disabled = false;
-        document.getElementById('map-status').innerText = "選択中: " + defaultName;
+        document.getElementById('map-status').innerText = "◎ " + defaultName;
     } catch (err) { document.getElementById('map-status').innerText = "地点名取得失敗"; }
 }
 
