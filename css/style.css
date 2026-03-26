@@ -229,6 +229,31 @@ svg { width: 100%; display: block; overflow: visible; }
 .line-tide { stroke: #1e90ff; stroke-width: 3; fill: none; }
 .wind-arrow { fill: #00d4ff; stroke: #008eb3; stroke-width: 1; }
 
+.y-axis-values {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    font-size: 14px;
+    font-weight: bold;
+    color: #444;
+}
+
+.y-max {
+    position: absolute;
+    top: -10px;
+    right: 5px;
+}
+
+.y-min {
+    position: absolute;
+    bottom: 10px; /* 下部ラベルと重ならないように調整 */
+    right: 5px;
+}
+
+
 /* ツールチップ */
 .tooltip {
     position: fixed; background: rgba(0,0,0,0.85); color: white;

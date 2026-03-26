@@ -555,7 +555,7 @@ async function draw() {
             titles[0].innerHTML = `🌦️ 天気<br>降水量mm`;
             titles[1].innerHTML = `${baseWindIcon}風向<br>🚩風速(m/s)`;
             titles[2].innerHTML = `🌡️ 気温(℃)<br>💧 海水(℃)`;
-            titles[3].innerHTML = `🌊 波高<br>📏 潮位(m)`;
+            titles[3].innerHTML = `🌊 波高(m)<br>📏 潮位(m)`;
         }
 
         // --- 表示開始位置の計算（現在時刻の4時間前から） ---
@@ -601,6 +601,7 @@ async function draw() {
             const svg = document.getElementById(svgId);
             const dateCont = document.getElementById(dateContId);
             const dateTop = document.getElementById('date-top');
+            const valCont = document.getElementById(`val-${svgId}`);
 
             if (!svg || !dateCont) return;
             dateCont.innerHTML = "";
@@ -612,6 +613,10 @@ async function draw() {
             let max = Math.ceil(Math.max(...allVals) / stepY) * stepY;
             let min = Math.floor(Math.min(...allVals) / stepY) * stepY;
             if (isWind) min = 0;
+            // ▽ 追加：最大値と最小値をラベルに反映（絶対位置などはCSSで制御することを想定）
+            if (valCont) {
+                valCont.innerHTML = `<div class="y-max">${max.toFixed(isWind ? 0 : 1)}</div><div class="y-min">${min.toFixed(isWind ? 0 : 1)}</div>`;
+            }
             const range = (max - min) || 1;
             const plotHeight = height - 20; 
             let html = "";
@@ -784,6 +789,37 @@ async function draw() {
                 `;
             };
             stage.onmouseleave = () => { guide.style.display = "none"; tooltip.style.display = "none"; };
+        }
+        // --- Yahoo雨雲レーダーリンクのボタン生成 ---
+        const radarContainer = document.getElementById('radar-link-container');
+        if (radarContainer) {
+            const now = new Date();
+            const Y = now.getFullYear();
+            const M = String(now.getMonth() + 1).padStart(2, '0');
+            const D = String(now.getDate()).padStart(2, '0');
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(Math.floor(now.getMinutes() / 5) * 5).padStart(2, '0');
+            const tParam = `${Y}${M}${D}${h}${m}00`;
+
+            const radarUrl = `https://weather.yahoo.co.jp/weather/zoomradar/?lat=${currentLat}&lon=${currentLon}&z=9.0&t=${tParam}`;
+            
+            // ボタン風の装飾をインラインスタイルで適用
+            radarContainer.innerHTML = `
+                <a href="${radarUrl}" target="_blank" style="
+                    display: inline-block;
+                    padding: 10px 20px;
+                    background-color: #007bff;
+                    color: white;
+                    text-decoration: none;
+                    border-radius: 5px;
+                    font-weight: bold;
+                    font-size: 14px;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                    transition: transform 0.2s, background-color 0.2s;
+                ">
+                    🌦️ Yahoo! 雨雲レーダーを表示
+                </a>
+            `;
         }
     } catch (e) { console.error(e); }
 }
