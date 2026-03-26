@@ -459,8 +459,10 @@ function openMap() {
         map = L.map('map-canvas', { center: [currentLat, currentLon], zoom: 14, layers: [esri] });
         L.control.layers({ "標準地図": esri, "衛星写真": satellite, "地理院地図": gsi }).addTo(map);
         map.on('click', onMapClick);
+        fetchAddressInfo(currentLat, currentLon);
     } else {
         map.setView([currentLat, currentLon], 14);
+        fetchAddressInfo(currentLat, currentLon);
     }
     if (tempMarker) map.removeLayer(tempMarker);
     tempMarker = L.marker([currentLat, currentLon]).addTo(map);
