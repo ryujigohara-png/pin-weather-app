@@ -262,8 +262,8 @@ svg { width: 100%; display: block; overflow: visible; }
     box-shadow: 0 5px 15px rgba(0,0,0,0.3); backdrop-filter: blur(4px);
     white-space: nowrap;
 }
-.tooltip b { display: block; margin-bottom: 6px; border-bottom: 1px solid #666; padding-bottom: 2px; }
-.tooltip .spot-name-tip { color: #00d4ff; font-weight: bold; border-bottom: 1px dashed #666; margin-bottom: 4px; padding-bottom: 2px; display: block; }
+.tooltip b { display: block; margin-bottom: 6px; font-size: 16px; border-bottom: 1px solid #666; padding-bottom: 2px; }
+.tooltip .spot-name-tip { color: #00d4ff; font-size: 16px; font-weight: bold; border-bottom: 1px dashed #666; margin-bottom: 4px; padding-bottom: 2px; display: block; }
 
 .icon-box { display: inline-block; width: 24px; text-align: center; vertical-align: middle; margin-right: 4px; }
 .legend-bar { display: inline-block; width: 12px; height: 12px; vertical-align: middle; }
