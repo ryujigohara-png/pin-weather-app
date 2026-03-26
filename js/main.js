@@ -597,11 +597,15 @@ async function draw() {
         svgW.innerHTML = wHtml;
 
         // --- 各セクション描画関数 ---
-        function renderSection(svgId, dateContId, datasets, height, stepY, isWind = false, isLast = false) {
+        function renderSection(svgId, dateContId, datasets, height, stepY, isWind = false, isLast = false, isFirst = false) {
             const svg = document.getElementById(svgId);
             const dateCont = document.getElementById(dateContId);
+            const dateTop = document.getElementById('date-top');
+
             if (!svg || !dateCont) return;
             dateCont.innerHTML = "";
+            if (isFirst && dateTop) dateTop.innerHTML = "";
+            
             const allVals = datasets.flatMap(ds => ds.data ? ds.data.slice(startIdx) : []);
             if (allVals.length === 0) return;
             
@@ -622,20 +626,32 @@ async function draw() {
                 const x = (i - startIdx) * hScale;
                 const d = new Date(allData.data.time[i]);
                 
-                // 日付ラベル生成（hScaleに基づいた配置）
                 if (i % 24 === 0 || i === startIdx) {
                     html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight}" class="grid-day" />`;
-                    const dateDiv = document.createElement('div');
-                    dateDiv.className = 'sticky-date';
-                    dateDiv.style.left = `${x}px`;
-                    dateDiv.dataset.x = x;
                     
                     const dayIdx = d.getDay();
                     const dayStr = weekDays[dayIdx];
                     let dayColor = (dayIdx === 0) ? "#FF0000" : (dayIdx === 6 ? "#0000FF" : "#000000");
+                    // 修正点：labelContentの生成をdayStr, dayColorの定義の後に移動
+                    const labelContent = `<span style="color:${dayColor}; font-size:${labelFS * 1.5}px;">${d.getMonth()+1}/${d.getDate()}(${dayStr})</span>`;
+
+                    const dateDiv = document.createElement('div');
+                    dateDiv.className = 'sticky-date';
+                    dateDiv.style.left = `${x}px`;
+                    dateDiv.dataset.x = x;
+
+                    // 【追加】上部コンテナ用ラベル生成 (isFirstがtrueの時のみ)
+                    if (isFirst && dateTop) {
+                        const topDiv = document.createElement('div');
+                        topDiv.className = 'sticky-date';
+                        topDiv.style.left = `${x}px`;
+                        topDiv.dataset.x = x;
+                        topDiv.innerHTML = labelContent;
+                        dateTop.appendChild(topDiv);
+                    }
 
                     if (isLast) {
-                        dateDiv.innerHTML = `<span style="color:${dayColor}; font-size:${labelFS * 1.5}px;">${d.getMonth()+1}/${d.getDate()}(${dayStr})</span>`;
+                        dateDiv.innerHTML = labelContent;
                     }
                     dateCont.appendChild(dateDiv);
                 } else if (i % 3 === 0) {
@@ -645,25 +661,18 @@ async function draw() {
                     }
                 }
             }
-            // --- 縦線描画（現在時刻：青破線、データ取得時刻：緑破線）精密座標版 ---
-            
-            // 基準となる開始時刻（startIdx時点の時刻）を取得
-            const startTime = new Date(allData.data.time[startIdx]).getTime();
 
-            // 1. 現在時刻線 (青) - 破線化と太さ変更
+            // --- 縦線描画（現在時刻・データ取得時刻） ---
+            const startTime = new Date(allData.data.time[startIdx]).getTime();
             const nowTime = new Date().getTime();
             const diffHoursNow = (nowTime - startTime) / (1000 * 60 * 60); 
-            
             if (diffHoursNow >= 0 && diffHoursNow < (216 - startIdx)) {
                 const nowX = diffHoursNow * hScale;
                 html += `<line x1="${nowX}" y1="0" x2="${nowX}" y2="${plotHeight}" stroke="#0000FF" stroke-width="2.5" stroke-dasharray="4 3" />`;
             }
-
-            // 2. データ取得時刻線 (緑) - 太さ変更
             if (allData.timestamp) {
                 const fetchedTime = new Date(allData.timestamp).getTime();
                 const diffHoursFetch = (fetchedTime - startTime) / (1000 * 60 * 60); 
-                
                 if (diffHoursFetch >= 0 && diffHoursFetch < (216 - startIdx)) {
                     const fetchX = diffHoursFetch * hScale;
                     html += `<line x1="${fetchX}" y1="0" x2="${fetchX}" y2="${plotHeight}" stroke="#228b22" stroke-width="2.5" stroke-dasharray="3 2" />`;
@@ -698,9 +707,9 @@ async function draw() {
             svg.innerHTML = html;
         }
 
-        renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], viewConfig.windHeight, 5.0, true, false);
-        renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, false);
-        renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], viewConfig.subHeight, 0.5, false, true);
+        renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], viewConfig.windHeight, 5.0, true, false, true);
+        renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, false, false);
+        renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], viewConfig.subHeight, 0.5, false, true, false);
 
         const scrollRoot = document.getElementById('scroll-root');
         const stage = document.getElementById('stage');
@@ -739,11 +748,10 @@ async function draw() {
                 let tx = (e.clientX > window.innerWidth / 2) ? e.clientX - tooltipWidth - 10 : e.clientX + 10;
                 tooltip.style.left = tx + "px";
 
-                // --- 縦方向の衝突検知修正（案2） ---
                 let ty = e.clientY + 20;
-                const tooltipHeight = tooltip.offsetHeight || 250; // 高さ取得、未描画時は概算
+                const tooltipHeight = tooltip.offsetHeight || 250; 
                 if (ty + tooltipHeight > window.innerHeight) {
-                    ty = window.innerHeight - tooltipHeight - 10; // 画面内に収まるように上にずらす
+                    ty = window.innerHeight - tooltipHeight - 10; 
                 }
                 tooltip.style.top = ty + "px";
 
@@ -751,12 +759,8 @@ async function draw() {
                 const weekDays = ["日", "月", "火", "水", "木", "金", "土"];
                 const dayStr = weekDays[d.getDay()];
                 const deg = allData.data.wind_direction_10m[hourIdx];
-                
-                // 現在時刻凡例用
                 const n = new Date();
                 const nStr = `${n.getMonth()+1}/${n.getDate()}(${weekDays[n.getDay()]}) ${n.getHours()}:${n.getMinutes().toString().padStart(2, '0')}`;
-
-                // データ取得時刻凡例用
                 let ftStr = "--/--(曜) --:--";
                 if (allData.timestamp) {
                     const ft = new Date(allData.timestamp);
@@ -776,7 +780,6 @@ async function draw() {
                     <div style="margin-top:6px; border-top:1px solid #444; padding-top:4px; font-size:10px; color:#ccc; line-height:1.4;">
                         <span style="display:inline-block; width:15px; border-top:4px dotted #0000FF; vertical-align:middle; margin-right:4px;"></span>現在時刻 ${nStr}<br>
                         <span style="display:inline-block; width:15px; border-top:4px dotted #228b22; vertical-align:middle; margin-right:4px;"></span>データ取得 ${ftStr}
-
                     </div>
                 `;
             };
