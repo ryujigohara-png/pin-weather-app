@@ -738,7 +738,14 @@ async function draw() {
                 const tooltipWidth = 180;
                 let tx = (e.clientX > window.innerWidth / 2) ? e.clientX - tooltipWidth - 10 : e.clientX + 10;
                 tooltip.style.left = tx + "px";
-                tooltip.style.top = (e.clientY + 20) + "px";
+
+                // --- 縦方向の衝突検知修正（案2） ---
+                let ty = e.clientY + 20;
+                const tooltipHeight = tooltip.offsetHeight || 250; // 高さ取得、未描画時は概算
+                if (ty + tooltipHeight > window.innerHeight) {
+                    ty = window.innerHeight - tooltipHeight - 10; // 画面内に収まるように上にずらす
+                }
+                tooltip.style.top = ty + "px";
 
                 const d = new Date(allData.data.time[hourIdx]); 
                 const weekDays = ["日", "月", "火", "水", "木", "金", "土"];
