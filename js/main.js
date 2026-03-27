@@ -7,7 +7,7 @@ const defaultViewConfig = {
     graphMargin: 0,    // グラフ間余白
     fontSize: 12,       // ラベルフォントサイズ
     iconScale: 0.7,     // 風向アイコン倍率
-    tooltipDuration: 3 // ツールチップ表示時間（s）
+    tooltipDuration: 7 // ツールチップ表示時間（s）
 };
 
 // 2. 読み込み時に「マージ（統合）」する
