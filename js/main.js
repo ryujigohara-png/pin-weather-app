@@ -313,28 +313,23 @@ function initCompassUI() {
 }
 
 /**
- * タブのレンダリング処理
- * 未登録地点（GPS/Map/ブラウザ保持情報）を左端に表示し、新しい地点で塗り替える。
+ * サブルーチン：タブのレンダリング処理
+ * 未登録地点を左端に表示し、isSelected時にスムーズスクロールで左端へ持ってくる。
  */
 function renderTabs(activeOverrideLabel = null) {
     const container = document.getElementById('spot-tabs');
     if (!container) return;
     container.innerHTML = "";
 
-    // 優先順位：引数の指定ラベル > 現在保持しているラベル(currentLabel)
     const activeLabel = activeOverrideLabel || currentLabel;
-    
-    // mySpotsの中にアクティブなラベルがあるか確認
     const activeIdx = mySpots.findIndex(s => s.label === activeLabel);
     let displaySpots = [...mySpots];
     let activeSpot = null;
     let isExternalSpot = false;
 
     if (activeIdx > -1) {
-        // 1. 登録済みの地点がアクティブな場合
         activeSpot = displaySpots.splice(activeIdx, 1)[0];
-    } else if (activeLabel && activeLabel !== 'GPS' && activeLabel !== 'Map') {
-        // 2. 未登録地点（GPS/Map/ブラウザ保持）がアクティブな場合
+    } else if (activeLabel && activeLabel !== 'gps' && activeLabel !== 'map' && activeLabel !== 'GPS' && activeLabel !== 'Map') {
         isExternalSpot = true;
         activeSpot = {
             label: activeLabel,
@@ -344,14 +339,9 @@ function renderTabs(activeOverrideLabel = null) {
     }
 
     let items = [];
-
-    // --- タブ配列の組み立て ---
-
-    // アクティブな地点を最優先（左端）に配置
     if (activeSpot) {
         items.push({ 
             id: activeSpot.label, 
-            // 未登録なら📍なし、登録済みなら📍付き（判別用）
             label: isExternalSpot ? activeSpot.label : `📍 ${activeSpot.label}`, 
             lat: activeSpot.lat, 
             lon: activeSpot.lon, 
@@ -360,16 +350,12 @@ function renderTabs(activeOverrideLabel = null) {
         });
     }
 
-    // 特殊ボタン（GPS, Map）
     items.push({ id: 'gps', label: 'GPS', isSpecial: true });
     items.push({ id: 'map', label: 'Map', isSpecial: true });
     
-    // 残りの登録済み地点
     displaySpots.forEach(s => {
         items.push({ id: s.label, label: `📍 ${s.label}`, lat: s.lat, lon: s.lon, rawLabel: s.label });
     });
-
-    // --- ボタンの生成 ---
 
     items.forEach((item) => {
         const btn = document.createElement('button');
@@ -387,7 +373,8 @@ function renderTabs(activeOverrideLabel = null) {
 
         if (isSelected) {
             btn.classList.add('active');
-            setTimeout(() => btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }), 100);
+            // 'start' にすることで左端にスクロールさせる
+            setTimeout(() => btn.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' }), 100);
         }
         btn.innerText = item.label;
 
@@ -398,7 +385,6 @@ function renderTabs(activeOverrideLabel = null) {
                 openMap();
                 renderTabs("Map");
             } else {
-                // 登録済み地点(📍あり)のみ、お気に入り順序を入れ替える
                 if (!item.isExternal) {
                     const idx = mySpots.findIndex(s => s.label === item.rawLabel);
                     if (idx > -1) {
@@ -411,7 +397,6 @@ function renderTabs(activeOverrideLabel = null) {
             }
         };
 
-        // 登録済み地点のみ削除可能
         if (!item.isSpecial && !item.isExternal) {
             const spotIdx = mySpots.findIndex(s => s.label === item.rawLabel);
             btn.oncontextmenu = (e) => { e.preventDefault(); confirmDelete(spotIdx); };
@@ -419,10 +404,10 @@ function renderTabs(activeOverrideLabel = null) {
             btn.ontouchstart = () => { timer = setTimeout(() => confirmDelete(spotIdx), 800); };
             btn.ontouchend = () => clearTimeout(timer);
         }
-
         container.appendChild(btn);
     });
 }
+
 
 function confirmDelete(index) {
     if (index === -1) return;
@@ -445,6 +430,47 @@ if (resetBtn) {
             updateLocation(mySpots[0].lat, mySpots[0].lon, mySpots[0].label);
         }
     };
+}
+
+
+/**
+ * サブルーチン：GPSボタンクリック時の処理
+ * 現在地を取得し、逆引きAPIで地名を取得してからupdateLocationを呼び出す。
+ */
+function handleGPSClick() {
+    if ("geolocation" in navigator) {
+        // 状態表示（任意ですが、UX向上のため）
+        const gpsBtn = document.querySelector('.btn-gps');
+        if (gpsBtn) gpsBtn.innerText = "取得中...";
+
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            let gpsLabel = "GPS地点";
+
+            try {
+                // GPS座標から地名を逆引き
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=ja`);
+                const data = await res.json();
+                const addr = data.address;
+                const city = addr.city || addr.town || addr.village || "";
+                const district = addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district || "";
+                if (city || district) {
+                    gpsLabel = (city + district) + "(GPS)";
+                }
+            } catch (err) {
+                console.error("GPS逆引き失敗:", err);
+            }
+
+            if (gpsBtn) gpsBtn.innerText = "GPS";
+            // 取得した地名で場所を更新（renderTabsが走り、左端に配置される）
+            updateLocation(lat, lon, gpsLabel);
+        }, (err) => {
+            console.error("GPS取得エラー:", err);
+            if (gpsBtn) gpsBtn.innerText = "GPS";
+            alert("位置情報の取得に失敗しました。");
+        });
+    }
 }
 
 const addBtn = document.getElementById('add-btn');
@@ -512,8 +538,14 @@ async function onMapClick(e) {
     await fetchAddressInfo(lat, lng);
 }
 
+/**
+ * サブルーチン：地図モーダル内での住所情報取得とボタン設定
+ * 地図クリック時や検索時に呼び出され、未登録地点表示ボタンと保存ボタンの挙動を定義する。
+ */
 async function fetchAddressInfo(lat, lng) {
-    document.getElementById('map-status').innerText = "地点情報を取得中...";
+    const statusEl = document.getElementById('map-status');
+    if (statusEl) statusEl.innerText = "地点情報を取得中...";
+    
     try {
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ja`);
         const data = await res.json();
@@ -522,39 +554,43 @@ async function fetchAddressInfo(lat, lng) {
         const district = addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district || "";
         const defaultName = city + district || "新規地点";
 
-        document.getElementById('temp-view-btn').onclick = () => {
-            updateLocation(lat, lng, defaultName + "(未登録)");
-            closeModal('map-modal');
-        };
-        document.getElementById('temp-view-btn').disabled = false;
-
-        document.getElementById('save-spot-btn').onclick = () => {
-            const spotName = prompt("登録する地点名を確認・修正してください", defaultName);
-            if (spotName) {
-                mySpots.push({lat, lon: lng, label: spotName});
-                localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-                renderTabs();
-                updateLocation(lat, lng, spotName);
+        // 「登録せずに表示」ボタンの設定
+        const tempViewBtn = document.getElementById('temp-view-btn');
+        if (tempViewBtn) {
+            tempViewBtn.onclick = () => {
+                // 地名に(未登録)を付与して更新。renderTabsのisExternalロジックにより左端に配置される。
+                updateLocation(lat, lng, defaultName + "(未登録)");
                 closeModal('map-modal');
-            }
-        };
-        document.getElementById('save-spot-btn').disabled = false;
-        document.getElementById('map-status').innerText = "◎ " + defaultName;
-    } catch (err) { document.getElementById('map-status').innerText = "地点名取得失敗"; }
+            };
+            tempViewBtn.disabled = false;
+        }
+
+        // 「この地点を保存」ボタンの設定
+        const saveSpotBtn = document.getElementById('save-spot-btn');
+        if (saveSpotBtn) {
+            saveSpotBtn.onclick = () => {
+                const spotName = prompt("登録する地点名を確認・修正してください", defaultName);
+                if (spotName) {
+                    mySpots.push({lat, lon: lng, label: spotName});
+                    localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                    renderTabs();
+                    updateLocation(lat, lng, spotName);
+                    closeModal('map-modal');
+                }
+            };
+            saveSpotBtn.disabled = false;
+        }
+        
+        if (statusEl) statusEl.innerText = "📌：" + defaultName;
+    } catch (err) {
+        if (statusEl) statusEl.innerText = "地点名取得失敗";
+    }
 }
 
 async function updateLocation(lat, lon, label) {
     currentLat = lat; currentLon = lon; currentLabel = label;
     renderTabs(); 
     await draw(); 
-}
-
-function handleGPSClick() {
-    if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition((pos) => {
-            updateLocation(pos.coords.latitude, pos.coords.longitude, "GPS");
-        });
-    }
 }
 
 const weatherIcons = { 0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️", 45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "🌦️", 61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "❄️", 73: "❄️", 75: "❄️", 80: "🌦️", 81: "🌦️", 82: "🌦️", 95: "⛈️" };
