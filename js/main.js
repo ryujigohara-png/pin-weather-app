@@ -43,17 +43,17 @@ function initViewSettings() {
     const openBtn = document.getElementById('openSettingsBtn'); // サイドバーのボタン
     const closeBtn = document.getElementById('closeViewSettings'); // モーダル内の閉じるボタン
     const saveBtn = document.getElementById('saveViewSettings'); // モーダル内の保存ボタン
+    const resetBtn = document.getElementById('resetViewSettings'); // 【追加】リセットボタン
 
     if (!modal || !openBtn) return;
 
-    // 1. サイドバーのボタンを押した時の動作（既存の openModal を活用）
+    // 1. サイドバーのボタンを押した時の動作
     openBtn.addEventListener('click', () => {
-        // 現在の設定値をスライダーに同期させてから表示
         syncSliderValues();
         openModal('viewSettingsModal');
     });
 
-    // 2. 閉じるボタン（既存の closeModal を活用）
+    // 2. 閉じるボタン
     if (closeBtn) {
         closeBtn.addEventListener('click', () => {
             closeModal('viewSettingsModal');
@@ -67,7 +67,14 @@ function initViewSettings() {
         });
     }
 
-    // 4. スライダーを動かした時の数値リアルタイム表示
+    // 【追加】 4. リセットボタンのイベント紐付け
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            resetViewSettings();
+        });
+    }
+
+    // 5. スライダーを動かした時の数値リアルタイム表示
     const configIds = ['hourWidth', 'windHeight', 'subHeight', 'margin', 'fontSize', 'iconScale'];
     configIds.forEach(id => {
         const input = document.getElementById(`input-${id}`);
@@ -119,6 +126,23 @@ function saveViewSettings() {
     // 完了通知を出してリロード
     // alert('設定を保存しました。再読み込みして反映します。'); 
     location.reload();
+}
+
+/**
+ * サブルーチン：設定のリセット処理
+ * 定義済みの defaultViewConfig を使用して設定を初期化する
+ */
+function resetViewSettings() {
+    if (confirm("表示設定をデフォルトに戻しますか？")) {
+        // オブジェクトの参照を切り離してコピー（安全のため）
+        const resetData = JSON.parse(JSON.stringify(defaultViewConfig));
+        
+        // localStorageを初期値で上書き保存
+        localStorage.setItem('pin_weather_view_config', JSON.stringify(resetData));
+        
+        // 反映のためリロード
+        location.reload();
+    }
 }
 
 
@@ -313,28 +337,23 @@ function initCompassUI() {
 }
 
 /**
- * タブのレンダリング処理
- * 未登録地点（GPS/Map/ブラウザ保持情報）を左端に表示し、新しい地点で塗り替える。
+ * サブルーチン：タブのレンダリング処理
+ * 未登録地点を左端に表示し、isSelected時にスムーズスクロールで左端へ持ってくる。
  */
 function renderTabs(activeOverrideLabel = null) {
     const container = document.getElementById('spot-tabs');
     if (!container) return;
     container.innerHTML = "";
 
-    // 優先順位：引数の指定ラベル > 現在保持しているラベル(currentLabel)
     const activeLabel = activeOverrideLabel || currentLabel;
-    
-    // mySpotsの中にアクティブなラベルがあるか確認
     const activeIdx = mySpots.findIndex(s => s.label === activeLabel);
     let displaySpots = [...mySpots];
     let activeSpot = null;
     let isExternalSpot = false;
 
     if (activeIdx > -1) {
-        // 1. 登録済みの地点がアクティブな場合
         activeSpot = displaySpots.splice(activeIdx, 1)[0];
-    } else if (activeLabel && activeLabel !== 'GPS' && activeLabel !== 'Map') {
-        // 2. 未登録地点（GPS/Map/ブラウザ保持）がアクティブな場合
+    } else if (activeLabel && activeLabel !== 'gps' && activeLabel !== 'map' && activeLabel !== 'GPS' && activeLabel !== 'Map') {
         isExternalSpot = true;
         activeSpot = {
             label: activeLabel,
@@ -344,14 +363,9 @@ function renderTabs(activeOverrideLabel = null) {
     }
 
     let items = [];
-
-    // --- タブ配列の組み立て ---
-
-    // アクティブな地点を最優先（左端）に配置
     if (activeSpot) {
         items.push({ 
             id: activeSpot.label, 
-            // 未登録なら📍なし、登録済みなら📍付き（判別用）
             label: isExternalSpot ? activeSpot.label : `📍 ${activeSpot.label}`, 
             lat: activeSpot.lat, 
             lon: activeSpot.lon, 
@@ -360,16 +374,12 @@ function renderTabs(activeOverrideLabel = null) {
         });
     }
 
-    // 特殊ボタン（GPS, Map）
     items.push({ id: 'gps', label: 'GPS', isSpecial: true });
     items.push({ id: 'map', label: 'Map', isSpecial: true });
     
-    // 残りの登録済み地点
     displaySpots.forEach(s => {
         items.push({ id: s.label, label: `📍 ${s.label}`, lat: s.lat, lon: s.lon, rawLabel: s.label });
     });
-
-    // --- ボタンの生成 ---
 
     items.forEach((item) => {
         const btn = document.createElement('button');
@@ -387,7 +397,8 @@ function renderTabs(activeOverrideLabel = null) {
 
         if (isSelected) {
             btn.classList.add('active');
-            setTimeout(() => btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }), 100);
+            // 'start' にすることで左端にスクロールさせる
+            setTimeout(() => btn.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' }), 100);
         }
         btn.innerText = item.label;
 
@@ -398,7 +409,6 @@ function renderTabs(activeOverrideLabel = null) {
                 openMap();
                 renderTabs("Map");
             } else {
-                // 登録済み地点(📍あり)のみ、お気に入り順序を入れ替える
                 if (!item.isExternal) {
                     const idx = mySpots.findIndex(s => s.label === item.rawLabel);
                     if (idx > -1) {
@@ -411,7 +421,6 @@ function renderTabs(activeOverrideLabel = null) {
             }
         };
 
-        // 登録済み地点のみ削除可能
         if (!item.isSpecial && !item.isExternal) {
             const spotIdx = mySpots.findIndex(s => s.label === item.rawLabel);
             btn.oncontextmenu = (e) => { e.preventDefault(); confirmDelete(spotIdx); };
@@ -419,10 +428,10 @@ function renderTabs(activeOverrideLabel = null) {
             btn.ontouchstart = () => { timer = setTimeout(() => confirmDelete(spotIdx), 800); };
             btn.ontouchend = () => clearTimeout(timer);
         }
-
         container.appendChild(btn);
     });
 }
+
 
 function confirmDelete(index) {
     if (index === -1) return;
@@ -445,6 +454,47 @@ if (resetBtn) {
             updateLocation(mySpots[0].lat, mySpots[0].lon, mySpots[0].label);
         }
     };
+}
+
+
+/**
+ * サブルーチン：GPSボタンクリック時の処理
+ * 現在地を取得し、逆引きAPIで地名を取得してからupdateLocationを呼び出す。
+ */
+function handleGPSClick() {
+    if ("geolocation" in navigator) {
+        // 状態表示（任意ですが、UX向上のため）
+        const gpsBtn = document.querySelector('.btn-gps');
+        if (gpsBtn) gpsBtn.innerText = "取得中...";
+
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            let gpsLabel = "GPS地点";
+
+            try {
+                // GPS座標から地名を逆引き
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=ja`);
+                const data = await res.json();
+                const addr = data.address;
+                const city = addr.city || addr.town || addr.village || "";
+                const district = addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district || "";
+                if (city || district) {
+                    gpsLabel = (city + district) + "(GPS)";
+                }
+            } catch (err) {
+                console.error("GPS逆引き失敗:", err);
+            }
+
+            if (gpsBtn) gpsBtn.innerText = "GPS";
+            // 取得した地名で場所を更新（renderTabsが走り、左端に配置される）
+            updateLocation(lat, lon, gpsLabel);
+        }, (err) => {
+            console.error("GPS取得エラー:", err);
+            if (gpsBtn) gpsBtn.innerText = "GPS";
+            alert("位置情報の取得に失敗しました。");
+        });
+    }
 }
 
 const addBtn = document.getElementById('add-btn');
@@ -512,8 +562,14 @@ async function onMapClick(e) {
     await fetchAddressInfo(lat, lng);
 }
 
+/**
+ * サブルーチン：地図モーダル内での住所情報取得とボタン設定
+ * 地図クリック時や検索時に呼び出され、未登録地点表示ボタンと保存ボタンの挙動を定義する。
+ */
 async function fetchAddressInfo(lat, lng) {
-    document.getElementById('map-status').innerText = "地点情報を取得中...";
+    const statusEl = document.getElementById('map-status');
+    if (statusEl) statusEl.innerText = "地点情報を取得中...";
+    
     try {
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ja`);
         const data = await res.json();
@@ -522,25 +578,37 @@ async function fetchAddressInfo(lat, lng) {
         const district = addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district || "";
         const defaultName = city + district || "新規地点";
 
-        document.getElementById('temp-view-btn').onclick = () => {
-            updateLocation(lat, lng, defaultName + "(未登録)");
-            closeModal('map-modal');
-        };
-        document.getElementById('temp-view-btn').disabled = false;
-
-        document.getElementById('save-spot-btn').onclick = () => {
-            const spotName = prompt("登録する地点名を確認・修正してください", defaultName);
-            if (spotName) {
-                mySpots.push({lat, lon: lng, label: spotName});
-                localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-                renderTabs();
-                updateLocation(lat, lng, spotName);
+        // 「登録せずに表示」ボタンの設定
+        const tempViewBtn = document.getElementById('temp-view-btn');
+        if (tempViewBtn) {
+            tempViewBtn.onclick = () => {
+                // 地名に(未登録)を付与して更新。renderTabsのisExternalロジックにより左端に配置される。
+                updateLocation(lat, lng, defaultName + "(未登録)");
                 closeModal('map-modal');
-            }
-        };
-        document.getElementById('save-spot-btn').disabled = false;
-        document.getElementById('map-status').innerText = "◎ " + defaultName;
-    } catch (err) { document.getElementById('map-status').innerText = "地点名取得失敗"; }
+            };
+            tempViewBtn.disabled = false;
+        }
+
+        // 「この地点を保存」ボタンの設定
+        const saveSpotBtn = document.getElementById('save-spot-btn');
+        if (saveSpotBtn) {
+            saveSpotBtn.onclick = () => {
+                const spotName = prompt("登録する地点名を確認・修正してください", defaultName);
+                if (spotName) {
+                    mySpots.push({lat, lon: lng, label: spotName});
+                    localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                    renderTabs();
+                    updateLocation(lat, lng, spotName);
+                    closeModal('map-modal');
+                }
+            };
+            saveSpotBtn.disabled = false;
+        }
+        
+        if (statusEl) statusEl.innerText = "📍：" + defaultName;
+    } catch (err) {
+        if (statusEl) statusEl.innerText = "地点名取得失敗";
+    }
 }
 
 async function updateLocation(lat, lon, label) {
@@ -549,33 +617,114 @@ async function updateLocation(lat, lon, label) {
     await draw(); 
 }
 
-function handleGPSClick() {
-    if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition((pos) => {
-            updateLocation(pos.coords.latitude, pos.coords.longitude, "GPS");
-        });
-    }
-}
-
 const weatherIcons = { 0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️", 45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "🌦️", 61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "❄️", 73: "❄️", 75: "❄️", 80: "🌦️", 81: "🌦️", 82: "🌦️", 95: "⛈️" };
 function getWindDirText(deg) { return windDirs[Math.round(deg / 22.5) % 16]; }
 
+/**
+ * サブルーチン：キャッシュ付きデータ取得
+ * リロード（再読み込み）時はキャッシュを無視して強制的にAPIを叩く。
+ */
 async function fetchWithCache(lat, lon) {
     const cacheKey = `weather_cache_${lat.toFixed(3)}_${lon.toFixed(3)}`;
     const cached = localStorage.getItem(cacheKey);
     const now = Date.now();
-    if (cached) {
+
+    // ページがリロード（再読み込み）されたかどうかを判定
+    const navEntries = performance.getEntriesByType('navigation');
+    const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
+
+    // リロードでなく、かつキャッシュが存在し、有効期限内であればキャッシュを返す
+    if (!isReload && cached) {
         const parsed = JSON.parse(cached);
-        if (now - parsed.timestamp < CACHE_DURATION) return { timestamp: parsed.timestamp, data: parsed.data };
+        if (now - parsed.timestamp < CACHE_DURATION) {
+            return { timestamp: parsed.timestamp, data: parsed.data };
+        }
     }
+
+    // API取得（リロード時、またはキャッシュ切れの場合）
     const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&forecast_days=9&wind_speed_unit=ms`;
     const mUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto&forecast_days=9&cell_selection=sea`;
-    const [wRes, mRes] = await Promise.all([fetch(wUrl).then(r => r.json()), fetch(mUrl).then(r => r.json())]);
-    const mergedData = { ...wRes.hourly, ...mRes.hourly };
-    const cacheData = { timestamp: now, data: mergedData };
-    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-    return cacheData;
+
+    try {
+        const [wRes, mRes] = await Promise.all([
+            fetch(wUrl).then(r => r.json()),
+            fetch(mUrl).then(r => r.json())
+        ]);
+
+        const mergedData = { ...wRes.hourly, ...mRes.hourly };
+        const cacheData = { timestamp: now, data: mergedData };
+        
+        // 最新データをキャッシュに保存
+        localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+        return cacheData;
+
+    } catch (error) {
+        console.error("API取得失敗:", error);
+        // APIが失敗した際、古いキャッシュがあればそれを返す（全滅を防ぐための保険）
+        if (cached) {
+            const parsed = JSON.parse(cached);
+            return { timestamp: parsed.timestamp, data: parsed.data };
+        }
+        throw error;
+    }
 }
+
+
+/**
+ * 外部気象サービスを現在の座標で開く
+ * @param {string} service - 'yahoo', 'windy', 'windfinder'
+ */
+function openExternalWeather(service) {
+    if (!currentLat || !currentLon) {
+        alert("地点情報がありません。");
+        return;
+    }
+
+    let url = "";
+    switch (service) {
+        case 'yahoo':
+            // Yahoo!天気（ピンポイント天気検索へ）
+            const now = new Date();
+            const Y = now.getFullYear();
+            const M = String(now.getMonth() + 1).padStart(2, '0');
+            const D = String(now.getDate()).padStart(2, '0');
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(Math.floor(now.getMinutes() / 5) * 5).padStart(2, '0');
+            const tParam = `${Y}${M}${D}${h}${m}00`;
+
+            url = `https://weather.yahoo.co.jp/weather/zoomradar/?lat=${currentLat}&&lon=${currentLon}`;
+            break;
+
+        case 'windy':
+            // Windy（座標指定）
+            url = `https://www.windy.com/${currentLat}/${currentLon}?${currentLat},${currentLon},11`;
+            break;
+
+        case 'windfinder':
+            // Windfinder（座標指定）
+            url = `https://www.windfinder.com/#11/${currentLat}/${currentLon}`;
+            break;
+    }
+
+    if (url) {
+        window.open(url, '_blank');
+    }
+}
+
+/**
+ * サブルーチン：グラフの表示位置を左端（開始点）にリセットする
+ */
+function resetGraphScroll() {
+    const scrollRoot = document.getElementById('scroll-root');
+    if (scrollRoot) {
+        // スムーズに動かしたい場合は 'smooth'、即座に飛ばす場合は 'auto'
+        scrollRoot.scrollTo({
+            left: 0,
+            behavior: 'auto' 
+        });
+    }
+}
+
 
 /**
  * サブルーチン：メイン描画処理
@@ -627,14 +776,42 @@ async function draw() {
         if (secTemp) { secTemp.style.height = viewConfig.subHeight + "px"; secTemp.style.marginBottom = gMargin + "px"; }
         if (secMarine) { secMarine.style.height = viewConfig.subHeight + "px"; }
         
-        // --- 天気アイコン描画 ---
+        // --- 天気アイコン・降水量棒グラフ描画 ---
         let wHtml = "";
+        const valContW = document.getElementById('val-svg-weather');
+        const pData = allData.data.precipitation ? allData.data.precipitation.slice(startIdx) : [];
+        const pMax = Math.ceil(Math.max(...pData, 1.0) / 5) * 5; // 5mm刻みでスケール
+        const pMin = 0;
+        const pRange = pMax - pMin;
+        const pPlotH = 35; // 棒グラフの表示領域の高さ
+        const pBaseY = 75; // 棒グラフの底辺Y座標
+
+        // 降水量の最大値と最小値をラベルに反映
+        if (valContW) {
+            //valContW.innerHTML = `<div   class="y-max">${pMax.toFixed(0)}</div><div class="y-min">${pMin.toFixed(0)}</div>`;
+        }
+        // 降水量セクションのグリッド線
+        for (let v = 0; v <= pMax; v += 5) {
+            const gy = pBaseY - (v / pRange) * pPlotH;
+            wHtml += `<line x1="0" y1="${gy}" x2="${totalW}" y2="${gy}" class="grid-y-sub" />`;
+        }
+
         for(let i = startIdx; i < 216; i++) {
             const x = (i - startIdx) * hScale; 
             const icon = weatherIcons[allData.data.weather_code[i]] || "❓";
+            // 天気アイコン
             wHtml += `<text x="${x}" y="32" font-size="28" text-anchor="middle">${icon}</text>`; 
+            
+            // 降水量棒グラフ
             const p = allData.data.precipitation ? allData.data.precipitation[i] : 0;
-            if (p > 0) wHtml += `<text x="${x}" y="70" font-size="${labelFS + 2}" font-weight="bold" fill="#0000FF" text-anchor="middle">${p.toFixed(1)}</text>`;
+            if (p > 0) {
+                const barH = (p / pRange) * pPlotH;
+                wHtml += `<rect x="${x - (hScale*0.3)}" y="${pBaseY - barH}" width="${hScale*0.6}" height="${barH}" fill="#0059ff" opacity="0.7" />`;
+                // 1.0mm以上なら数値を表示（視認性のため）
+                //if (p >= 1.0) {
+                    wHtml += `<text x="${x}" y="${pBaseY - barH - 2}" font-size="${labelFS - 2}" font-weight="bold" fill="#0000FF" text-anchor="middle">${p.toFixed(1)}</text>`;
+                //}
+            }
         }
         svgW.innerHTML = wHtml;
 
@@ -734,7 +911,17 @@ async function draw() {
                         const x = (i - startIdx) * hScale;
                         const deg = allData.data.wind_direction_10m[i];
                         const dirText = getWindDirText(deg);
-                        let color = targetWindDirections.includes(dirText) ? (val >= 10.0 ? '#dc143c' : (val >= 5 ? '#ffa500' : '#87ceeb')) : (val >= 10.0 ? 'rgba(220, 20, 60, 0.4)' : '#ccc');
+                        // 風速色分けロジックの修正
+                        let color;
+                        if (targetWindDirections.includes(dirText)) {
+                            if (val >= 10.0) color = '#dc143c';      // 10以上
+                            else if (val >= 5.0) color = '#ffa500';  // 5以上10未満
+                            else if (val >= 3.0) color = '#87CEEB';  // 3以上5未満（水色）
+                            else color = '#ccc';                  // それ以外（ごく薄い水色など）
+                        } else {
+                            color = (val >= 10.0 ? 'rgba(220, 20, 60, 0.4)' : '#ccc');
+                        }
+
                         html += `<rect x="${x - (hScale*0.4)}" y="${plotHeight-h}" width="${hScale*0.8}" height="${h}" fill="${color}" />`;
                         if (isWind) {
                             html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-25}) rotate(${(deg+180)%360}) scale(${1.6 * iScale})" class="wind-arrow" />`;
@@ -757,6 +944,8 @@ async function draw() {
         renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], viewConfig.windHeight, 5.0, true, false, true);
         renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, false, false);
         renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], viewConfig.subHeight, 0.5, false, true, false);
+
+        resetGraphScroll();
 
         const scrollRoot = document.getElementById('scroll-root');
         const stage = document.getElementById('stage');
@@ -834,39 +1023,11 @@ async function draw() {
             };
             stage.onmouseleave = () => { guide.style.display = "none"; tooltip.style.display = "none"; };
         }
-        // --- Yahoo雨雲レーダーリンクのボタン生成 ---
-        const radarContainer = document.getElementById('radar-link-container');
-        if (radarContainer) {
-            const now = new Date();
-            const Y = now.getFullYear();
-            const M = String(now.getMonth() + 1).padStart(2, '0');
-            const D = String(now.getDate()).padStart(2, '0');
-            const h = String(now.getHours()).padStart(2, '0');
-            const m = String(Math.floor(now.getMinutes() / 5) * 5).padStart(2, '0');
-            const tParam = `${Y}${M}${D}${h}${m}00`;
-
-            const radarUrl = `https://weather.yahoo.co.jp/weather/zoomradar/?lat=${currentLat}&lon=${currentLon}&z=9.0&t=${tParam}`;
-            
-            // ボタン風の装飾をインラインスタイルで適用
-            radarContainer.innerHTML = `
-                <a href="${radarUrl}" target="_blank" style="
-                    display: inline-block;
-                    padding: 10px 20px;
-                    background-color: #007bff;
-                    color: white;
-                    text-decoration: none;
-                    border-radius: 5px;
-                    font-weight: bold;
-                    font-size: 14px;
-                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                    transition: transform 0.2s, background-color 0.2s;
-                ">
-                    🌦️ Yahoo! 雨雲レーダーを表示
-                </a>
-            `;
-        }
+        
     } catch (e) { console.error(e); }
 }
+
+
 
 /**
  * 監視リスナー：4時間経過判定

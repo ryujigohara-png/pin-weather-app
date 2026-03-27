@@ -271,7 +271,7 @@ svg { width: 100%; display: block; overflow: visible; }
 
 #hover-guide { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(255,0,0,0.3); display: none; pointer-events: none; z-index: 5; }
 .footer-info { 
-    max-width: 1500px; margin: 15px auto; padding: 15px; font-size: 12px; 
+    max-width: 1500px; margin: 1px auto; padding: 1px; font-size: 12px; 
     color: #666; line-height: 1.6; border-top: 1px solid #ddd;
 }
 
@@ -337,3 +337,35 @@ svg { width: 100%; display: block; overflow: visible; }
     color: white !important;
     flex: 2; 
 }
+
+/* 風速凡例専用のスタイル */
+.legend-wind-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 15px;
+    padding: 10px;
+    margin-top: 5px;
+    font-size: 11px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 5px;
+}
+
+.legend-wind-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.legend-wind-rect {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.legend-wind-label {
+    color: #333;
+    font-weight: bold;
+}
+
