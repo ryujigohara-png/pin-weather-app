@@ -578,6 +578,48 @@ async function fetchWithCache(lat, lon) {
 }
 
 /**
+ * 外部気象サービスを現在の座標で開く
+ * @param {string} service - 'yahoo', 'windy', 'windfinder'
+ */
+function openExternalWeather(service) {
+    if (!currentLat || !currentLon) {
+        alert("地点情報がありません。");
+        return;
+    }
+
+    let url = "";
+    switch (service) {
+        case 'yahoo':
+            // Yahoo!天気（ピンポイント天気検索へ）
+            const now = new Date();
+            const Y = now.getFullYear();
+            const M = String(now.getMonth() + 1).padStart(2, '0');
+            const D = String(now.getDate()).padStart(2, '0');
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(Math.floor(now.getMinutes() / 5) * 5).padStart(2, '0');
+            const tParam = `${Y}${M}${D}${h}${m}00`;
+
+            url = `https://weather.yahoo.co.jp/weather/zoomradar/?lat=${currentLat}&&lon=${currentLon}`;
+            break;
+
+        case 'windy':
+            // Windy（座標指定）
+            url = `https://www.windy.com/${currentLat}/${currentLon}?${currentLat},${currentLon},11`;
+            break;
+
+        case 'windfinder':
+            // Windfinder（座標指定）
+            url = `https://www.windfinder.com/#11/${currentLat}/${currentLon}`;
+            break;
+    }
+
+    if (url) {
+        window.open(url, '_blank');
+    }
+}
+
+
+/**
  * サブルーチン：メイン描画処理
  * 画面右半分でのツールチップ反転を厳格化し、サイドバーの幅設定(hScale)を
  * 日付ラベルや座標計算の全工程に完全反映した修正版。
@@ -834,37 +876,7 @@ async function draw() {
             };
             stage.onmouseleave = () => { guide.style.display = "none"; tooltip.style.display = "none"; };
         }
-        // --- Yahoo雨雲レーダーリンクのボタン生成 ---
-        const radarContainer = document.getElementById('radar-link-container');
-        if (radarContainer) {
-            const now = new Date();
-            const Y = now.getFullYear();
-            const M = String(now.getMonth() + 1).padStart(2, '0');
-            const D = String(now.getDate()).padStart(2, '0');
-            const h = String(now.getHours()).padStart(2, '0');
-            const m = String(Math.floor(now.getMinutes() / 5) * 5).padStart(2, '0');
-            const tParam = `${Y}${M}${D}${h}${m}00`;
-
-            const radarUrl = `https://weather.yahoo.co.jp/weather/zoomradar/?lat=${currentLat}&lon=${currentLon}&z=9.0&t=${tParam}`;
-            
-            // ボタン風の装飾をインラインスタイルで適用
-            radarContainer.innerHTML = `
-                <a href="${radarUrl}" target="_blank" style="
-                    display: inline-block;
-                    padding: 10px 20px;
-                    background-color: #007bff;
-                    color: white;
-                    text-decoration: none;
-                    border-radius: 5px;
-                    font-weight: bold;
-                    font-size: 14px;
-                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                    transition: transform 0.2s, background-color 0.2s;
-                ">
-                    🌦️ Yahoo! 雨雲レーダーを表示
-                </a>
-            `;
-        }
+        
     } catch (e) { console.error(e); }
 }
 
