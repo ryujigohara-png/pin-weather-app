@@ -169,7 +169,7 @@ function applyEnvVisuals() {
     } else {
         config = {
             titleSuffix: "",
-            headerColor: "#7681ba", 
+            headerColor: "#007bff", 
             envName: "Main版"
         };
     }
@@ -247,7 +247,7 @@ function initApp() {
     if (mapBtn) {
         mapBtn.onclick = () => { 
             openMap(); 
-            renderTabs("🗺️ Map"); 
+            renderTabs("Map"); 
         };
     }
 }
@@ -312,39 +312,75 @@ function initCompassUI() {
     }
 }
 
+/**
+ * タブのレンダリング処理
+ * 未登録地点（GPS/Map/ブラウザ保持情報）を左端に表示し、新しい地点で塗り替える。
+ */
 function renderTabs(activeOverrideLabel = null) {
     const container = document.getElementById('spot-tabs');
     if (!container) return;
     container.innerHTML = "";
 
+    // 優先順位：引数の指定ラベル > 現在保持しているラベル(currentLabel)
     const activeLabel = activeOverrideLabel || currentLabel;
+    
+    // mySpotsの中にアクティブなラベルがあるか確認
     const activeIdx = mySpots.findIndex(s => s.label === activeLabel);
     let displaySpots = [...mySpots];
     let activeSpot = null;
+    let isExternalSpot = false;
 
     if (activeIdx > -1) {
+        // 1. 登録済みの地点がアクティブな場合
         activeSpot = displaySpots.splice(activeIdx, 1)[0];
+    } else if (activeLabel && activeLabel !== 'GPS' && activeLabel !== 'Map') {
+        // 2. 未登録地点（GPS/Map/ブラウザ保持）がアクティブな場合
+        isExternalSpot = true;
+        activeSpot = {
+            label: activeLabel,
+            lat: currentLat,
+            lon: currentLon
+        };
     }
 
     let items = [];
+
+    // --- タブ配列の組み立て ---
+
+    // アクティブな地点を最優先（左端）に配置
     if (activeSpot) {
-        items.push({ id: activeSpot.label, label: `📍 ${activeSpot.label}`, lat: activeSpot.lat, lon: activeSpot.lon, rawLabel: activeSpot.label });
+        items.push({ 
+            id: activeSpot.label, 
+            // 未登録なら📍なし、登録済みなら📍付き（判別用）
+            label: isExternalSpot ? activeSpot.label : `📍 ${activeSpot.label}`, 
+            lat: activeSpot.lat, 
+            lon: activeSpot.lon, 
+            rawLabel: activeSpot.label,
+            isExternal: isExternalSpot 
+        });
     }
-    items.push({ id: 'gps', label: '🛰️ GPS', isSpecial: true });
-    items.push({ id: 'map', label: '🗺️ Map', isSpecial: true });
+
+    // 特殊ボタン（GPS, Map）
+    items.push({ id: 'gps', label: 'GPS', isSpecial: true });
+    items.push({ id: 'map', label: 'Map', isSpecial: true });
     
+    // 残りの登録済み地点
     displaySpots.forEach(s => {
         items.push({ id: s.label, label: `📍 ${s.label}`, lat: s.lat, lon: s.lon, rawLabel: s.label });
     });
+
+    // --- ボタンの生成 ---
 
     items.forEach((item) => {
         const btn = document.createElement('button');
         const isSelected = (item.id === activeLabel || item.label === activeLabel || item.rawLabel === activeLabel);
         
         btn.className = 'btn';
-        if (item.id === 'gps') btn.classList.add('btn-gps');
-        else if (item.id === 'map') btn.classList.add('btn-map-view');
-        else {
+        if (item.id === 'gps') {
+            btn.classList.add('btn-gps');
+        } else if (item.id === 'map') {
+            btn.classList.add('btn-map-view');
+        } else {
             btn.classList.add('btn-location');
             btn.setAttribute('data-raw-label', item.rawLabel);
         }
@@ -360,19 +396,23 @@ function renderTabs(activeOverrideLabel = null) {
                 handleGPSClick();
             } else if (item.id === 'map') {
                 openMap();
-                renderTabs("🗺️ Map");
+                renderTabs("Map");
             } else {
-                const idx = mySpots.findIndex(s => s.label === item.rawLabel);
-                if (idx > -1) {
-                    const selectedSpot = mySpots.splice(idx, 1)[0];
-                    mySpots.unshift(selectedSpot);
-                    localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                // 登録済み地点(📍あり)のみ、お気に入り順序を入れ替える
+                if (!item.isExternal) {
+                    const idx = mySpots.findIndex(s => s.label === item.rawLabel);
+                    if (idx > -1) {
+                        const selectedSpot = mySpots.splice(idx, 1)[0];
+                        mySpots.unshift(selectedSpot);
+                        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                    }
                 }
                 updateLocation(item.lat, item.lon, item.rawLabel);
             }
         };
 
-        if (!item.isSpecial) {
+        // 登録済み地点のみ削除可能
+        if (!item.isSpecial && !item.isExternal) {
             const spotIdx = mySpots.findIndex(s => s.label === item.rawLabel);
             btn.oncontextmenu = (e) => { e.preventDefault(); confirmDelete(spotIdx); };
             let timer;
@@ -419,8 +459,10 @@ function openMap() {
         map = L.map('map-canvas', { center: [currentLat, currentLon], zoom: 14, layers: [esri] });
         L.control.layers({ "標準地図": esri, "衛星写真": satellite, "地理院地図": gsi }).addTo(map);
         map.on('click', onMapClick);
+        fetchAddressInfo(currentLat, currentLon);
     } else {
         map.setView([currentLat, currentLon], 14);
+        fetchAddressInfo(currentLat, currentLon);
     }
     if (tempMarker) map.removeLayer(tempMarker);
     tempMarker = L.marker([currentLat, currentLon]).addTo(map);
@@ -497,7 +539,7 @@ async function fetchAddressInfo(lat, lng) {
             }
         };
         document.getElementById('save-spot-btn').disabled = false;
-        document.getElementById('map-status').innerText = "選択中: " + defaultName;
+        document.getElementById('map-status').innerText = "◎ " + defaultName;
     } catch (err) { document.getElementById('map-status').innerText = "地点名取得失敗"; }
 }
 
@@ -510,7 +552,7 @@ async function updateLocation(lat, lon, label) {
 function handleGPSClick() {
     if ("geolocation" in navigator) {
         navigator.geolocation.getCurrentPosition((pos) => {
-            updateLocation(pos.coords.latitude, pos.coords.longitude, "🛰️ GPS");
+            updateLocation(pos.coords.latitude, pos.coords.longitude, "GPS");
         });
     }
 }
@@ -552,10 +594,10 @@ async function draw() {
         // --- Y軸ラベルのアイコン設置 ---
         const titles = document.querySelectorAll('.y-axis-title');
         if (titles.length >= 4) {
-            titles[0].innerHTML = `🌦️ 天気<br>降水量mm`;
-            titles[1].innerHTML = `${baseWindIcon}風向<br>🚩風速(m/s)`;
-            titles[2].innerHTML = `🌡️ 気温(℃)<br>💧 海水(℃)`;
-            titles[3].innerHTML = `🌊 波高<br>📏 潮位(m)`;
+            titles[0].innerHTML = `天気<br>降水量mm`;
+            titles[1].innerHTML = `${baseWindIcon}風向<br>風速(m/s)`;
+            titles[2].innerHTML = `気温(℃)<br>海水(℃)`;
+            titles[3].innerHTML = `波高(m)<br>潮位(m)`;
         }
 
         // --- 表示開始位置の計算（現在時刻の4時間前から） ---
@@ -597,17 +639,26 @@ async function draw() {
         svgW.innerHTML = wHtml;
 
         // --- 各セクション描画関数 ---
-        function renderSection(svgId, dateContId, datasets, height, stepY, isWind = false, isLast = false) {
+        function renderSection(svgId, dateContId, datasets, height, stepY, isWind = false, isLast = false, isFirst = false) {
             const svg = document.getElementById(svgId);
             const dateCont = document.getElementById(dateContId);
+            const dateTop = document.getElementById('date-top');
+            const valCont = document.getElementById(`val-${svgId}`);
+
             if (!svg || !dateCont) return;
             dateCont.innerHTML = "";
+            if (isFirst && dateTop) dateTop.innerHTML = "";
+            
             const allVals = datasets.flatMap(ds => ds.data ? ds.data.slice(startIdx) : []);
             if (allVals.length === 0) return;
             
             let max = Math.ceil(Math.max(...allVals) / stepY) * stepY;
             let min = Math.floor(Math.min(...allVals) / stepY) * stepY;
             if (isWind) min = 0;
+            // ▽ 追加：最大値と最小値をラベルに反映（絶対位置などはCSSで制御することを想定）
+            if (valCont) {
+                valCont.innerHTML = `<div class="y-max">${max.toFixed(isWind ? 0 : 1)}</div><div class="y-min">${min.toFixed(isWind ? 0 : 1)}</div>`;
+            }
             const range = (max - min) || 1;
             const plotHeight = height - 20; 
             let html = "";
@@ -622,20 +673,32 @@ async function draw() {
                 const x = (i - startIdx) * hScale;
                 const d = new Date(allData.data.time[i]);
                 
-                // 日付ラベル生成（hScaleに基づいた配置）
                 if (i % 24 === 0 || i === startIdx) {
                     html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight}" class="grid-day" />`;
-                    const dateDiv = document.createElement('div');
-                    dateDiv.className = 'sticky-date';
-                    dateDiv.style.left = `${x}px`;
-                    dateDiv.dataset.x = x;
                     
                     const dayIdx = d.getDay();
                     const dayStr = weekDays[dayIdx];
                     let dayColor = (dayIdx === 0) ? "#FF0000" : (dayIdx === 6 ? "#0000FF" : "#000000");
+                    // 修正点：labelContentの生成をdayStr, dayColorの定義の後に移動
+                    const labelContent = `<span style="color:${dayColor}; font-size:${labelFS * 1.5}px;">${d.getMonth()+1}/${d.getDate()}(${dayStr})</span>`;
+
+                    const dateDiv = document.createElement('div');
+                    dateDiv.className = 'sticky-date';
+                    dateDiv.style.left = `${x}px`;
+                    dateDiv.dataset.x = x;
+
+                    // 【追加】上部コンテナ用ラベル生成 (isFirstがtrueの時のみ)
+                    if (isFirst && dateTop) {
+                        const topDiv = document.createElement('div');
+                        topDiv.className = 'sticky-date';
+                        topDiv.style.left = `${x}px`;
+                        topDiv.dataset.x = x;
+                        topDiv.innerHTML = labelContent;
+                        dateTop.appendChild(topDiv);
+                    }
 
                     if (isLast) {
-                        dateDiv.innerHTML = `<span style="color:${dayColor}; font-size:${labelFS * 1.5}px;">${d.getMonth()+1}/${d.getDate()}(${dayStr})</span>`;
+                        dateDiv.innerHTML = labelContent;
                     }
                     dateCont.appendChild(dateDiv);
                 } else if (i % 3 === 0) {
@@ -645,25 +708,18 @@ async function draw() {
                     }
                 }
             }
-            // --- 縦線描画（現在時刻：青破線、データ取得時刻：緑破線）精密座標版 ---
-            
-            // 基準となる開始時刻（startIdx時点の時刻）を取得
-            const startTime = new Date(allData.data.time[startIdx]).getTime();
 
-            // 1. 現在時刻線 (青) - 破線化と太さ変更
+            // --- 縦線描画（現在時刻・データ取得時刻） ---
+            const startTime = new Date(allData.data.time[startIdx]).getTime();
             const nowTime = new Date().getTime();
             const diffHoursNow = (nowTime - startTime) / (1000 * 60 * 60); 
-            
             if (diffHoursNow >= 0 && diffHoursNow < (216 - startIdx)) {
                 const nowX = diffHoursNow * hScale;
                 html += `<line x1="${nowX}" y1="0" x2="${nowX}" y2="${plotHeight}" stroke="#0000FF" stroke-width="2.5" stroke-dasharray="4 3" />`;
             }
-
-            // 2. データ取得時刻線 (緑) - 太さ変更
             if (allData.timestamp) {
                 const fetchedTime = new Date(allData.timestamp).getTime();
                 const diffHoursFetch = (fetchedTime - startTime) / (1000 * 60 * 60); 
-                
                 if (diffHoursFetch >= 0 && diffHoursFetch < (216 - startIdx)) {
                     const fetchX = diffHoursFetch * hScale;
                     html += `<line x1="${fetchX}" y1="0" x2="${fetchX}" y2="${plotHeight}" stroke="#228b22" stroke-width="2.5" stroke-dasharray="3 2" />`;
@@ -698,9 +754,9 @@ async function draw() {
             svg.innerHTML = html;
         }
 
-        renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], viewConfig.windHeight, 5.0, true, false);
-        renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, false);
-        renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], viewConfig.subHeight, 0.5, false, true);
+        renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], viewConfig.windHeight, 5.0, true, false, true);
+        renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, false, false);
+        renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], viewConfig.subHeight, 0.5, false, true, false);
 
         const scrollRoot = document.getElementById('scroll-root');
         const stage = document.getElementById('stage');
@@ -738,18 +794,22 @@ async function draw() {
                 const tooltipWidth = 180;
                 let tx = (e.clientX > window.innerWidth / 2) ? e.clientX - tooltipWidth - 10 : e.clientX + 10;
                 tooltip.style.left = tx + "px";
-                tooltip.style.top = (e.clientY + 20) + "px";
+
+                let ty = e.clientY + 20;
+                const tooltipHeight = tooltip.offsetHeight || 250; 
+                if (ty + tooltipHeight > window.innerHeight) {
+                    ty = window.innerHeight - tooltipHeight - 10; 
+                }
+                tooltip.style.top = ty + "px";
 
                 const d = new Date(allData.data.time[hourIdx]); 
                 const weekDays = ["日", "月", "火", "水", "木", "金", "土"];
                 const dayStr = weekDays[d.getDay()];
                 const deg = allData.data.wind_direction_10m[hourIdx];
-                
-                // 現在時刻凡例用
+                // 追加：天気アイコンの取得
+                const wIcon = weatherIcons[allData.data.weather_code[hourIdx]] || "❓";
                 const n = new Date();
                 const nStr = `${n.getMonth()+1}/${n.getDate()}(${weekDays[n.getDay()]}) ${n.getHours()}:${n.getMinutes().toString().padStart(2, '0')}`;
-
-                // データ取得時刻凡例用
                 let ftStr = "--/--(曜) --:--";
                 if (allData.timestamp) {
                     const ft = new Date(allData.timestamp);
@@ -758,22 +818,52 @@ async function draw() {
 
                 tooltip.innerHTML = `
                     <span class="spot-name-tip">📍 ${currentLabel}</span>
-                    <b>${d.getMonth()+1}/${d.getDate()}(${dayStr}) ${d.getHours()}:00</b>
-                    <div class="icon-box"><span class="legend-bar" style="background:#0000FF; margin-right:0;"></span></div>☔降水: ${allData.data.precipitation ? allData.data.precipitation[hourIdx]?.toFixed(1) : "0.0"}mm<br>
+                    <b>${d.getMonth()+1}/${d.getDate()}(${dayStr}) ${d.getHours()}:00 ${wIcon}</b>
+                    <div class="icon-box"><span class="legend-bar" style="background:#0000FF; margin-right:0;"></span></div>降水: ${allData.data.precipitation ? allData.data.precipitation[hourIdx]?.toFixed(1) : "0.0"}mm<br>
                     <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${(deg+180)%360})"/></svg></div>風向: ${getWindDirText(deg)} (${deg}°)<br>
                     <div class="icon-box">🚩</div>風速: ${allData.data.wind_speed_10m[hourIdx]?.toFixed(1) || "0.0"}m/s<br>
-                    <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>🌡️気温: ${allData.data.temperature_2m[hourIdx]?.toFixed(1) || "0.0"}℃<br>
-                    <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>💧海水: ${allData.data.sea_surface_temperature ? allData.data.sea_surface_temperature[hourIdx]?.toFixed(1) : "---"}℃<br>
-                    <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>🌊波高: ${allData.data.wave_height ? allData.data.wave_height[hourIdx]?.toFixed(2) : "0.00"}m<br>
-                    <div class="icon-box"><span class="legend-line" style="background:#1e90ff; margin-right:0;"></span></div>📏潮位: ${allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl[hourIdx]?.toFixed(2) : "0.00"}m
+                    <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>気温: ${allData.data.temperature_2m[hourIdx]?.toFixed(1) || "0.0"}℃<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>海水: ${allData.data.sea_surface_temperature ? allData.data.sea_surface_temperature[hourIdx]?.toFixed(1) : "---"}℃<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>波高: ${allData.data.wave_height ? allData.data.wave_height[hourIdx]?.toFixed(2) : "0.00"}m<br>
+                    <div class="icon-box"><span class="legend-line" style="background:#1e90ff; margin-right:0;"></span></div>潮位: ${allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl[hourIdx]?.toFixed(2) : "0.00"}m
                     <div style="margin-top:6px; border-top:1px solid #444; padding-top:4px; font-size:10px; color:#ccc; line-height:1.4;">
                         <span style="display:inline-block; width:15px; border-top:4px dotted #0000FF; vertical-align:middle; margin-right:4px;"></span>現在時刻 ${nStr}<br>
                         <span style="display:inline-block; width:15px; border-top:4px dotted #228b22; vertical-align:middle; margin-right:4px;"></span>データ取得 ${ftStr}
-
                     </div>
                 `;
             };
             stage.onmouseleave = () => { guide.style.display = "none"; tooltip.style.display = "none"; };
+        }
+        // --- Yahoo雨雲レーダーリンクのボタン生成 ---
+        const radarContainer = document.getElementById('radar-link-container');
+        if (radarContainer) {
+            const now = new Date();
+            const Y = now.getFullYear();
+            const M = String(now.getMonth() + 1).padStart(2, '0');
+            const D = String(now.getDate()).padStart(2, '0');
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(Math.floor(now.getMinutes() / 5) * 5).padStart(2, '0');
+            const tParam = `${Y}${M}${D}${h}${m}00`;
+
+            const radarUrl = `https://weather.yahoo.co.jp/weather/zoomradar/?lat=${currentLat}&lon=${currentLon}&z=9.0&t=${tParam}`;
+            
+            // ボタン風の装飾をインラインスタイルで適用
+            radarContainer.innerHTML = `
+                <a href="${radarUrl}" target="_blank" style="
+                    display: inline-block;
+                    padding: 10px 20px;
+                    background-color: #007bff;
+                    color: white;
+                    text-decoration: none;
+                    border-radius: 5px;
+                    font-weight: bold;
+                    font-size: 14px;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                    transition: transform 0.2s, background-color 0.2s;
+                ">
+                    🌦️ Yahoo! 雨雲レーダーを表示
+                </a>
+            `;
         }
     } catch (e) { console.error(e); }
 }
