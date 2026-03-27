@@ -358,8 +358,8 @@ svg { width: 100%; display: block; overflow: visible; }
 }
 
 .legend-wind-rect {
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
     border-radius: 3px;
     display: inline-block;
 }

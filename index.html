@@ -33,6 +33,7 @@
         <div style="font-size: 12px; color: #666; margin-bottom: 8px;">スマホで共有</div>
         <div id="sidebar-qrcode" style="display: inline-block; background: white; padding: 5px;"></div>
     </div>
+    <button class="btn" id="copy-url-btn" style="background-color: #e3f2fd; color: #1976d2; border: 1px solid #bbdefb;">🔗 URLをコピー</button>
 </div>
 
 <div class="control-wrapper">
@@ -148,6 +149,14 @@
                 <input type="range" id="input-iconScale" class="config-slider" min="0.5" max="1.5" step="0.1" value="0.8">
             </div>
 
+            <div class="config-group">
+                <div class="config-label-area">
+                    <span class="config-title">ツールチップ表示時間</span>
+                    <span id="val-tooltipDuration" class="config-value">3s</span>
+                </div>
+                <input type="range" id="input-tooltipDuration" class="config-slider" min="1" max="10" step="1" value="3">
+            </div>
+
         </div>
 
         <div class="modal-footer">
@@ -205,7 +214,7 @@
 
 <div class="legend-wind-container">
     <div class="legend-wind-item">
-        <span class="legend-wind-label">風速：
+        <span class="legend-wind-label">凡例：風速 
         <span class="legend-wind-rect" style="background: #dc143c;"></span>
         <span class="legend-wind-label">10m/s〜 
     </div>
