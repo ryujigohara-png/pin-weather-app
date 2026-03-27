@@ -605,7 +605,7 @@ async function fetchAddressInfo(lat, lng) {
             saveSpotBtn.disabled = false;
         }
         
-        if (statusEl) statusEl.innerText = "📌：" + defaultName;
+        if (statusEl) statusEl.innerText = "📍：" + defaultName;
     } catch (err) {
         if (statusEl) statusEl.innerText = "地点名取得失敗";
     }
