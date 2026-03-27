@@ -669,14 +669,42 @@ async function draw() {
         if (secTemp) { secTemp.style.height = viewConfig.subHeight + "px"; secTemp.style.marginBottom = gMargin + "px"; }
         if (secMarine) { secMarine.style.height = viewConfig.subHeight + "px"; }
         
-        // --- 天気アイコン描画 ---
+        // --- 天気アイコン・降水量棒グラフ描画 ---
         let wHtml = "";
+        const valContW = document.getElementById('val-svg-weather');
+        const pData = allData.data.precipitation ? allData.data.precipitation.slice(startIdx) : [];
+        const pMax = Math.ceil(Math.max(...pData, 1.0) / 5) * 5; // 5mm刻みでスケール
+        const pMin = 0;
+        const pRange = pMax - pMin;
+        const pPlotH = 35; // 棒グラフの表示領域の高さ
+        const pBaseY = 75; // 棒グラフの底辺Y座標
+
+        // 降水量の最大値と最小値をラベルに反映
+        if (valContW) {
+            //valContW.innerHTML = `<div   class="y-max">${pMax.toFixed(0)}</div><div class="y-min">${pMin.toFixed(0)}</div>`;
+        }
+        // 降水量セクションのグリッド線
+        for (let v = 0; v <= pMax; v += 5) {
+            const gy = pBaseY - (v / pRange) * pPlotH;
+            wHtml += `<line x1="0" y1="${gy}" x2="${totalW}" y2="${gy}" class="grid-y-sub" />`;
+        }
+
         for(let i = startIdx; i < 216; i++) {
             const x = (i - startIdx) * hScale; 
             const icon = weatherIcons[allData.data.weather_code[i]] || "❓";
+            // 天気アイコン
             wHtml += `<text x="${x}" y="32" font-size="28" text-anchor="middle">${icon}</text>`; 
+            
+            // 降水量棒グラフ
             const p = allData.data.precipitation ? allData.data.precipitation[i] : 0;
-            if (p > 0) wHtml += `<text x="${x}" y="70" font-size="${labelFS + 2}" font-weight="bold" fill="#0000FF" text-anchor="middle">${p.toFixed(1)}</text>`;
+            if (p > 0) {
+                const barH = (p / pRange) * pPlotH;
+                wHtml += `<rect x="${x - (hScale*0.3)}" y="${pBaseY - barH}" width="${hScale*0.6}" height="${barH}" fill="#0059ff" opacity="0.7" />`;
+                // 1.0mm以上なら数値を表示（視認性のため）
+                //if (p >= 1.0) {
+                    wHtml += `<text x="${x}" y="${pBaseY - barH - 2}" font-size="${labelFS - 2}" font-weight="bold" fill="#0000FF" text-anchor="middle">${p.toFixed(1)}</text>`;
+                //}
+            }
         }
         svgW.innerHTML = wHtml;
 
@@ -776,7 +804,17 @@ async function draw() {
                         const x = (i - startIdx) * hScale;
                         const deg = allData.data.wind_direction_10m[i];
                         const dirText = getWindDirText(deg);
-                        let color = targetWindDirections.includes(dirText) ? (val >= 10.0 ? '#dc143c' : (val >= 5 ? '#ffa500' : '#87ceeb')) : (val >= 10.0 ? 'rgba(220, 20, 60, 0.4)' : '#ccc');
+                        // 風速色分けロジックの修正
+                        let color;
+                        if (targetWindDirections.includes(dirText)) {
+                            if (val >= 10.0) color = '#dc143c';      // 10以上
+                            else if (val >= 5.0) color = '#ffa500';  // 5以上10未満
+                            else if (val >= 3.0) color = '#87CEEB';  // 3以上5未満（水色）
+                            else color = '#ccc';                  // それ以外（ごく薄い水色など）
+                        } else {
+                            color = (val >= 10.0 ? 'rgba(220, 20, 60, 0.4)' : '#ccc');
+                        }
+
                         html += `<rect x="${x - (hScale*0.4)}" y="${plotHeight-h}" width="${hScale*0.8}" height="${h}" fill="${color}" />`;
                         if (isWind) {
                             html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-25}) rotate(${(deg+180)%360}) scale(${1.6 * iScale})" class="wind-arrow" />`;
@@ -879,6 +917,8 @@ async function draw() {
         
     } catch (e) { console.error(e); }
 }
+
+
 
 /**
  * 監視リスナー：4時間経過判定
