@@ -152,8 +152,9 @@
 
         <div class="modal-footer">
             <div class="guide-text">※保存するとページが再読み込みされ、設定が反映されます。</div>
-            <button id="closeViewSettings" class="btn">閉じる</button>
             <button id="saveViewSettings" class="btn btn-apply">設定を保存</button>
+            <button id="resetViewSettings" class="btn" style="background-color: #f0f0f0; color: #333;">デフォルトに戻す</button>
+            <button id="closeViewSettings" class="btn">閉じる</button>
         </div>
     </div>
 </div>
@@ -202,11 +203,29 @@
     </div>
 </div>
 
+<div class="legend-wind-container">
+    <div class="legend-wind-item">
+        <span class="legend-wind-label">風速：
+        <span class="legend-wind-rect" style="background: #dc143c;"></span>
+        <span class="legend-wind-label">10m/s〜 
+    </div>
+    <div class="legend-wind-item">
+        <span class="legend-wind-rect" style="background: #ffa500;"></span>
+        <span class="legend-wind-label">5m/s〜 </span>
+    </div>
+    <div class="legend-wind-item">
+        <span class="legend-wind-rect" style="background: #87ceeb;"></span>
+        <span class="legend-wind-label">3m/s〜 </span>
+    </div>
+    <div class="legend-wind-item">
+        <span class="legend-wind-rect" style="background: #ccc;"></span>
+        <span class="legend-wind-label">… </span>
+    </div>
+</div>
+
 
 <div class="footer-info">
-
-    <div class="weather-links" style="display: flex; gap: 12px; padding: 5px 20px; justify-content: center; background: #ffffff; border-bottom: 1px solid #eaeaea; box-shadow: 0 2px 5px rgba(0,0,0,0.02);">
-        
+    <div class="weather-links" style="display: flex; gap: 12px; padding: 10px 20px; justify-content: center; background: #ffffff; border-bottom: 10px solid #eaeaea; box-shadow: 0 2px 5px rgba(0,0,0,0.02);">
         <button class="btn weather-link-btn" onclick="openExternalWeather('yahoo')" 
                 style="background: linear-gradient(135deg, #0056b3 0%, #004099 100%); border: none; padding: 8px 18px; border-radius: 25px; cursor: pointer; display: flex; align-items: center; gap: 9px; box-shadow: 0 4px 6px rgba(0,64,153,0.3); transition: transform 0.1s, box-shadow: 0.1s;">
             <img src="https://www.google.com/s2/favicons?domain=weather.yahoo.co.jp&sz=32" alt="Y" style="width: 16px; height: 16px; border-radius: 4px; background: #fff; padding: 1px;">

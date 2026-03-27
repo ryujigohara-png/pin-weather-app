@@ -43,17 +43,17 @@ function initViewSettings() {
     const openBtn = document.getElementById('openSettingsBtn'); // サイドバーのボタン
     const closeBtn = document.getElementById('closeViewSettings'); // モーダル内の閉じるボタン
     const saveBtn = document.getElementById('saveViewSettings'); // モーダル内の保存ボタン
+    const resetBtn = document.getElementById('resetViewSettings'); // 【追加】リセットボタン
 
     if (!modal || !openBtn) return;
 
-    // 1. サイドバーのボタンを押した時の動作（既存の openModal を活用）
+    // 1. サイドバーのボタンを押した時の動作
     openBtn.addEventListener('click', () => {
-        // 現在の設定値をスライダーに同期させてから表示
         syncSliderValues();
         openModal('viewSettingsModal');
     });
 
-    // 2. 閉じるボタン（既存の closeModal を活用）
+    // 2. 閉じるボタン
     if (closeBtn) {
         closeBtn.addEventListener('click', () => {
             closeModal('viewSettingsModal');
@@ -67,7 +67,14 @@ function initViewSettings() {
         });
     }
 
-    // 4. スライダーを動かした時の数値リアルタイム表示
+    // 【追加】 4. リセットボタンのイベント紐付け
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            resetViewSettings();
+        });
+    }
+
+    // 5. スライダーを動かした時の数値リアルタイム表示
     const configIds = ['hourWidth', 'windHeight', 'subHeight', 'margin', 'fontSize', 'iconScale'];
     configIds.forEach(id => {
         const input = document.getElementById(`input-${id}`);
@@ -119,6 +126,23 @@ function saveViewSettings() {
     // 完了通知を出してリロード
     // alert('設定を保存しました。再読み込みして反映します。'); 
     location.reload();
+}
+
+/**
+ * サブルーチン：設定のリセット処理
+ * 定義済みの defaultViewConfig を使用して設定を初期化する
+ */
+function resetViewSettings() {
+    if (confirm("表示設定をデフォルトに戻しますか？")) {
+        // オブジェクトの参照を切り離してコピー（安全のため）
+        const resetData = JSON.parse(JSON.stringify(defaultViewConfig));
+        
+        // localStorageを初期値で上書き保存
+        localStorage.setItem('pin_weather_view_config', JSON.stringify(resetData));
+        
+        // 反映のためリロード
+        location.reload();
+    }
 }
 
 
@@ -596,22 +620,55 @@ async function updateLocation(lat, lon, label) {
 const weatherIcons = { 0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️", 45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "🌦️", 61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "❄️", 73: "❄️", 75: "❄️", 80: "🌦️", 81: "🌦️", 82: "🌦️", 95: "⛈️" };
 function getWindDirText(deg) { return windDirs[Math.round(deg / 22.5) % 16]; }
 
+/**
+ * サブルーチン：キャッシュ付きデータ取得
+ * リロード（再読み込み）時はキャッシュを無視して強制的にAPIを叩く。
+ */
 async function fetchWithCache(lat, lon) {
     const cacheKey = `weather_cache_${lat.toFixed(3)}_${lon.toFixed(3)}`;
     const cached = localStorage.getItem(cacheKey);
     const now = Date.now();
-    if (cached) {
+
+    // ページがリロード（再読み込み）されたかどうかを判定
+    const navEntries = performance.getEntriesByType('navigation');
+    const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
+
+    // リロードでなく、かつキャッシュが存在し、有効期限内であればキャッシュを返す
+    if (!isReload && cached) {
         const parsed = JSON.parse(cached);
-        if (now - parsed.timestamp < CACHE_DURATION) return { timestamp: parsed.timestamp, data: parsed.data };
+        if (now - parsed.timestamp < CACHE_DURATION) {
+            return { timestamp: parsed.timestamp, data: parsed.data };
+        }
     }
+
+    // API取得（リロード時、またはキャッシュ切れの場合）
     const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&forecast_days=9&wind_speed_unit=ms`;
     const mUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto&forecast_days=9&cell_selection=sea`;
-    const [wRes, mRes] = await Promise.all([fetch(wUrl).then(r => r.json()), fetch(mUrl).then(r => r.json())]);
-    const mergedData = { ...wRes.hourly, ...mRes.hourly };
-    const cacheData = { timestamp: now, data: mergedData };
-    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-    return cacheData;
+
+    try {
+        const [wRes, mRes] = await Promise.all([
+            fetch(wUrl).then(r => r.json()),
+            fetch(mUrl).then(r => r.json())
+        ]);
+
+        const mergedData = { ...wRes.hourly, ...mRes.hourly };
+        const cacheData = { timestamp: now, data: mergedData };
+        
+        // 最新データをキャッシュに保存
+        localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+        return cacheData;
+
+    } catch (error) {
+        console.error("API取得失敗:", error);
+        // APIが失敗した際、古いキャッシュがあればそれを返す（全滅を防ぐための保険）
+        if (cached) {
+            const parsed = JSON.parse(cached);
+            return { timestamp: parsed.timestamp, data: parsed.data };
+        }
+        throw error;
+    }
 }
+
 
 /**
  * 外部気象サービスを現在の座標で開く
@@ -651,6 +708,20 @@ function openExternalWeather(service) {
 
     if (url) {
         window.open(url, '_blank');
+    }
+}
+
+/**
+ * サブルーチン：グラフの表示位置を左端（開始点）にリセットする
+ */
+function resetGraphScroll() {
+    const scrollRoot = document.getElementById('scroll-root');
+    if (scrollRoot) {
+        // スムーズに動かしたい場合は 'smooth'、即座に飛ばす場合は 'auto'
+        scrollRoot.scrollTo({
+            left: 0,
+            behavior: 'auto' 
+        });
     }
 }
 
@@ -873,6 +944,8 @@ async function draw() {
         renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], viewConfig.windHeight, 5.0, true, false, true);
         renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, false, false);
         renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], viewConfig.subHeight, 0.5, false, true, false);
+
+        resetGraphScroll();
 
         const scrollRoot = document.getElementById('scroll-root');
         const stage = document.getElementById('stage');
