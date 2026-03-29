@@ -692,8 +692,14 @@ async function fetchWithCache(lat, lon) {
         }
     }
 
+    // 日本の範囲（JMA API対象エリア）かどうかの判定
+    const isJapan = lat >= 20 && lat <= 50 && lon >= 120 && lon <= 150;
+    const weatherBaseUrl = isJapan 
+        ? "https://jma-api.open-meteo.com/v1/forecast" 
+        : "https://api.open-meteo.com/v1/forecast";
+
     // API取得（リロード時、またはキャッシュ切れの場合）
-    const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&forecast_days=9&wind_speed_unit=ms`;
+    const wUrl = `${weatherBaseUrl}?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&forecast_days=9&wind_speed_unit=ms`;
     const mUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto&forecast_days=9&cell_selection=sea`;
 
     try {
