@@ -1,5 +1,7 @@
+// 1. データの入れ物
 let allData = {};
-// --- [追加] 詳細設定の初期値と保存・読込ロジック ---
+
+// 2. 詳細設定の初期値
 const defaultViewConfig = {
     hourWidth: 20,      // 旧 hScale
     windHeight: 180,    // 風速グラフ高さ
@@ -7,40 +9,291 @@ const defaultViewConfig = {
     graphMargin: 0,    // グラフ間余白
     fontSize: 12,       // ラベルフォントサイズ
     iconScale: 0.7,     // 風向アイコン倍率
-    tooltipDuration: 7 // ツールチップ表示時間（s）
+    tooltipDuration: 7, // ツールチップ表示時間（s）
+    language: 'ja'      // [追加] 言語設定の初期値
 };
 
-// 2. 読み込み時に「マージ（統合）」する
-// localStorageの内容を読み込み、足りない項目をdefaultViewConfigから補完する
+// 3. localStorage からの読み込みとマージ
 const savedConfig = JSON.parse(localStorage.getItem('pin_weather_view_config')) || {};
-
-// スプレッド構文を使用して、デフォルト値をベースに保存された値で上書きする
 let viewConfig = { ...defaultViewConfig, ...savedConfig };
 
-// これで、もしsavedConfigにtooltipDurationがなくても、
-// defaultViewConfigの「3」が自動的にセットされるため undefined になりません。
+// ★重要：ここで先に i18n を定義する！！
+const i18n = {
+    _currentLang: 'ja',
+    setLang(lang) { this._currentLang = lang; },
+    dict: {
+        'ja': {
+            // --- グラフ・ツールチップ用 ---
+            days: ["日", "月", "火", "水", "木", "金", "土"],
+            months: ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"],
+            precip: "降水量",
+            windDir: "風向",
+            windSpeed: "風速",
+            temp: "気温",
+            seawater: "海水温",
+            wave: "波高",
+            tide: "潮位",
+            nowTime: "現在時刻",
+            fetchTime: "データ取得",
 
+            // --- サイドバー・基本UI ---
+            btnWindConfig: "🎐 風向色付設定",
+            btnDetailSettings: "⚙ 表示詳細設定",
+            btnResetAll: "♻️ 全リセット",
+            shareQR: "スマホで共有",
+            btnCopyUrl: "🔗 URLをコピー",
+            copySuccess: "✅ コピー完了！",
+            copyError: "コピーに失敗しました。",
 
-// --- [修正] 既存の定数を viewConfig 参照に付け替え ---
-// これにより、既存コード内の「hScale」という変数を一括で動的に制御できます。
+            // --- 地図・地点登録モーダル ---
+            mapClickGuide: "地点をクリックしてください",
+            btnSearch: "検索",
+            btnSaveSpot: "MySpotsに登録",
+            btnTempView: "グラフ表示",
+            btnClose: "キャンセル", // 共通の「閉じる/キャンセル」
+            mapStatusFetching: "地点情報を取得中...",
+            mapStatusFail: "地点名取得失敗",
+            mapNewSpot: "新規地点",
+            mapSavePrompt: "登録する地点名を確認・修正してください",
+            layerStreet: "標準地図",
+            layerSatellite: "衛星写真",
+            layerGSI: "地理院地図",
+
+            // --- 風向設定モーダル ---
+            windModalTitle: "色付けする風向を選択",
+            compassCenterText: "中央をクリックで<br>全選択 / 解除",
+            btnApply: "更新して適用",
+
+            // --- 表示詳細設定モーダル ---
+            settingsTitle: "グラフ表示詳細設定",
+            configLangTitle: "Language / 表示言語",
+            cfgHourWidth: "1時間の幅 (hScale)",
+            cfgWindHeight: "風速グラフの高さ",
+            cfgSubHeight: "気温・海象グラフの高さ",
+            cfgMargin: "グラフ間の余白",
+            cfgFontSize: "ラベル文字サイズ",
+            cfgIconScale: "風向アイコン倍率",
+            cfgTooltipDuration: "ツールチップ表示時間",
+            saveGuideText: "※保存するとページが再読み込みされ、設定が反映されます。",
+            btnSaveSettings: "設定を保存",
+            btnRestoreDefault: "デフォルトに戻す",
+
+            // --- グラフ軸・凡例・その他 ---
+            yAxisWeather: "天気<br>降水量mm",
+            yAxisWind: "風向<br>風速(m/s)",
+            yAxisTemp: "気温(℃)<br>海水(℃)",
+            yAxisMarine: "波高(m)<br>潮位(m)",
+            legendWindTitle: "風向色付：",
+            speedunit: "m/s",
+            disclaimer: "【免責事項】海上気象データは予測モデルに基づく「最寄りの海上地点」の数値であり、実際の局地的な地形や潮流による影響を反映しきれない場合があります。",
+            
+            // --- メッセージ類 ---
+            confirmDelete: (name) => `「${name}」を削除しますか？`,
+            confirmInit: "初期化しますか？",
+            confirmReset: "表示設定をデフォルトに戻しますか？",
+            gpsFetching: "取得中...",
+            gpsError: "位置情報の取得に失敗しました。",
+            gpsDefaultLabel: "GPS地点",
+            noLocationError: "地点情報がありません。"
+        },
+        'en': {
+            // --- Graph & Tooltip ---
+            days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+            months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+            precip: "Precip",
+            windDir: "Wind",
+            windSpeed: "Speed",
+            temp: "Temp",
+            seawater: "Sea Temp",
+            wave: "Wave",
+            tide: "Tide",
+            nowTime: "Current",
+            fetchTime: "Fetched",
+
+            // --- Sidebar & Base UI ---
+            btnWindConfig: "🎐 Wind Color Settings",
+            btnDetailSettings: "⚙ Display Settings",
+            btnResetAll: "♻️ Reset All Spots",
+            shareQR: "Share with Mobile",
+            btnCopyUrl: "🔗 Copy URL",
+            copySuccess: "✅ Copied!",
+            copyError: "Failed to copy.",
+
+            // --- Map & Spot Modal ---
+            mapClickGuide: "Click on the map",
+            btnSearch: "Search",
+            btnSaveSpot: "Save to MySpots",
+            btnTempView: "View Graph",
+            btnClose: "Cancel",
+            mapStatusFetching: "Fetching location info...",
+            mapStatusFail: "Failed to get location name",
+            mapNewSpot: "New Spot",
+            mapSavePrompt: "Please confirm or edit the spot name",
+            layerStreet: "Street",
+            layerSatellite: "Satellite",
+            layerGSI: "GSI Map",
+
+            // --- Wind Modal ---
+            windModalTitle: "Select Wind Directions to Color",
+            compassCenterText: "Click Center to<br>Select/Deselect All",
+            btnApply: "Apply Changes",
+
+            // --- Detail Settings Modal ---
+            settingsTitle: "Detailed Display Settings",
+            configLangTitle: "Language",
+            cfgHourWidth: "Hour Width (hScale)",
+            cfgWindHeight: "Wind Graph Height",
+            cfgSubHeight: "Sub Graph Height",
+            cfgMargin: "Graph Margin",
+            cfgFontSize: "Font Size",
+            cfgIconScale: "Icon Scale",
+            cfgTooltipDuration: "Tooltip Duration",
+            saveGuideText: "*Saving will reload the page to apply settings.",
+            btnSaveSettings: "Save Settings",
+            btnRestoreDefault: "Restore Default",
+
+            // --- Axes, Legends, etc. ---
+            yAxisWeather: "Weather<br>Precip(mm)",
+            yAxisWind: "Wind Dir<br>Speed(m/s)",
+            yAxisTemp: "Temp(°C)<br>Sea(°C)",
+            yAxisMarine: "Wave(m)<br>Tide(m)",
+            legendWindTitle: "Wind Color:",
+            speedunit: "m/s",
+            disclaimer: "[Disclaimer] Marine weather data is based on forecast models for the 'nearest sea point' and may not reflect local terrain or tidal effects.",
+
+            // --- Messages ---
+            confirmDelete: (name) => `Delete "${name}"?`,
+            confirmInit: "Initialize all spots?",
+            confirmReset: "Reset all view settings to default?",
+            gpsFetching: "Locating...",
+            gpsError: "Failed to get location.",
+            gpsDefaultLabel: "GPS Location",
+            noLocationError: "No location information available."
+        }
+    },
+    t(key) { 
+        return this.dict[this._currentLang][key] || key; 
+    }
+};
+
+// 3. 言語設定を即時適用
+i18n.setLang(viewConfig.language || 'ja');
+
+// ==========================================
+// 4. 風向マスターと言語互換ロジック
+// ==========================================
+const jaDirs = ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"];
+const enDirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+
+// 表示用の基本風向リスト（現在の言語に合わせる）
+const windDirs = i18n._currentLang === 'ja' ? [...jaDirs] : [...enDirs];
+
+// localStorage から保存されたフィルタを読み込み、現在の言語に「強制変換」して同期させる
+let rawSavedDirections = JSON.parse(localStorage.getItem('pin_weather_wind_filter')) || [...windDirs];
+
+let targetWindDirections = rawSavedDirections.map(val => {
+    if (i18n._currentLang === 'en') {
+        const idx = jaDirs.indexOf(val);
+        return idx !== -1 ? enDirs[idx] : val;
+    } else {
+        const idx = enDirs.indexOf(val);
+        return idx !== -1 ? jaDirs[idx] : val;
+    }
+});
+
+// ==========================================
+// 5. 定数とDOM初期化
+// ==========================================
 const hScale = viewConfig.hourWidth; 
 const CACHE_DURATION = 4 * 60 * 60 * 1000; 
 
-const windDirs = ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "北西", "北北西"];
+window.addEventListener('DOMContentLoaded', () => {
+    updateStaticUI();
+    const langSelect = document.getElementById('config-language');
+    if (langSelect) { langSelect.value = i18n._currentLang; }
+});
+
 const defaultSpots = [
     {lat: 31.337, lon: 130.795, label: "高須沖(鹿児島県)"},
     {lat: 35.30, lon: 139.48, label: "江の島沖(神奈川県)"}
 ];
 
 let mySpots = JSON.parse(localStorage.getItem('pin_weather_spots')) || defaultSpots;
-let targetWindDirections = JSON.parse(localStorage.getItem('pin_weather_wind_filter')) || [...windDirs];
-
 let currentLat = mySpots[0].lat;
 let currentLon = mySpots[0].lon;
 let currentLabel = mySpots[0].label;
 
 let map, tempMarker;
 
+function updateStaticUI() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        // confirmDelete のような関数型データでない場合のみ text を置換
+        if (typeof i18n.dict[i18n._currentLang][key] === 'string') {
+            el.innerHTML = i18n.t(key); // HTMLタグを含む場合があるため innerHTML を使用
+        }
+    });
+}
+
+/**
+ * 言語設定に基づいた日付文字列を返す
+ * @param {Date} dateObj 
+ * @returns {string}
+ */
+function getLocalizedDate(dateObj) {
+    const d = dateObj.getDate();
+    const w = dateObj.getDay();
+    const m = dateObj.getMonth();
+
+    if (i18n._currentLang === 'ja') {
+        // 日本語形式: 4/1(水)
+        return `${m + 1}/${d}(${i18n.dict.ja.days[w]})`;
+    } else {
+        // 英語形式: Wed, Apr 1st
+        let suffix = "th";
+        if (d % 10 === 1 && d !== 11) suffix = "st";
+        else if (d % 10 === 2 && d !== 12) suffix = "nd";
+        else if (d % 10 === 3 && d !== 13) suffix = "rd";
+        
+        const dayName = i18n.dict.en.days[w];
+        const monthName = i18n.dict.en.months[m];
+        return `${dayName}, ${monthName} ${d}${suffix}`;
+    }
+}
+
+/**
+ * サブルーチン：HTML上の静的テキストを現在の言語で一斉更新
+ */
+function updateStaticUI() {
+    // 1. data-i18n 属性を持つすべての要素をループ処理
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        const translation = i18n.t(key);
+
+        // 翻訳が存在する場合のみ処理
+        if (translation && translation !== key) {
+            // confirmDelete のような関数型データは除外（個別のダイアログ等で使用するため）
+            if (typeof translation === 'string') {
+                // 免責事項や軸ラベルには <br> 等が含まれるため innerHTML を使用
+                el.innerHTML = translation;
+            }
+        }
+    });
+
+    // 2. プレースホルダー（検索窓）の個別対応
+    const searchInput = document.getElementById('map-search-input');
+    if (searchInput) {
+        searchInput.placeholder = i18n._currentLang === 'ja' 
+            ? "地名・施設名を入力して検索..." 
+            : "Search location...";
+    }
+
+    // 3. 設定画面のセレクトボックスの状態を現在の言語に同期
+    const langSelect = document.getElementById('config-language');
+    if (langSelect) {
+        langSelect.value = i18n._currentLang;
+    }
+}
 
 
 /**
@@ -136,6 +389,9 @@ function saveViewSettings() {
     viewConfig.iconScale = parseFloat(document.getElementById('input-iconScale').value);
     viewConfig.tooltipDuration = parseInt(document.getElementById('input-tooltipDuration').value);
 
+    // [追加] 言語設定を取得
+    viewConfig.language = document.getElementById('config-language').value;
+
     // localStorageに保存（JSON形式）
     localStorage.setItem('pin_weather_view_config', JSON.stringify(viewConfig));
 
@@ -143,20 +399,15 @@ function saveViewSettings() {
     // alert('設定を保存しました。再読み込みして反映します。'); 
     location.reload();
 }
-
 /**
  * サブルーチン：設定のリセット処理
  * 定義済みの defaultViewConfig を使用して設定を初期化する
  */
 function resetViewSettings() {
-    if (confirm("表示設定をデフォルトに戻しますか？")) {
-        // オブジェクトの参照を切り離してコピー（安全のため）
+    // 辞書からメッセージを取得
+    if (confirm(i18n.t('confirmReset'))) {
         const resetData = JSON.parse(JSON.stringify(defaultViewConfig));
-        
-        // localStorageを初期値で上書き保存
         localStorage.setItem('pin_weather_view_config', JSON.stringify(resetData));
-        
-        // 反映のためリロード
         location.reload();
     }
 }
@@ -195,29 +446,22 @@ function initCopyUrlEvent() {
 
     copyBtn.onclick = async () => {
         try {
-            // 現在のURLを取得
-            const url = window.location.href;
-            
-            // クリップボードに書き込み
-            await navigator.clipboard.writeText(url);
-            
-            // ボタンのテキストを一時的に変更して通知（またはalert）
+            await navigator.clipboard.writeText(window.location.href);
             const originalText = copyBtn.innerText;
-            copyBtn.innerText = "✅ コピー完了！";
+            
+            // 辞書から成功メッセージを取得
+            copyBtn.innerText = i18n.t('copySuccess');
             copyBtn.style.backgroundColor = "#c8e6c9";
             
             setTimeout(() => {
                 copyBtn.innerText = originalText;
                 copyBtn.style.backgroundColor = "#e3f2fd";
             }, 2000);
-            
         } catch (err) {
-            console.error('URLのコピーに失敗しました', err);
-            alert('コピーに失敗しました。ブラウザの設定を確認してください。');
+            alert(i18n.t('copyError')); // 辞書からエラーメッセージを取得
         }
     };
 }
-
 
 /**
  * サブルーチン：環境判定とUIへの反映
@@ -348,7 +592,9 @@ function initCompassUI() {
     const centerX = 160; 
     const centerY = 160;
 
-    container.innerHTML = '<div class="compass-center">ALL</div>';
+    // 中央のテキストを辞書から取得するように変更
+    const centerText = i18n._currentLang === 'ja' ? "全選択<br>解除" : "ALL";
+    container.innerHTML = `<div class="compass-center">${centerText}</div>`;
 
     windDirs.forEach((dir, i) => {
         const angle = (i * 22.5 - 90) * (Math.PI / 180);
@@ -356,10 +602,12 @@ function initCompassUI() {
         const y = centerY + radius * Math.sin(angle) - 15;
 
         const el = document.createElement('div');
+        // ここでの dir と targetWindDirections の中身が同じ言語（日本語同士 or 英語同士）になるため、正しく active が付きます
         el.className = 'compass-label' + (targetWindDirections.includes(dir) ? ' active' : '');
         el.style.left = `${x}px`;
         el.style.top = `${y}px`;
         el.innerText = dir;
+        
         el.onclick = () => {
             if (targetWindDirections.includes(dir)) {
                 targetWindDirections = targetWindDirections.filter(d => d !== dir);
@@ -486,7 +734,8 @@ function renderTabs(activeOverrideLabel = null) {
 
 function confirmDelete(index) {
     if (index === -1) return;
-    if (confirm(`「${mySpots[index].label}」を削除しますか？`)) {
+    // 関数形式の辞書呼び出し
+    if (confirm(i18n.dict[i18n._currentLang].confirmDelete(mySpots[index].label))) {
         mySpots.splice(index, 1);
         localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
         renderTabs();
@@ -496,7 +745,7 @@ function confirmDelete(index) {
 const resetBtn = document.getElementById('reset-all-btn');
 if (resetBtn) {
     resetBtn.onclick = () => {
-        if (confirm("初期化しますか？")) {
+        if (confirm(i18n.t('confirmInit'))) {
             toggleSidebar();
             mySpots = JSON.parse(JSON.stringify(defaultSpots));
             localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
@@ -514,18 +763,16 @@ if (resetBtn) {
  */
 function handleGPSClick() {
     if ("geolocation" in navigator) {
-        // 状態表示（任意ですが、UX向上のため）
         const gpsBtn = document.querySelector('.btn-gps');
-        if (gpsBtn) gpsBtn.innerText = "取得中...";
+        if (gpsBtn) gpsBtn.innerText = i18n.t('gpsFetching');
 
         navigator.geolocation.getCurrentPosition(async (pos) => {
             const lat = pos.coords.latitude;
             const lon = pos.coords.longitude;
-            let gpsLabel = "GPS地点";
+            let gpsLabel = i18n.t('gpsDefaultLabel');
 
             try {
-                // GPS座標から地名を逆引き
-                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=ja`);
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=${i18n._currentLang}`);
                 const data = await res.json();
                 const addr = data.address;
                 const city = addr.city || addr.town || addr.village || "";
@@ -533,17 +780,14 @@ function handleGPSClick() {
                 if (city || district) {
                     gpsLabel = (city + district) + "(GPS)";
                 }
-            } catch (err) {
-                console.error("GPS逆引き失敗:", err);
-            }
+            } catch (err) { console.error(err); }
 
             if (gpsBtn) gpsBtn.innerText = "GPS";
-            // 取得した地名で場所を更新（renderTabsが走り、左端に配置される）
             updateLocation(lat, lon, gpsLabel);
         }, (err) => {
-            console.error("GPS取得エラー:", err);
+            console.error(err);
             if (gpsBtn) gpsBtn.innerText = "GPS";
-            alert("位置情報の取得に失敗しました。");
+            alert(i18n.t('gpsError'));
         });
     }
 }
@@ -556,9 +800,17 @@ function openMap() {
     if (!map) {
         const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
         const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
-        const gsi = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', { attribution: '&copy; 国地理院' });
+        const gsi = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', { attribution: '&copy; 国土地理院' });
+        
         map = L.map('map-canvas', { center: [currentLat, currentLon], zoom: 14, layers: [esri] });
-        L.control.layers({ "標準地図": esri, "衛星写真": satellite, "地理院地図": gsi }).addTo(map);
+        
+        // レイヤー名の多言語化
+        const baseMaps = {};
+        baseMaps[i18n.t('layerStreet')] = esri;
+        baseMaps[i18n.t('layerSatellite')] = satellite;
+        baseMaps[i18n.t('layerGSI')] = gsi;
+        
+        L.control.layers(baseMaps).addTo(map);
         map.on('click', onMapClick);
         fetchAddressInfo(currentLat, currentLon);
     } else {
@@ -619,32 +871,30 @@ async function onMapClick(e) {
  */
 async function fetchAddressInfo(lat, lng) {
     const statusEl = document.getElementById('map-status');
-    if (statusEl) statusEl.innerText = "地点情報を取得中...";
+    if (statusEl) statusEl.innerText = i18n.t('mapStatusFetching');
     
     try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ja`);
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=${i18n._currentLang}`);
         const data = await res.json();
         const addr = data.address;
         const city = addr.city || addr.town || addr.village || "";
         const district = addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district || "";
-        const defaultName = city + district || "新規地点";
+        const defaultName = city + district || i18n.t('mapNewSpot');
 
-        // 「登録せずに表示」ボタンの設定
         const tempViewBtn = document.getElementById('temp-view-btn');
         if (tempViewBtn) {
             tempViewBtn.onclick = () => {
-                // 地名に(未登録)を付与して更新。renderTabsのisExternalロジックにより左端に配置される。
-                updateLocation(lat, lng, defaultName + "(未登録)");
+                const suffix = i18n._currentLang === 'ja' ? "(未登録)" : "(Temp)";
+                updateLocation(lat, lng, defaultName + suffix);
                 closeModal('map-modal');
             };
             tempViewBtn.disabled = false;
         }
 
-        // 「この地点を保存」ボタンの設定
         const saveSpotBtn = document.getElementById('save-spot-btn');
         if (saveSpotBtn) {
             saveSpotBtn.onclick = () => {
-                const spotName = prompt("登録する地点名を確認・修正してください", defaultName);
+                const spotName = prompt(i18n.t('mapSavePrompt'), defaultName);
                 if (spotName) {
                     mySpots.push({lat, lon: lng, label: spotName});
                     localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
@@ -658,9 +908,9 @@ async function fetchAddressInfo(lat, lng) {
         
         if (statusEl) statusEl.innerText = "📍：" + defaultName;
     } catch (err) {
-        if (statusEl) statusEl.innerText = "地点名取得失敗";
+        if (statusEl) statusEl.innerText = i18n.t('mapStatusFail');
     }
-}
+}    
 
 async function updateLocation(lat, lon, label) {
     currentLat = lat; currentLon = lon; currentLabel = label;
@@ -727,7 +977,7 @@ async function fetchWithCache(lat, lon) {
  */
 function openExternalWeather(service) {
     if (!currentLat || !currentLon) {
-        alert("地点情報がありません。");
+        alert(i18n.t('noLocationError'));
         return;
     }
 
@@ -795,10 +1045,10 @@ async function draw() {
         // --- Y軸ラベルのアイコン設置 ---
         const titles = document.querySelectorAll('.y-axis-title');
         if (titles.length >= 4) {
-            titles[0].innerHTML = `天気<br>降水量mm`;
-            titles[1].innerHTML = `${baseWindIcon}風向<br>風速(m/s)`;
-            titles[2].innerHTML = `気温(℃)<br>海水(℃)`;
-            titles[3].innerHTML = `波高(m)<br>潮位(m)`;
+            titles[0].innerHTML = `${i18n.t('weather') || '天気'}<br>${i18n.t('precip')}mm`;
+            titles[1].innerHTML = `${baseWindIcon}${i18n.t('windDir')}<br>(${i18n.t('speedunit') || 'm/s'})`;
+            titles[2].innerHTML = `${i18n.t('temp')}(℃)<br>${i18n.t('seawater')}(℃)`;
+            titles[3].innerHTML = `${i18n.t('wave')}(m)<br>${i18n.t('tide')}(m)`;
         }
 
         // --- 表示開始位置の計算（現在時刻の4時間前から） ---
@@ -919,9 +1169,11 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
             html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight}" class="grid-day" />`;
             
             const dayIdx = d.getDay();
-            const dayStr = weekDays[dayIdx];
             let dayColor = (dayIdx === 0) ? "#FF0000" : (dayIdx === 6 ? "#0000FF" : "#000000");
-            const labelContent = `<span style="color:${dayColor}; font-size:${labelFS * 1.5}px;">${d.getMonth()+1}/${d.getDate()}(${dayStr})</span>`;
+            
+            // --- [修正] 自作サブルーチンを使用して多言語化された日付を取得 ---
+            const localizedDateStr = getLocalizedDate(d);
+            const labelContent = `<span style="color:${dayColor}; font-size:${labelFS * 1.5}px;" class="notranslate">${localizedDateStr}</span>`;
 
             const dateDiv = document.createElement('div');
             dateDiv.className = 'sticky-date';
@@ -1039,6 +1291,9 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
             let hourIdx = Math.round(graphX / hScale) + startIdx;
             hourIdx = Math.min(Math.max(hourIdx, startIdx), 215);
 
+            // --- [重要] ここで d を定義。これが無いと ReferenceError で停止します ---
+            const d = new Date(allData.data.time[hourIdx]);
+
             const snapX = (hourIdx - startIdx) * hScale + 100;
             guide.style.left = snapX + "px"; 
             guide.style.display = "block";
@@ -1058,36 +1313,41 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
             }
             tooltip.style.top = ty + "px";
 
-            const d = new Date(allData.data.time[hourIdx]); 
-            const weekDays = ["日", "月", "火", "水", "木", "金", "土"];
-            const dayStr = weekDays[d.getDay()];
+            // 1. 予報時刻の多言語化
+            const localizedDateStr = getLocalizedDate(d);
             const deg = allData.data.wind_direction_10m[hourIdx];
             const wIcon = weatherIcons[allData.data.weather_code[hourIdx]] || "❓";
+
+            // 2. 現在時刻の多言語化
             const n = new Date();
-            const nStr = `${n.getMonth()+1}/${n.getDate()}(${weekDays[n.getDay()]}) ${n.getHours()}:${n.getMinutes().toString().padStart(2, '0')}`;
+            const nDayStr = i18n.dict[i18n._currentLang].days[n.getDay()];
+            const nStr = `${n.getMonth()+1}/${n.getDate()}(${nDayStr}) ${n.getHours()}:${n.getMinutes().toString().padStart(2, '0')}`;
+            
+            // 3. データ取得時刻の多言語化
             let ftStr = "--/--(曜) --:--";
             if (allData.timestamp) {
                 const ft = new Date(allData.timestamp);
-                ftStr = `${ft.getMonth()+1}/${ft.getDate()}(${weekDays[ft.getDay()]}) ${ft.getHours()}:${ft.getMinutes().toString().padStart(2, '0')}`;
+                const ftDayStr = i18n.dict[i18n._currentLang].days[ft.getDay()];
+                ftStr = `${ft.getMonth()+1}/${ft.getDate()}(${ftDayStr}) ${ft.getHours()}:${ft.getMinutes().toString().padStart(2, '0')}`;
             }
 
             tooltip.innerHTML = `
                 <span class="spot-name-tip">📍 ${currentLabel}</span>
-                <b>${d.getMonth()+1}/${d.getDate()}(${dayStr}) ${d.getHours()}:00 ${wIcon}</b>
-                <div class="icon-box"><span class="legend-bar" style="background:#0000FF; margin-right:0;"></span></div>降水: ${allData.data.precipitation ? allData.data.precipitation[hourIdx]?.toFixed(1) : "0.0"}mm<br>
-                <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${(deg+180)%360})"/></svg></div>風向: ${getWindDirText(deg)} (${deg}°)<br>
-                <div class="icon-box">🚩</div>風速: ${allData.data.wind_speed_10m[hourIdx]?.toFixed(1) || "0.0"}m/s<br>
-                <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>気温: ${allData.data.temperature_2m[hourIdx]?.toFixed(1) || "0.0"}℃<br>
-                <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>海水: ${allData.data.sea_surface_temperature ? allData.data.sea_surface_temperature[hourIdx]?.toFixed(1) : "---"}℃<br>
-                <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>波高: ${allData.data.wave_height ? allData.data.wave_height[hourIdx]?.toFixed(2) : "0.00"}m<br>
-                <div class="icon-box"><span class="legend-line" style="background:#1e90ff; margin-right:0;"></span></div>潮位: ${allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl[hourIdx]?.toFixed(2) : "0.00"}m
-                <div style="margin-top:6px; border-top:1px solid #444; padding-top:4px; font-size:10px; color:#ccc; line-height:1.4;">
-                    <span style="display:inline-block; width:15px; border-top:4px dotted #0000FF; vertical-align:middle; margin-right:4px;"></span>現在時刻 ${nStr}<br>
-                    <span style="display:inline-block; width:15px; border-top:4px dotted #228b22; vertical-align:middle; margin-right:4px;"></span>データ取得 ${ftStr}
+                <b class="notranslate">${localizedDateStr} ${d.getHours()}:00 ${wIcon}</b>
+                <div class="icon-box"><span class="legend-bar" style="background:#0000FF; margin-right:0;"></span></div>${i18n.t('precip')}: ${allData.data.precipitation ? allData.data.precipitation[hourIdx]?.toFixed(1) : "0.0"}mm<br>
+                <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${(deg+180)%360})"/></svg></div>${i18n._currentLang === 'ja' ? '風向' : 'Wind'}: ${getWindDirText(deg)} (${deg}°)<br>
+                <div class="icon-box">🚩</div>${i18n._currentLang === 'ja' ? '風速' : 'Speed'}: ${allData.data.wind_speed_10m[hourIdx]?.toFixed(1) || "0.0"}m/s<br>
+                <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>${i18n.t('temp')}: ${allData.data.temperature_2m[hourIdx]?.toFixed(1) || "0.0"}℃<br>
+                <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>${i18n.t('seawater')}: ${allData.data.sea_surface_temperature ? allData.data.sea_surface_temperature[hourIdx]?.toFixed(1) : "---"}℃<br>
+                <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>${i18n.t('wave')}: ${allData.data.wave_height ? allData.data.wave_height[hourIdx]?.toFixed(2) : "0.00"}m<br>
+                <div class="icon-box"><span class="legend-line" style="background:#1e90ff; margin-right:0;"></span></div>${i18n.t('tide')}: ${allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl[hourIdx]?.toFixed(2) : "0.00"}m
+                <div style="margin-top:6px; border-top:1px solid #444; padding-top:4px; font-size:10px; color:#ccc; line-height:1.4;" class="notranslate">
+                    <span style="display:inline-block; width:15px; border-top:4px dotted #0000FF; vertical-align:middle; margin-right:4px;"></span>${i18n.t('nowTime')} ${nStr}<br>
+                    <span style="display:inline-block; width:15px; border-top:4px dotted #228b22; vertical-align:middle; margin-right:4px;"></span>${i18n.t('fetchTime')} ${ftStr}
                 </div>
             `;
 
-            // スマホ等でのタップ操作を想定し、5秒後に消えるタイマーをセット
+            // スマホ等でのタップ操作を想定し、タイマーをセット
             const tooltipDur = viewConfig.tooltipDuration * 1000;    
             tooltipTimer = setTimeout(() => {
                 hideTooltipUI();

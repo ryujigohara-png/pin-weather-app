@@ -7,6 +7,7 @@
   "categories": ["weather", "sports"],
   "start_url": "../index.html",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
   "orientation": "any",
   "background_color": "#ffffff",
   "theme_color": "#0078ff",
