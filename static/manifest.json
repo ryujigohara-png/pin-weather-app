@@ -1,23 +1,38 @@
 {
-  "short_name": "PinWeather",
+  "lang": "ja",
   "name": "Pin_Weather! pin spot Weekly Weather Forecast App",
+  "short_name": "PinWeather",
+  "description": "好きな場所を登録して、天気・降水量・風速・風向・気温・海水温・波高・潮位を1週間分一気見できる予報アプリ。セーリングやウィングフォイルなど、海で遊ぶ・働く人に最適です。",
+  "start_url": "../index.html",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#0078ff",
+  "scope": "/",
   "icons": [
     {
       "src": "icons/icon-192.png",
       "type": "image/png",
       "sizes": "192x192",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
     },
     {
       "src": "icons/icon-512.png",
       "type": "image/png",
       "sizes": "512x512",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
-  ],
-  "start_url": "../index.html",
-  "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#0078ff",
-  "scope": "/"
+  ]
 }
