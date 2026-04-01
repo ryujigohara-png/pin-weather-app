@@ -3,6 +3,8 @@
   "name": "Pin_Weather! pin spot Weekly Weather Forecast App",
   "short_name": "PinWeather",
   "description": "好きな場所を登録して、天気・降水量・風速・風向・気温・海水温・波高・潮位を1週間分一気見できる予報アプリ。セーリングやウィングフォイルなど、海で遊ぶ・働く人に最適です。",
+  "id": "/index.html",
+  "categories": ["weather", "sports"],
   "start_url": "../index.html",
   "display": "standalone",
   "orientation": "any",
@@ -33,6 +35,29 @@
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "icons/screenshot-mobile1.png",
+      "sizes": "1080x2400",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "アプリの予報画面"
+    },
+    {
+      "src": "icons/screenshot-mobile2.png",
+      "sizes": "1080x2400",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "ツールチップ（詳細情報）表示画面"
+    },
+    {
+      "src": "icons/screenshot-desktop.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "アプリのPC表示画面"
     }
   ]
 }
