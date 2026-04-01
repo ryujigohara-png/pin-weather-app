@@ -3,21 +3,21 @@
   "name": "Pin_Weather! pin spot Weekly Weather Forecast App",
   "icons": [
     {
-      "src": "static/icons/icon-192.png",
+      "src": "icons/icon-192.png",
       "type": "image/png",
       "sizes": "192x192",
       "purpose": "any maskable"
     },
     {
-      "src": "static/icons/icon-512.png",
+      "src": "icons/icon-512.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any maskable"
     }
   ],
-  "start_url": "index.html",
+  "start_url": "../index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0078ff",
-  "scope": "./"
+  "scope": "/"
 }
