@@ -1,19 +1,29 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" class="notranslate">
 <head>
+    <meta charset="UTF-8">
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-W6J941H892"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-
       gtag('config', 'G-W6J941H892');
     </script>
 
-    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pin_Weather Pro - Windy Filter</title>
+
     <link rel="manifest" href="static/manifest.json">
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('static/service-worker.js', { scope: '/' })
+                .then(reg => console.log('Service Worker registered with scope:', reg.scope))
+                .catch(err => console.log('Service Worker registration failed', err));
+        });
+    }
+    </script>
+
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="PinWeather">
@@ -34,15 +44,15 @@
         <span class="close-sidebar" onclick="toggleSidebar()" style="cursor: pointer; font-size: 24px; padding: 0 5px;">&times;</span>
     </div>
     
-    <button class="btn btn-wind-config" id="wind-cfg-btn">🎐 風向色付設定</button>
-    <button class="btn btn-detailSettings" id="openSettingsBtn">⚙ 表示詳細設定</button>
-    <button class="btn btn-reset" id="reset-all-btn">♻️ 全リセット</button>
+    <button class="btn btn-wind-config" id="wind-cfg-btn" data-i18n="btnWindConfig">🎐 風向色付設定</button>
+    <button class="btn btn-detailSettings" id="openSettingsBtn" data-i18n="btnDetailSettings">⚙ 表示詳細設定</button>
+    <button class="btn btn-reset" id="reset-all-btn" data-i18n="btnResetAll">♻️ 全リセット</button>
     
     <div class="sidebar-qr-container" style="margin-top: 30px; padding: 10px; text-align: center; border-top: 1px solid #eee;">
-        <div style="font-size: 12px; color: #666; margin-bottom: 8px;">スマホで共有</div>
+        <div style="font-size: 12px; color: #666; margin-bottom: 8px;" data-i18n="shareQR">スマホで共有</div>
         <div id="sidebar-qrcode" style="display: inline-block; background: white; padding: 5px;"></div>
     </div>
-    <button class="btn" id="copy-url-btn" style="background-color: #e3f2fd; color: #1976d2; border: 1px solid #bbdefb;">🔗 URLをコピー</button>
+    <button class="btn" id="copy-url-btn" style="background-color: #e3f2fd; color: #1976d2; border: 1px solid #bbdefb;" data-i18n="btnCopyUrl">🔗 URLをコピー</button>
 </div>
 
 <div class="control-wrapper">
@@ -56,7 +66,7 @@
     <div class="modal-content" style="display: flex; flex-direction: column; max-width: 600px; width: 90%;">
         
         <div style="padding: 15px 20px 10px 20px; border-bottom: 1px solid #35baf4;">
-            <div id="map-status" style="font-size: 16px; color: #666; margin-bottom: 0px; min-height: 1.3em; line-height: 1.2;">
+            <div id="map-status" style="font-size: 16px; color: #666; margin-bottom: 0px; min-height: 1.3em; line-height: 1.2;" data-i18n="mapClickGuide">
                 地点をクリックしてください
             </div>
             
@@ -65,7 +75,7 @@
                        placeholder="地名・施設名を入力して検索..." 
                        style="flex: 1; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;">
                 <button class="btn" id="map-search-btn" 
-                        style="background: #007bff; color: white; padding: 8px 16px; border-radius: 4px; cursor: pointer; white-space: nowrap; border: none;">
+                        style="background: #007bff; color: white; padding: 8px 16px; border-radius: 4px; cursor: pointer; white-space: nowrap; border: none;" data-i18n="btnSearch">
                     検索
                 </button>
             </div>
@@ -75,15 +85,15 @@
 
         <div class="modal-footer" style="padding: 15px 20px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #eee;">
             <button class="btn" id="save-spot-btn" disabled 
-                    style="background: #007bff; color: white; padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer;">
+                    style="background: #007bff; color: white; padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer;" data-i18n="btnSaveSpot">
                 MySpotsに登録
             </button>
             <button class="btn" id="temp-view-btn" disabled 
-                    style="background: #28a745; color: white; padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer;">
+                    style="background: #28a745; color: white; padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer;" data-i18n="btnTempView">
                 グラフ表示
             </button>
             <button class="btn" onclick="closeModal('map-modal')" 
-                    style="background: #6c757d; color: white; padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer;">
+                    style="background: #6c757d; color: white; padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer;" data-i18n="btnClose">
                 キャンセル
             </button>
         </div>
@@ -92,13 +102,13 @@
 
 <div id="wind-modal" class="modal-overlay">
     <div class="modal-content" style="max-width: 450px; height: auto; min-height: 500px;">
-        <div style="padding:15px; border-bottom:1px solid #ddd; font-weight:bold;">色付けする風向を選択</div>
+        <div style="padding:15px; border-bottom:1px solid #ddd; font-weight:bold;" data-i18n="windModalTitle">色付けする風向を選択</div>
         <div class="compass-container" id="compass-ui">
-            <div class="compass-center">中央をクリックで<br>全選択 / 解除</div>
+            <div class="compass-center" data-i18n="compassCenterText">中央をクリックで<br>全選択 / 解除</div>
         </div>
         <div class="modal-footer">
-            <button class="btn" style="background:#6c757d; color:white;" onclick="closeModal('wind-modal')">閉じる</button>
-            <button class="btn" style="background:#6f42c1; color:white;" id="apply-wind-btn">更新して適用</button>
+            <button class="btn" style="background:#6c757d; color:white;" onclick="closeModal('wind-modal')" data-i18n="btnClose">閉じる</button>
+            <button class="btn" style="background:#6f42c1; color:white;" id="apply-wind-btn" data-i18n="btnApply">更新して適用</button>
         </div>
     </div>
 </div>
@@ -106,13 +116,23 @@
 <div id="viewSettingsModal" class="modal-overlay" style="display: none;">
     <div class="modal-content" style="max-width: 500px; height: auto; max-height: 90%;">
         <div class="search-bar">
-            <span style="font-weight: bold; padding: 5px;">グラフ表示詳細設定</span>
+            <span style="font-weight: bold; padding: 5px;" data-i18n="settingsTitle">グラフ表示詳細設定</span>
         </div>
         
         <div class="view-settings-body">
             <div class="config-group">
                 <div class="config-label-area">
-                    <span class="config-title">1時間の幅 (hScale)</span>
+                    <span class="config-title" data-i18n="configLangTitle">Language / 表示言語</span>
+                </div>
+                <select id="config-language" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
+                    <option value="ja">日本語</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+
+            <div class="config-group">
+                <div class="config-label-area">
+                    <span class="config-title" data-i18n="cfgHourWidth">1時間の幅 (hScale)</span>
                     <span id="val-hourWidth" class="config-value">32px</span>
                 </div>
                 <input type="range" id="input-hourWidth" class="config-slider" min="10" max="100" value="32">
@@ -120,7 +140,7 @@
 
             <div class="config-group">
                 <div class="config-label-area">
-                    <span class="config-title">風速グラフの高さ</span>
+                    <span class="config-title" data-i18n="cfgWindHeight">風速グラフの高さ</span>
                     <span id="val-windHeight" class="config-value">280px</span>
                 </div>
                 <input type="range" id="input-windHeight" class="config-slider" min="150" max="500" step="10" value="280">
@@ -128,7 +148,7 @@
 
             <div class="config-group">
                 <div class="config-label-area">
-                    <span class="config-title">気温・海象グラフの高さ</span>
+                    <span class="config-title" data-i18n="cfgSubHeight">気温・海象グラフの高さ</span>
                     <span id="val-subHeight" class="config-value">160px</span>
                 </div>
                 <input type="range" id="input-subHeight" class="config-slider" min="80" max="300" step="10" value="160">
@@ -136,7 +156,7 @@
 
             <div class="config-group">
                 <div class="config-label-area">
-                    <span class="config-title">グラフ間の余白</span>
+                    <span class="config-title" data-i18n="cfgMargin">グラフ間の余白</span>
                     <span id="val-margin" class="config-value">15px</span>
                 </div>
                 <input type="range" id="input-margin" class="config-slider" min="0" max="50" step="1" value="15">
@@ -144,7 +164,7 @@
 
             <div class="config-group">
                 <div class="config-label-area">
-                    <span class="config-title">ラベル文字サイズ</span>
+                    <span class="config-title" data-i18n="cfgFontSize">ラベル文字サイズ</span>
                     <span id="val-fontSize" class="config-value">12px</span>
                 </div>
                 <input type="range" id="input-fontSize" class="config-slider" min="8" max="24" step="1" value="12">
@@ -152,7 +172,7 @@
 
             <div class="config-group">
                 <div class="config-label-area">
-                    <span class="config-title">風向アイコン倍率</span>
+                    <span class="config-title" data-i18n="cfgIconScale">風向アイコン倍率</span>
                     <span id="val-iconScale" class="config-value">0.8</span>
                 </div>
                 <input type="range" id="input-iconScale" class="config-slider" min="0.5" max="1.5" step="0.1" value="0.8">
@@ -160,7 +180,7 @@
 
             <div class="config-group">
                 <div class="config-label-area">
-                    <span class="config-title">ツールチップ表示時間</span>
+                    <span class="config-title" data-i18n="cfgTooltipDuration">ツールチップ表示時間</span>
                     <span id="val-tooltipDuration" class="config-value">3s</span>
                 </div>
                 <input type="range" id="input-tooltipDuration" class="config-slider" min="1" max="10" step="1" value="3">
@@ -169,10 +189,10 @@
         </div>
 
         <div class="modal-footer">
-            <div class="guide-text">※保存するとページが再読み込みされ、設定が反映されます。</div>
-            <button id="saveViewSettings" class="btn btn-apply">設定を保存</button>
-            <button id="resetViewSettings" class="btn" style="background-color: #f0f0f0; color: #333;">デフォルトに戻す</button>
-            <button id="closeViewSettings" class="btn">閉じる</button>
+            <div class="guide-text" data-i18n="saveGuideText">※保存するとページが再読み込みされ、設定が反映されます。</div>
+            <button id="saveViewSettings" class="btn btn-apply" data-i18n="btnSaveSettings">設定を保存</button>
+            <button id="resetViewSettings" class="btn" style="background-color: #f0f0f0; color: #333;" data-i18n="btnRestoreDefault">デフォルトに戻す</button>
+            <button id="closeViewSettings" class="btn" data-i18n="btnClose">閉じる</button>
         </div>
     </div>
 </div>
@@ -185,7 +205,7 @@
             <div class="chart-section section-weather">
                 <div class="date-container" id="date-top" style="height: 25px; margin-bottom: 105px;"></div>
                 <div class="sticky-label">
-                    <div class="y-axis-title" style="margin-top:20px;">天気<br>降水量mm</div>
+                    <div class="y-axis-title" style="margin-top:20px;" data-i18n="yAxisWeather">天気<br>降水量mm</div>
                     <div id="val-svg-weather" class="y-axis-values"></div>
                 </div>
                 <svg id="svg-weather"></svg>
@@ -193,7 +213,7 @@
 
             <div class="chart-section section-wind" style="border-bottom: none;">
                 <div class="sticky-label">
-                    <div class="y-axis-title">風向<br>風速(m/s)</div>
+                    <div class="y-axis-title" data-i18n="yAxisWind">風向<br>風速(m/s)</div>
                     <div id="val-svg-wind" class="y-axis-values"></div>
                 </div>
                 <div class="date-container" id="date-wind"></div>
@@ -202,7 +222,7 @@
 
             <div class="chart-section section-temp" style="border-bottom: none;">
                 <div class="sticky-label">
-                    <div class="y-axis-title">気温(℃)<br>海水(℃)</div>
+                    <div class="y-axis-title" data-i18n="yAxisTemp">気温(℃)<br>海水(℃)</div>
                     <div id="val-svg-temps" class="y-axis-values"></div>
                 </div>
                 <div class="date-container" id="date-temp"></div>
@@ -211,7 +231,7 @@
 
             <div class="chart-section section-marine">
                 <div class="sticky-label">
-                    <div class="y-axis-title">波高(m)<br>潮位(m)</div>
+                    <div class="y-axis-title" data-i18n="yAxisMarine">波高(m)<br>潮位(m)</div>
                     <div id="val-svg-marine" class="y-axis-values"></div>
                 </div>
                 <div class="date-container" id="date-marine"></div>
@@ -223,24 +243,23 @@
 
 <div class="legend-wind-container">
     <div class="legend-wind-item">
-        <span class="legend-wind-label">風向色付： 
+        <span class="legend-wind-label" data-i18n="legendWindTitle">風向色付：</span>
         <span class="legend-wind-rect" style="background: #dc143c;"></span>
-        <span class="legend-wind-label">10m/s〜 
+        <span class="legend-wind-label">10m/s〜</span>
     </div>
     <div class="legend-wind-item">
         <span class="legend-wind-rect" style="background: #ffa500;"></span>
-        <span class="legend-wind-label">5m/s〜 </span>
+        <span class="legend-wind-label">5m/s〜</span>
     </div>
     <div class="legend-wind-item">
         <span class="legend-wind-rect" style="background: #87ceeb;"></span>
-        <span class="legend-wind-label">3m/s〜 </span>
+        <span class="legend-wind-label">3m/s〜</span>
     </div>
     <div class="legend-wind-item">
         <span class="legend-wind-rect" style="background: #ccc;"></span>
-        <span class="legend-wind-label">… </span>
+        <span class="legend-wind-label">…</span>
     </div>
 </div>
-
 
 <div class="footer-info">
     <div class="weather-links" style="display: flex; gap: 12px; padding: 10px 20px; justify-content: center; background: #ffffff; border-bottom: 10px solid #eaeaea; box-shadow: 0 2px 5px rgba(0,0,0,0.02);">
@@ -263,7 +282,9 @@
         </button>
     </div>
     
-    【  免責事項】海上気象データは予測モデルに基づく「最寄りの海上地点」の数値であり、実際の局地的な地形や潮流による影響を反映しきれない場合があります。<br>
+    <div data-i18n="disclaimer">
+    【免責事項】海上気象データは予測モデルに基づく「最寄りの海上地点」の数値であり、実際の局地的な地形や潮流による影響を反映しきれない場合があります。
+    </div>
     Weather data by <a href="https://open-meteo.com/" target="_blank">Open-Meteo.com</a><br>
 </div>
 
