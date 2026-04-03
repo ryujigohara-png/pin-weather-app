@@ -369,3 +369,33 @@ svg { width: 100%; display: block; overflow: visible; }
     font-weight: bold;
 }
 
+/* 汎用ダイアログ用追加スタイル（修正版） */
+.btn-save { background: #007bff !important; color: white !important; }
+.btn-danger-outline { 
+    background: #fff !important; 
+    color: #dc3545 !important; 
+    border: 1px solid #dc3545 !important; 
+    font-size: 11px !important; 
+    flex: 0.8 !important; 
+    margin-right: auto; /* 削除ボタンを左寄りに配置 */
+}
+.btn-secondary { background: #6c757d !important; color: white !important; }
+
+/* style.css への追記・修正 */
+#common-modal-header {
+    padding: 12px 15px; /* 上下を少し詰め、タイトルの存在感を適正化 */
+    text-align: center;
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+}
+
+#common-modal-title {
+    font-size: 17px; /* 18pxよりさらに1px下げ、UIに馴染ませる */
+    font-weight: bold;
+    line-height: 1.4;
+}
+
+#common-modal-message {
+    font-size: 12px; /* メッセージはさらに小さくして対比を強調 */
+    color: #666;
+    margin-top: 5px;
+}

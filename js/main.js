@@ -94,7 +94,10 @@ const i18n = {
             gpsFetching: "取得中...",
             gpsError: "位置情報の取得に失敗しました。",
             gpsDefaultLabel: "GPS地点",
-            noLocationError: "地点情報がありません。"
+            noLocationError: "地点情報がありません。",
+            editSpotGuide: "地点名を編集、または削除します",
+            btnDelete: "削除",
+            confirmDeletePrefix: "本当に削除しますか："
         },
         'en': {
             // --- Graph & Tooltip ---
@@ -168,7 +171,10 @@ const i18n = {
             gpsFetching: "Locating...",
             gpsError: "Failed to get location.",
             gpsDefaultLabel: "GPS Location",
-            noLocationError: "No location information available."
+            noLocationError: "No location information available.",
+            editSpotGuide: "Edit or delete the spot name",
+            btnDelete: "Delete",
+            confirmDeletePrefix: "Are you sure you want to delete:"
         }
     },
     t(key) { 
@@ -404,12 +410,18 @@ function saveViewSettings() {
  * 定義済みの defaultViewConfig を使用して設定を初期化する
  */
 function resetViewSettings() {
-    // 辞書からメッセージを取得
-    if (confirm(i18n.t('confirmReset'))) {
-        const resetData = JSON.parse(JSON.stringify(defaultViewConfig));
-        localStorage.setItem('pin_weather_view_config', JSON.stringify(resetData));
-        location.reload();
-    }
+    // 汎用ダイアログを呼び出し
+    showAppDialog({
+        title: i18n.t('btnResetAll'), // タイトルに「全リセット」などの大きな文字を表示
+        messageKey: 'confirmReset',    // 小さい文字で「設定を初期化しますか？」を表示
+        onSave: () => {
+            // 「保存（実行）」ボタンが押された時の処理
+            const resetData = JSON.parse(JSON.stringify(defaultViewConfig));
+            localStorage.setItem('pin_weather_view_config', JSON.stringify(resetData));
+            location.reload();
+        }
+        // onDelete は不要なので渡さない（「削除」ボタンは表示されない）
+    });
 }
 
 
@@ -445,24 +457,30 @@ function initCopyUrlEvent() {
     if (!copyBtn) return;
 
     copyBtn.onclick = async () => {
+        const originalText = copyBtn.innerText;
+        const originalBg = copyBtn.style.backgroundColor || "#e3f2fd";
+
         try {
             await navigator.clipboard.writeText(window.location.href);
-            const originalText = copyBtn.innerText;
             
-            // 辞書から成功メッセージを取得
+            // 成功時：緑系に変化
             copyBtn.innerText = i18n.t('copySuccess');
             copyBtn.style.backgroundColor = "#c8e6c9";
             
-            setTimeout(() => {
-                copyBtn.innerText = originalText;
-                copyBtn.style.backgroundColor = "#e3f2fd";
-            }, 2000);
         } catch (err) {
-            alert(i18n.t('copyError')); // 辞書からエラーメッセージを取得
+            // 失敗時：alert を廃止し、ボタンを赤系に変化させて通知
+            copyBtn.innerText = i18n.t('copyError');
+            copyBtn.style.backgroundColor = "#ffcdd2"; // 薄い赤
+            console.error("Copy failed:", err);
         }
+
+        // 2秒後に元の状態に戻す（成功・失敗共通）
+        setTimeout(() => {
+            copyBtn.innerText = originalText;
+            copyBtn.style.backgroundColor = originalBg;
+        }, 2000);
     };
 }
-
 /**
  * サブルーチン：環境判定とUIへの反映
  * index.htmlの構造に合わせてセレクタを修正
@@ -636,6 +654,86 @@ function initCompassUI() {
 }
 
 /**
+ * サブルーチン：環境色を反映した汎用ダイアログを表示（多言語・サイズ調整版）
+ */
+function showAppDialog({ title, messageKey, inputValue = null, onSave = null, onDelete = null }) {
+    const modal = document.getElementById('app-common-modal');
+    const header = document.getElementById('common-modal-header');
+    const titleEl = document.getElementById('common-modal-title');
+    const msgEl = document.getElementById('common-modal-message');
+    const inputArea = document.getElementById('common-modal-input-area');
+    const input = document.getElementById('common-modal-input');
+    const footer = document.getElementById('common-modal-footer');
+
+    // 1. 環境色の厳密な一致（applyEnvVisualsのロジックを流用）
+    const hostname = window.location.hostname;
+    let bgColor = "#007bff"; // Main (Blue)
+    let textColor = "#ffffff";
+
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.includes("192.168.")) {
+        bgColor = "#b0fbcf"; // Local (Greenish)
+        textColor = "#333333";
+    } else if (hostname.includes("beta")) {
+        bgColor = "#f5dc1b"; // Beta (Yellow)
+        textColor = "#333333";
+    }
+
+    header.style.backgroundColor = bgColor;
+    titleEl.style.color = textColor;
+
+    // 2. コンテンツのセット（多言語化対応）
+    titleEl.innerText = title;
+    // メッセージキーがあれば翻訳、なければ空
+    msgEl.innerText = messageKey ? i18n.t(messageKey) : "";
+    
+    if (inputValue !== null) {
+        inputArea.style.display = 'block';
+        input.value = inputValue;
+    } else {
+        inputArea.style.display = 'none';
+    }
+
+    // 3. ボタンの生成
+    footer.innerHTML = "";
+    
+    // showAppDialog 内の onDelete ボタン生成部分（修正版）
+    if (onDelete) {
+        const btnDelete = document.createElement('button');
+        btnDelete.className = "btn btn-danger-outline";
+        btnDelete.innerText = i18n.t('btnDelete'); 
+        
+        btnDelete.onclick = () => {
+            // 標準の confirm を廃止し、直接 onDelete を実行する
+            // ※ すでにダイアログを開いていること自体が「操作の意図」の確認になっているため
+            onDelete();
+            modal.style.display = 'none';
+        };
+        footer.appendChild(btnDelete);
+    }
+
+    // キャンセルボタン
+    const btnCancel = document.createElement('button');
+    btnCancel.className = "btn btn-secondary";
+    btnCancel.innerText = i18n.t('btnClose');
+    btnCancel.onclick = () => modal.style.display = 'none';
+    footer.appendChild(btnCancel);
+
+    // 保存ボタン
+    if (onSave) {
+        const btnSave = document.createElement('button');
+        btnSave.className = "btn btn-save";
+        btnSave.innerText = i18n.t('btnApply') || i18n.t('btnSaveSettings');
+        btnSave.onclick = () => {
+            onSave(input.value);
+            modal.style.display = 'none';
+        };
+        footer.appendChild(btnSave);
+    }
+
+    modal.style.display = 'flex';
+}
+
+/**
  * サブルーチン：タブのレンダリング処理
  * 未登録地点を左端に表示し、isSelected時にスムーズスクロールで左端へ持ってくる。
  */
@@ -720,11 +818,35 @@ function renderTabs(activeOverrideLabel = null) {
             }
         };
 
+        // 修正後：地点ボタンの長押し・右クリック処理
         if (!item.isSpecial && !item.isExternal) {
             const spotIdx = mySpots.findIndex(s => s.label === item.rawLabel);
-            btn.oncontextmenu = (e) => { e.preventDefault(); confirmDelete(spotIdx); };
+            
+            // 修正後：地点ボタンの長押し・右クリック処理
+            const openEditor = (e) => {
+                if (e) e.preventDefault();
+                showAppDialog({
+                    title: item.rawLabel,
+                    messageKey: 'editSpotGuide', // 辞書に追加：例「名前の変更と削除」
+                    inputValue: item.rawLabel,
+                    onSave: (newName) => {
+                        if (newName && newName !== item.rawLabel) {
+                            mySpots[spotIdx].label = newName;
+                            localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                            renderTabs(newName);
+                        }
+                    },
+                    onDelete: () => {
+                        mySpots.splice(spotIdx, 1);
+                        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                        renderTabs();
+                    }
+                });
+            };
+
+            btn.oncontextmenu = openEditor;
             let timer;
-            btn.ontouchstart = () => { timer = setTimeout(() => confirmDelete(spotIdx), 800); };
+            btn.ontouchstart = () => { timer = setTimeout(openEditor, 800); };
             btn.ontouchend = () => clearTimeout(timer);
         }
         container.appendChild(btn);
@@ -732,30 +854,52 @@ function renderTabs(activeOverrideLabel = null) {
 }
 
 
+/**
+ * サブルーチン：地点の削除確認（自作ダイアログ版）
+ * @param {number} index - 削除対象の mySpots インデックス
+ */
 function confirmDelete(index) {
-    if (index === -1) return;
-    // 関数形式の辞書呼び出し
-    if (confirm(i18n.dict[i18n._currentLang].confirmDelete(mySpots[index].label))) {
-        mySpots.splice(index, 1);
-        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-        renderTabs();
-    }
+    if (index === -1 || !mySpots[index]) return;
+
+    const targetLabel = mySpots[index].label;
+
+    showAppDialog({
+        title: targetLabel,
+        messageKey: 'editSpotGuide', // または削除専用のキー
+        onDelete: () => {
+            // 自作ダイアログ内の「削除」ボタンが押された時の実処理
+            mySpots.splice(index, 1);
+            localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+            renderTabs();
+        }
+    });
 }
 
 const resetBtn = document.getElementById('reset-all-btn');
 if (resetBtn) {
     resetBtn.onclick = () => {
-        if (confirm(i18n.t('confirmInit'))) {
-            toggleSidebar();
-            mySpots = JSON.parse(JSON.stringify(defaultSpots));
-            localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-            targetWindDirections = [...windDirs];
-            localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
-            updateLocation(mySpots[0].lat, mySpots[0].lon, mySpots[0].label);
-        }
+        // 自作ダイアログを表示
+        showAppDialog({
+            title: i18n.t('btnResetAll'), // 大きなタイトル
+            messageKey: 'confirmInit',    // 小さなメッセージ（「全て初期化しますか？」等）
+            onSave: () => {
+                // 「はい/実行」が押された時の実処理をここに集約
+                toggleSidebar();
+                
+                // 地点データの初期化
+                mySpots = JSON.parse(JSON.stringify(defaultSpots));
+                localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                
+                // 風向フィルタの初期化
+                targetWindDirections = [...windDirs];
+                localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
+                
+                // 画面表示の更新
+                updateLocation(mySpots[0].lat, mySpots[0].lon, mySpots[0].label);
+            }
+        });
     };
 }
-
 
 /**
  * サブルーチン：GPSボタンクリック時の処理
@@ -785,12 +929,21 @@ function handleGPSClick() {
             if (gpsBtn) gpsBtn.innerText = "GPS";
             updateLocation(lat, lon, gpsLabel);
         }, (err) => {
+            // エラー時の処理
             console.error(err);
             if (gpsBtn) gpsBtn.innerText = "GPS";
-            alert(i18n.t('gpsError'));
+            
+            // alert を廃止し、自作ダイアログを表示
+            showAppDialog({
+                title: "GPS Error", // 大きなタイトル（英語でも日本語でも伝わる表現）
+                messageKey: 'gpsError' // 辞書から「現在地を取得できませんでした」等のメッセージ
+                // ボタンは「閉じる」のみが自動で配置される
+            });
         });
     }
 }
+
+
 
 const addBtn = document.getElementById('add-btn');
 if (addBtn) addBtn.onclick = () => openMap();
@@ -867,7 +1020,6 @@ async function onMapClick(e) {
 
 /**
  * サブルーチン：地図モーダル内での住所情報取得とボタン設定
- * 地図クリック時や検索時に呼び出され、未登録地点表示ボタンと保存ボタンの挙動を定義する。
  */
 async function fetchAddressInfo(lat, lng) {
     const statusEl = document.getElementById('map-status');
@@ -879,7 +1031,7 @@ async function fetchAddressInfo(lat, lng) {
         const addr = data.address;
         const city = addr.city || addr.town || addr.village || "";
         const district = addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district || "";
-        const defaultName = city + district || i18n.t('mapNewSpot');
+        const defaultName = (city + district) || i18n.t('mapNewSpot');
 
         const tempViewBtn = document.getElementById('temp-view-btn');
         if (tempViewBtn) {
@@ -894,14 +1046,23 @@ async function fetchAddressInfo(lat, lng) {
         const saveSpotBtn = document.getElementById('save-spot-btn');
         if (saveSpotBtn) {
             saveSpotBtn.onclick = () => {
-                const spotName = prompt(i18n.t('mapSavePrompt'), defaultName);
-                if (spotName) {
-                    mySpots.push({lat, lon: lng, label: spotName});
-                    localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-                    renderTabs();
-                    updateLocation(lat, lng, spotName);
-                    closeModal('map-modal');
-                }
+                // prompt を廃止し、自作ダイアログを表示
+                showAppDialog({
+                    title: defaultName,         // 取得した住所を大きく表示
+                    messageKey: 'mapSavePrompt', // 「この地点を保存しますか？」等のガイド
+                    inputValue: defaultName,    // 入力欄にデフォルトの住所をセット
+                    onSave: (spotName) => {
+                        // 保存ボタンが押された時の処理
+                        if (spotName) {
+                            mySpots.push({lat, lon: lng, label: spotName});
+                            localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                            renderTabs();
+                            updateLocation(lat, lng, spotName);
+                            // すべて完了してから地図モーダルを閉じる
+                            closeModal('map-modal');
+                        }
+                    }
+                });
             };
             saveSpotBtn.disabled = false;
         }
@@ -910,7 +1071,7 @@ async function fetchAddressInfo(lat, lng) {
     } catch (err) {
         if (statusEl) statusEl.innerText = i18n.t('mapStatusFail');
     }
-}    
+}
 
 async function updateLocation(lat, lon, label) {
     currentLat = lat; currentLon = lon; currentLabel = label;
@@ -976,8 +1137,13 @@ async function fetchWithCache(lat, lon) {
  * @param {string} service - 'yahoo', 'windy', 'windfinder'
  */
 function openExternalWeather(service) {
+    // 座標がない場合のエラー処理
     if (!currentLat || !currentLon) {
-        alert(i18n.t('noLocationError'));
+        // alert を廃止し、自作ダイアログを表示
+        showAppDialog({
+            title: "Location Error",      // 大きなタイトル
+            messageKey: 'noLocationError' // 辞書から「地点が選択されていません」等を取得
+        });
         return;
     }
 
@@ -985,14 +1151,7 @@ function openExternalWeather(service) {
     switch (service) {
         case 'yahoo':
             // Yahoo!天気（ピンポイント天気検索へ）
-            const now = new Date();
-            const Y = now.getFullYear();
-            const M = String(now.getMonth() + 1).padStart(2, '0');
-            const D = String(now.getDate()).padStart(2, '0');
-            const h = String(now.getHours()).padStart(2, '0');
-            const m = String(Math.floor(now.getMinutes() / 5) * 5).padStart(2, '0');
-            const tParam = `${Y}${M}${D}${h}${m}00`;
-
+            // ※tParamのロジックはURL生成に依存しない場合はそのままでOK
             url = `https://weather.yahoo.co.jp/weather/zoomradar/?lat=${currentLat}&&lon=${currentLon}`;
             break;
 
