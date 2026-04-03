@@ -750,7 +750,7 @@ function renderTabs(activeOverrideLabel = null) {
 
     if (activeIdx > -1) {
         activeSpot = displaySpots.splice(activeIdx, 1)[0];
-    } else if (activeLabel && activeLabel !== 'gps' && activeLabel !== 'map' && activeLabel !== 'GPS' && activeLabel !== 'Map') {
+    } else if (activeLabel && !['gps', 'map', 'GPS', 'Map'].includes(activeLabel)) {
         isExternalSpot = true;
         activeSpot = {
             label: activeLabel,
@@ -767,15 +767,16 @@ function renderTabs(activeOverrideLabel = null) {
             lat: activeSpot.lat, 
             lon: activeSpot.lon, 
             rawLabel: activeSpot.label,
-            isExternal: isExternalSpot 
+            isExternal: false // 地点タブなので編集対象にするため false
         });
     }
 
-    items.push({ id: 'gps', label: 'GPS', isSpecial: true });
-    items.push({ id: 'map', label: 'Map', isSpecial: true });
+    // 操作用ボタンは isExternal: true として扱い、編集対象から外す
+    items.push({ id: 'gps', label: 'GPS', isSpecial: true, isExternal: true });
+    items.push({ id: 'map', label: 'Map', isSpecial: true, isExternal: true });
     
     displaySpots.forEach(s => {
-        items.push({ id: s.label, label: `📍 ${s.label}`, lat: s.lat, lon: s.lon, rawLabel: s.label });
+        items.push({ id: s.label, label: `📍 ${s.label}`, lat: s.lat, lon: s.lon, rawLabel: s.label, isExternal: false });
     });
 
     items.forEach((item) => {
@@ -794,7 +795,6 @@ function renderTabs(activeOverrideLabel = null) {
 
         if (isSelected) {
             btn.classList.add('active');
-            // 'start' にすることで左端にスクロールさせる
             setTimeout(() => btn.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' }), 100);
         }
         btn.innerText = item.label;
@@ -818,41 +818,52 @@ function renderTabs(activeOverrideLabel = null) {
             }
         };
 
-        // 修正後：地点ボタンの長押し・右クリック処理
-        if (!item.isSpecial && !item.isExternal) {
+        // 外部サイト連携・操作ボタン以外（＝地点タブすべて）を対象にする
+        if (!item.isExternal) {
             const spotIdx = mySpots.findIndex(s => s.label === item.rawLabel);
             
-            // 修正後：地点ボタンの長押し・右クリック処理
             const openEditor = (e) => {
                 if (e) e.preventDefault();
+                
                 showAppDialog({
                     title: item.rawLabel,
-                    messageKey: 'editSpotGuide', // 辞書に追加：例「名前の変更と削除」
+                    messageKey: 'editSpotGuide',
                     inputValue: item.rawLabel,
                     onSave: (newName) => {
-                        if (newName && newName !== item.rawLabel) {
+                        if (!newName) return;
+
+                        if (spotIdx !== -1) {
                             mySpots[spotIdx].label = newName;
-                            localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-                            renderTabs(newName);
+                        } else {
+                            // 未登録の(GPS)や(MAP)地点を新規保存
+                            mySpots.push({ 
+                                lat: item.lat, 
+                                lon: item.lon, 
+                                label: newName 
+                            });
                         }
+                        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                        renderTabs(newName);
                     },
-                    onDelete: () => {
+                    onDelete: spotIdx !== -1 ? () => {
                         mySpots.splice(spotIdx, 1);
                         localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
                         renderTabs();
-                    }
+                    } : null 
                 });
             };
 
             btn.oncontextmenu = openEditor;
             let timer;
-            btn.ontouchstart = () => { timer = setTimeout(openEditor, 800); };
+            btn.ontouchstart = (e) => { 
+                timer = setTimeout(() => openEditor(e), 800); 
+            };
             btn.ontouchend = () => clearTimeout(timer);
+            btn.ontouchmove = () => clearTimeout(timer);
         }
         container.appendChild(btn);
     });
 }
-
 
 /**
  * サブルーチン：地点の削除確認（自作ダイアログ版）
