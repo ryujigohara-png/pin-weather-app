@@ -656,7 +656,7 @@ function initCompassUI() {
 /**
  * サブルーチン：環境色を反映した汎用ダイアログを表示（多言語・サイズ調整版）
  */
-function showAppDialog({ title, messageKey, inputValue = null, onSave = null, onDelete = null }) {
+function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onSave = null, onDelete = null }) {
     const modal = document.getElementById('app-common-modal');
     const header = document.getElementById('common-modal-header');
     const titleEl = document.getElementById('common-modal-title');
@@ -696,19 +696,29 @@ function showAppDialog({ title, messageKey, inputValue = null, onSave = null, on
     // 3. ボタンの生成
     footer.innerHTML = "";
     
-    // showAppDialog 内の onDelete ボタン生成部分（修正版）
+    // 削除ボタン
     if (onDelete) {
         const btnDelete = document.createElement('button');
         btnDelete.className = "btn btn-danger-outline";
         btnDelete.innerText = i18n.t('btnDelete'); 
         
         btnDelete.onclick = () => {
-            // 標準の confirm を廃止し、直接 onDelete を実行する
-            // ※ すでにダイアログを開いていること自体が「操作の意図」の確認になっているため
             onDelete();
             modal.style.display = 'none';
         };
         footer.appendChild(btnDelete);
+    }
+
+    // 地図ボタン（新規追加）
+    if (onMap) {
+        const btnMap = document.createElement('button');
+        btnMap.className = "btn btn-map-view"; // 既存の地図ボタン用クラスを流用
+        btnMap.innerText = "Map"; 
+        btnMap.onclick = () => {
+            onMap();
+            modal.style.display = 'none';
+        };
+        footer.appendChild(btnMap);
     }
 
     // キャンセルボタン
@@ -829,13 +839,21 @@ function renderTabs(activeOverrideLabel = null) {
                     title: item.rawLabel,
                     messageKey: 'editSpotGuide',
                     inputValue: item.rawLabel,
+                    // 【ここを追加】地図を表示するコールバックを渡す
+                    onMap: () => {
+                        // 地図を開く関数（既存の openMap）を、その地点の座標で呼び出す
+                        if (typeof openMap === 'function') {
+                            openMap(item.lat, item.lon);
+                        }
+                    },
                     onSave: (newName) => {
                         if (!newName) return;
 
                         if (spotIdx !== -1) {
+                            // 1. 既存地点の更新
                             mySpots[spotIdx].label = newName;
                         } else {
-                            // 未登録の(GPS)や(MAP)地点を新規保存
+                            // 2. GPS地点など、未登録地点を新規保存（永続化）
                             mySpots.push({ 
                                 lat: item.lat, 
                                 lon: item.lon, 
