@@ -544,59 +544,66 @@ function applyEnvVisuals() {
 
 /**
  * サブルーチン：アプリ起動時の初期化
- * 1. 保存データがあればロード
- * 2. 初回時はIPから市区町村レベルを推定して即時描画
+ * 1. 保存データがあればロード（空でなければ）
+ * 2. データがない、または全削除時はIPから市区町村レベルを推定して即時描画
  * 3. WelcomeダイアログでGPS/Mapの選択を促す
  */
 async function initApp() {
     const savedData = localStorage.getItem('pin_weather_spots');
     
-    // --- パターンA：既存ユーザー（保存データあり） ---
-    if (savedData) {
-        mySpots = JSON.parse(savedData);
-        if (mySpots.length > 0) {
-            const lastSpot = mySpots[0];
-            currentLat = lastSpot.lat;
-            currentLon = lastSpot.lon;
-            currentLabel = lastSpot.label;
-        }
+    // 文字列として存在していても、中身が空配列 "[]" の場合があるためパースして確認
+    let parsedData = null;
+    try {
+        if (savedData) parsedData = JSON.parse(savedData);
+    } catch (e) {
+        parsedData = null;
+    }
+
+    // --- パターンA：既存ユーザー（有効な保存データあり） ---
+    // parsedData が存在し、かつ1件以上の地点がある場合のみ
+    if (parsedData && parsedData.length > 0) {
+        mySpots = parsedData;
+        const lastSpot = mySpots[0];
+        currentLat = lastSpot.lat;
+        currentLon = lastSpot.lon;
+        currentLabel = lastSpot.label;
+        
         finalizeInit(); // 即座に描画
     } 
-    // --- パターンB：初回起動ユーザー ---
+    // --- パターンB：初回起動ユーザー または 全地点削除後のユーザー ---
     else {
         mySpots = [];
         
         // 1. IPアドレスから市区町村レベルのおおまかな現在地を取得（非同期）
-        // これにより「高須沖」固定ではなく、ユーザーの近隣地点が初期値になる
         await setApproximateLocation(); 
         
         // 2. 推定された地点で即座に描画（真っ白な画面を回避）
         finalizeInit();
 
-        // 3. Welcomeダイアログの表示（GPS vs Map の2ボタン）
+        // 3. Welcomeダイアログの表示
         setTimeout(() => {
-            showAppDialog({
-                title: "Welcome",
-                messageKey: 'welcomeGuide',
-                onMap: () => openMap(),
-                onSave: () => handleGPSClick() // 保存枠をGPSとして利用
-            });
-            
-            // ダイアログ内のボタン表示を調整（保存→GPS、キャンセル非表示）
-            setupWelcomeButtons();
+            if (typeof showAppDialog === 'function') {
+                showAppDialog({
+                    title: "Welcome",
+                    messageKey: 'welcomeGuide',
+                    onMap: () => openMap(),
+                    onSave: () => handleGPSClick() 
+                });
+                setupWelcomeButtons();
+            }
         }, 500);
 
-        // 4. バックグラウンドで精密なGPS取得を試みる（許可があれば自動更新）
+        // 4. バックグラウンドで精密なGPS取得を試みる
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
                     currentLat = pos.coords.latitude;
                     currentLon = pos.coords.longitude;
-                    currentLabel = i18n.t('gpsDefaultLabel') || "現在地(GPS)";
+                    currentLabel = (typeof i18n !== 'undefined' && i18n.t) ? (i18n.t('gpsDefaultLabel') || "現在地(GPS)") : "現在地(GPS)";
                     updateLocation(currentLat, currentLon, currentLabel);
-                    renderTabs();
+                    if (typeof renderTabs === 'function') renderTabs();
                 },
-                null, // 拒否時はすでにおおまかな場所が出ているので何もしない
+                null,
                 { timeout: 8000 }
             );
         }
@@ -721,6 +728,20 @@ function setupGeneralEvents() {
             // GoogleフォームなどのURLを指定（例として私の提案時の構成を維持）
             const formUrl = "https://forms.gle/zdbaJNdodCMzcftK6";
             window.open(formUrl, '_blank');
+        };
+    }
+
+    // 8. プライバシーポリシーのリンク
+    const privacyLink = document.getElementById('privacy-link');
+    if (privacyLink) {
+        privacyLink.onclick = (e) => {
+            e.preventDefault(); // 画面遷移を防ぐ
+            // 公開時は、アップロードしたprivacy.htmlのURLを指定してください
+            //const privacyUrl = "https://あなたのドメイン/privacy.html"; 
+            // テスト用には、相対パス（同じサーバー内に privacy.html がある場合）
+            // これなら、beta版で開けばbetaの、main版で開けばmainのポリシーが開きます。
+            const privacyUrl = "./privacy.html";
+            window.open(privacyUrl, '_blank');
         };
     }
 }
