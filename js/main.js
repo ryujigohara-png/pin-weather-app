@@ -80,7 +80,7 @@ const i18n = {
             btnRestoreDefault: "デフォルトに戻す",
 
             // --- グラフ軸・凡例・その他 ---
-            yAxisWeather: "天気<br>降水量mm",
+            yAxisWeather: "天気<br>降水(mm)",
             yAxisWind: "風向<br>風速(m/s)",
             yAxisTemp: "気温(℃)<br>海水(℃)",
             yAxisMarine: "波高(m)<br>潮位(m)",
@@ -222,13 +222,29 @@ window.addEventListener('DOMContentLoaded', () => {
     const langSelect = document.getElementById('config-language');
     if (langSelect) { langSelect.value = i18n._currentLang; }
 });
-
 const defaultSpots = [
     {lat: 31.337, lon: 130.795, label: "高須沖(鹿児島県)"},
     {lat: 35.30, lon: 139.48, label: "江の島沖(神奈川県)"}
 ];
 
-let mySpots = JSON.parse(localStorage.getItem('pin_weather_spots')) || defaultSpots;
+// 保存データを確認
+const savedSpotsRaw = localStorage.getItem('pin_weather_spots');
+let mySpots = defaultSpots; // 最初からデフォルトを入れておく
+
+try {
+    if (savedSpotsRaw) {
+        const parsed = JSON.parse(savedSpotsRaw);
+        // 空配列 [] でない場合のみ、保存データで上書きする
+        if (Array.isArray(parsed) && parsed.length > 0) {
+            mySpots = parsed;
+        }
+    }
+} catch (e) {
+    console.error("Storage parse error:", e);
+    mySpots = defaultSpots;
+}
+
+// ここで mySpots[0] は必ず存在するため、エラーは出ません
 let currentLat = mySpots[0].lat;
 let currentLon = mySpots[0].lon;
 let currentLabel = mySpots[0].label;
@@ -389,8 +405,8 @@ function syncSliderValues() {
  * サブルーチン：設定の保存と適用
  * localStorageに書き込み、ページをリロードして定数を再定義させる。
  */
-function saveViewSettings() {
-    // UIから値を取得して viewConfig を更新
+async function saveViewSettings() {
+    // 1. UIから値を取得して viewConfig を更新
     viewConfig.hourWidth = parseInt(document.getElementById('input-hourWidth').value);
     viewConfig.windHeight = parseInt(document.getElementById('input-windHeight').value);
     viewConfig.subHeight = parseInt(document.getElementById('input-subHeight').value);
@@ -399,16 +415,33 @@ function saveViewSettings() {
     viewConfig.iconScale = parseFloat(document.getElementById('input-iconScale').value);
     viewConfig.tooltipDuration = parseInt(document.getElementById('input-tooltipDuration').value);
 
-    // [追加] 言語設定を取得
+    // 言語設定を取得
     viewConfig.language = document.getElementById('config-language').value;
 
-    // localStorageに保存（JSON形式）
+    // 2. 【重要】地点データが空（操作不能リスク）の状態かチェック
+    const savedSpots = localStorage.getItem('pin_weather_spots');
+    let hasSpots = false;
+    try {
+        const parsed = JSON.parse(savedSpots);
+        if (parsed && parsed.length > 0) hasSpots = true;
+    } catch(e) { hasSpots = false; }
+
+    // 地点がない場合は、リロード前に現在地を特定・保存して「真っ白」を防ぐ
+    if (!hasSpots) {
+        console.log("No spots found during save. Fetching approximate location...");
+        await setApproximateLocation(); // 既存のIP Geolocation関数を利用
+        // 推定された地点を保存
+        const newSpot = { label: currentLabel, lat: currentLat, lon: currentLon };
+        localStorage.setItem('pin_weather_spots', JSON.stringify([newSpot]));
+    }
+
+    // 3. 表示設定を保存（JSON形式）
     localStorage.setItem('pin_weather_view_config', JSON.stringify(viewConfig));
 
-    // 完了通知を出してリロード
-    // alert('設定を保存しました。再読み込みして反映します。'); 
+    // 4. 完了通知なしでリロード
     location.reload();
 }
+
 /**
  * サブルーチン：設定のリセット処理
  * 定義済みの defaultViewConfig を使用して設定を初期化する
@@ -1384,6 +1417,15 @@ let tooltipTimer = null;
  */
 async function draw() {
     try {
+        // --- 実行前の安全確認：座標が未定義なら即座に初期化へ ---
+        if (typeof currentLat === 'undefined' || currentLat === null || typeof currentLon === 'undefined' || currentLon === null) {
+            console.warn("Location coordinates are undefined. Redirecting to initApp...");
+            if (typeof initApp === 'function') {
+                await initApp();
+            }
+            return;
+        }
+
         allData = await fetchWithCache(currentLat, currentLon);
         const svgW = document.getElementById('svg-weather');
         if (!svgW) return;
@@ -1394,10 +1436,17 @@ async function draw() {
         // --- Y軸ラベルのアイコン設置 ---
         const titles = document.querySelectorAll('.y-axis-title');
         if (titles.length >= 4) {
-            titles[0].innerHTML = `${i18n.t('weather') || '天気'}<br>${i18n.t('precip')}mm`;
-            titles[1].innerHTML = `${baseWindIcon}${i18n.t('windDir')}<br>(${i18n.t('speedunit') || 'm/s'})`;
-            titles[2].innerHTML = `${i18n.t('temp')}(℃)<br>${i18n.t('seawater')}(℃)`;
-            titles[3].innerHTML = `${i18n.t('wave')}(m)<br>${i18n.t('tide')}(m)`;
+            // 【修正箇所】翻訳ファイルの yAxisWeather をそのまま使用。これで「weather」などの混入を防ぎます。
+            titles[0].innerHTML = i18n.t('yAxisWeather');
+            
+            // 風向アイコン＋翻訳ファイルの yAxisWind
+            titles[1].innerHTML = `${baseWindIcon}${i18n.t('yAxisWind')}`;
+            
+            // 翻訳ファイルの yAxisTemp ("気温(℃)<br>海水(℃)")
+            titles[2].innerHTML = i18n.t('yAxisTemp');
+            
+            // 翻訳ファイルの yAxisMarine ("波高(m)<br>潮位(m)")
+            titles[3].innerHTML = i18n.t('yAxisMarine');
         }
 
         // --- 表示開始位置の計算（現在時刻の4時間前から） ---
@@ -1406,13 +1455,12 @@ async function draw() {
         const startIdx = Math.max(0, fullIdx - 4);
         const displayCount = 216 - startIdx;
 
-        // --- 設定値の取得（サイドバーの値：hScaleが全ての基準） ---
+        // --- 設定値の取得 ---
         const hScale = viewConfig.hourWidth; 
         const labelFS = viewConfig.fontSize;
         const iScale = viewConfig.iconScale;
         const gMargin = viewConfig.graphMargin;
         const totalW = hScale * (displayCount - 1);
-        const tooltipDur = viewConfig.tooltipDuration * 1000;    
 
         // --- 各セクションの幅を更新 ---
         const secWind = document.querySelector('.section-wind');
@@ -1430,15 +1478,12 @@ async function draw() {
         
         // --- 天気アイコン・降水量棒グラフ描画 ---
         let wHtml = "";
-        const valContW = document.getElementById('val-svg-weather');
         const pData = allData.data.precipitation ? allData.data.precipitation.slice(startIdx) : [];
-        const pMax = Math.ceil(Math.max(...pData, 1.0) / 5) * 5; // 5mm刻みでスケール
-        const pMin = 0;
-        const pRange = pMax - pMin;
-        const pPlotH = 35; // 棒グラフの表示領域の高さ
-        const pBaseY = 75; // 棒グラフの底辺Y座標
+        const pMax = Math.ceil(Math.max(...pData, 1.0) / 5) * 5; 
+        const pRange = pMax;
+        const pPlotH = 35; 
+        const pBaseY = 75; 
 
-        // 降水量セクションのグリッド線
         for (let v = 0; v <= pMax; v += 5) {
             const gy = pBaseY - (v / pRange) * pPlotH;
             wHtml += `<line x1="0" y1="${gy}" x2="${totalW}" y2="${gy}" class="grid-y-sub" />`;
@@ -1447,10 +1492,8 @@ async function draw() {
         for(let i = startIdx; i < 216; i++) {
             const x = (i - startIdx) * hScale; 
             const icon = weatherIcons[allData.data.weather_code[i]] || "❓";
-            // 天気アイコン
             wHtml += `<text x="${x}" y="32" font-size="28" text-anchor="middle">${icon}</text>`; 
             
-            // 降水量棒グラフ
             const p = allData.data.precipitation ? allData.data.precipitation[i] : 0;
             if (p > 0) {
                 const barH = (p / pRange) * pPlotH;
@@ -1465,16 +1508,16 @@ async function draw() {
         renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, false, false, startIdx, hScale, totalW, labelFS, iScale);
         renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], viewConfig.subHeight, 0.5, false, true, false, startIdx, hScale, totalW, labelFS, iScale);
 
-        // スクロール位置リセット
         resetGraphScroll();
-
-        // スクロール時の日付ラベル追従処理
         initScrollEvent(hScale);
-
-        // ツールチップ・ガイド線イベントの初期化
         initTooltipEvent(startIdx, hScale, totalW, labelFS);
         
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error("Critical Draw Error:", e);
+        if (typeof initApp === 'function') {
+            initApp();
+        }
+    }
 }
 
 /**
