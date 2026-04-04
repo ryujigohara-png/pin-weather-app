@@ -88,6 +88,7 @@ const i18n = {
             disclaimer: "【免責事項】海上気象データは予測モデルに基づく「最寄りの海上地点」の数値であり、実際の局地的な地形や潮流による影響を反映しきれない場合があります。",
             
             // --- メッセージ類 ---
+            welcomeGuide: "表示したい地点を登録してください。現在地を取得するか、地図から場所を選択できます。",
             confirmDelete: (name) => `「${name}」を削除しますか？`,
             confirmInit: "初期化しますか？",
             confirmReset: "表示設定をデフォルトに戻しますか？",
@@ -165,6 +166,7 @@ const i18n = {
             disclaimer: "[Disclaimer] Marine weather data is based on forecast models for the 'nearest sea point' and may not reflect local terrain or tidal effects.",
 
             // --- Messages ---
+            welcomeGuide: "Please register a spot to display. You can use GPS or select a location from the map.",
             confirmDelete: (name) => `Delete "${name}"?`,
             confirmInit: "Initialize all spots?",
             confirmReset: "Reset all view settings to default?",
@@ -538,23 +540,133 @@ function applyEnvVisuals() {
     }
 }
 
-function initApp() {
-    // 既存の初期化処理の中で呼び出す
+/**
+ * サブルーチン：アプリ起動時の初期化
+ */
+async function initApp() {
+    const savedData = localStorage.getItem('pin_weather_spots');
+    
+    if (savedData) {
+        mySpots = JSON.parse(savedData);
+        if (mySpots.length > 0) {
+            const lastSpot = mySpots[0];
+            currentLat = lastSpot.lat;
+            currentLon = lastSpot.lon;
+            currentLabel = lastSpot.label;
+        }
+        finalizeInit();
+    } else {
+        mySpots = [];
+        
+        // 1. まず「おおまかな現在地」をバックグラウンドで取得しにいく
+        // これにより、GPS不許可時でもユーザーに近い場所が表示される
+        await setApproximateLocation(); 
+        
+        finalizeInit(); // おおまかな場所、または高須沖で即座に描画
+
+        // 2. Welcomeダイアログの表示
+        setTimeout(() => {
+            showAppDialog({
+                title: "Welcome",
+                messageKey: 'welcomeGuide',
+                onMap: () => openMap(),
+                onSave: () => handleGPSClick()
+            });
+            
+            // ボタン表示の調整（前述のロジック）
+            setupWelcomeButtons();
+        }, 300);
+
+        // 3. 詳細なGPS取得を試みる（許可があれば上書き）
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    currentLat = pos.coords.latitude;
+                    currentLon = pos.coords.longitude;
+                    currentLabel = i18n.t('gpsDefaultLabel');
+                    updateLocation(currentLat, currentLon, currentLabel);
+                    renderTabs();
+                },
+                null, // 失敗時はすでにおおまかな場所が出ているので何もしない
+                { timeout: 5000 }
+            );
+        }
+    }
+}
+
+/**
+ * サブルーチン：IPアドレスから「市町村レベル」のおおまかな現在地を取得
+ */
+async function setApproximateLocation() {
+    try {
+        // ipapi.co は市町村名 (city) を返してくれる無料APIの一つです
+        const response = await fetch('https://ipapi.co/json/');
+        if (!response.ok) throw new Error('Network error');
+        
+        const data = await response.json();
+        
+        if (data.latitude && data.longitude) {
+            currentLat = data.latitude;
+            currentLon = data.longitude;
+
+            // 市町村名があればそれを使い、なければ県名、それもなければ「現在地」とする
+            const locationName = data.city || data.region || "現在地";
+            currentLabel = `${locationName}(Approx)`;
+            
+            console.log(`Approximate location set to: ${locationName}`);
+        } else {
+            throw new Error('Incomplete data');
+        }
+    } catch (error) {
+        // 失敗時（オフラインやプライベートIP）はサンプル
+        currentLat = 31.337; 
+        currentLon = 130.795;
+        currentLabel = "高須沖(Sample)";
+    }
+}
+
+/**
+ * サブルーチン：Welcomeダイアログのボタンラベル調整
+ */
+function setupWelcomeButtons() {
+    const footer = document.getElementById('common-modal-footer');
+    if (!footer) return;
+    const buttons = footer.getElementsByTagName('button');
+    for (let btn of buttons) {
+        if (btn.classList.contains('btn-save')) btn.innerText = "GPS";
+        if (btn.classList.contains('btn-secondary')) btn.style.display = 'none';
+    }
+}
+
+/**
+ * サブルーチン：初期化プロセスの完了とイベント登録
+ * ※ 既存の initApp 内にあった共通処理をここに集約
+ */
+function finalizeInit() {
     initViewSettings();
     initCopyUrlEvent();
-
     applyEnvVisuals(); 
     renderTabs();
     initCompassUI();
+    
+    // 画面の地点表示を更新（ここでグラフが描画される）
     updateLocation(currentLat, currentLon, currentLabel);
     
     generateSidebarQRCode();
 
+    // UIボタン等のイベントリスナー登録
+    setupGeneralEvents();
+}
+
+/**
+ * サブルーチン：UIイベントの登録
+ */
+function setupGeneralEvents() {
     const searchInput = document.getElementById('map-search-input');
     if (searchInput) {
-        searchInput.addEventListener('keypress', (e) => {
+        searchInput.onkeypress = (e) => {
             if (e.key === 'Enter') executeMapSearch();
-        });
+        };
     }
     
     const searchBtn = document.getElementById('map-search-btn');
@@ -588,6 +700,7 @@ function initApp() {
         };
     }
 }
+
 
 function toggleSidebar() {
     const sb = document.getElementById('sidebar');
