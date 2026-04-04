@@ -542,10 +542,14 @@ function applyEnvVisuals() {
 
 /**
  * サブルーチン：アプリ起動時の初期化
+ * 1. 保存データがあればロード
+ * 2. 初回時はIPから市区町村レベルを推定して即時描画
+ * 3. WelcomeダイアログでGPS/Mapの選択を促す
  */
 async function initApp() {
     const savedData = localStorage.getItem('pin_weather_spots');
     
+    // --- パターンA：既存ユーザー（保存データあり） ---
     if (savedData) {
         mySpots = JSON.parse(savedData);
         if (mySpots.length > 0) {
@@ -554,71 +558,72 @@ async function initApp() {
             currentLon = lastSpot.lon;
             currentLabel = lastSpot.label;
         }
-        finalizeInit();
-    } else {
+        finalizeInit(); // 即座に描画
+    } 
+    // --- パターンB：初回起動ユーザー ---
+    else {
         mySpots = [];
         
-        // 1. まず「おおまかな現在地」をバックグラウンドで取得しにいく
-        // これにより、GPS不許可時でもユーザーに近い場所が表示される
+        // 1. IPアドレスから市区町村レベルのおおまかな現在地を取得（非同期）
+        // これにより「高須沖」固定ではなく、ユーザーの近隣地点が初期値になる
         await setApproximateLocation(); 
         
-        finalizeInit(); // おおまかな場所、または高須沖で即座に描画
+        // 2. 推定された地点で即座に描画（真っ白な画面を回避）
+        finalizeInit();
 
-        // 2. Welcomeダイアログの表示
+        // 3. Welcomeダイアログの表示（GPS vs Map の2ボタン）
         setTimeout(() => {
             showAppDialog({
                 title: "Welcome",
                 messageKey: 'welcomeGuide',
                 onMap: () => openMap(),
-                onSave: () => handleGPSClick()
+                onSave: () => handleGPSClick() // 保存枠をGPSとして利用
             });
             
-            // ボタン表示の調整（前述のロジック）
+            // ダイアログ内のボタン表示を調整（保存→GPS、キャンセル非表示）
             setupWelcomeButtons();
-        }, 300);
+        }, 500);
 
-        // 3. 詳細なGPS取得を試みる（許可があれば上書き）
+        // 4. バックグラウンドで精密なGPS取得を試みる（許可があれば自動更新）
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
                     currentLat = pos.coords.latitude;
                     currentLon = pos.coords.longitude;
-                    currentLabel = i18n.t('gpsDefaultLabel');
+                    currentLabel = i18n.t('gpsDefaultLabel') || "現在地(GPS)";
                     updateLocation(currentLat, currentLon, currentLabel);
                     renderTabs();
                 },
-                null, // 失敗時はすでにおおまかな場所が出ているので何もしない
-                { timeout: 5000 }
+                null, // 拒否時はすでにおおまかな場所が出ているので何もしない
+                { timeout: 8000 }
             );
         }
     }
 }
 
 /**
- * サブルーチン：IPアドレスから「市町村レベル」のおおまかな現在地を取得
+ * サブルーチン：IP Geolocationによる市区町村レベルの推定
  */
 async function setApproximateLocation() {
     try {
-        // ipapi.co は市町村名 (city) を返してくれる無料APIの一つです
+        // 無料のIP Geolocation API (ipapi.co) を利用
         const response = await fetch('https://ipapi.co/json/');
-        if (!response.ok) throw new Error('Network error');
+        if (!response.ok) throw new Error('API Network Error');
         
         const data = await response.json();
         
         if (data.latitude && data.longitude) {
             currentLat = data.latitude;
             currentLon = data.longitude;
-
-            // 市町村名があればそれを使い、なければ県名、それもなければ「現在地」とする
-            const locationName = data.city || data.region || "現在地";
-            currentLabel = `${locationName}(Approx)`;
-            
-            console.log(`Approximate location set to: ${locationName}`);
+            // 市町村名(city)を優先、なければ県名(region)、それもなければ「現在地」
+            const locName = data.city || data.region || "現在地";
+            currentLabel = `${locName}(Approx)`;
         } else {
-            throw new Error('Incomplete data');
+            throw new Error('Data Incomplete');
         }
     } catch (error) {
-        // 失敗時（オフラインやプライベートIP）はサンプル
+        console.warn("Approximate location failed. Falling back to default sample.", error);
+        // 最終的なバックアップ（高須沖）
         currentLat = 31.337; 
         currentLon = 130.795;
         currentLabel = "高須沖(Sample)";
@@ -626,21 +631,26 @@ async function setApproximateLocation() {
 }
 
 /**
- * サブルーチン：Welcomeダイアログのボタンラベル調整
+ * サブルーチン：Welcomeダイアログのボタン外観調整
  */
 function setupWelcomeButtons() {
     const footer = document.getElementById('common-modal-footer');
     if (!footer) return;
     const buttons = footer.getElementsByTagName('button');
     for (let btn of buttons) {
-        if (btn.classList.contains('btn-save')) btn.innerText = "GPS";
-        if (btn.classList.contains('btn-secondary')) btn.style.display = 'none';
+        // 「適用/保存」ボタンのクラス（btn-save）を探してGPSに書き換え
+        if (btn.classList.contains('btn-save')) {
+            btn.innerText = "GPS";
+        }
+        // 「閉じる/キャンセル」ボタン（btn-secondary）を非表示にする
+        if (btn.classList.contains('btn-secondary')) {
+            btn.style.display = 'none';
+        }
     }
 }
 
 /**
- * サブルーチン：初期化プロセスの完了とイベント登録
- * ※ 既存の initApp 内にあった共通処理をここに集約
+ * サブルーチン：共通の初期化プロセス
  */
 function finalizeInit() {
     initViewSettings();
@@ -648,14 +658,9 @@ function finalizeInit() {
     applyEnvVisuals(); 
     renderTabs();
     initCompassUI();
-    
-    // 画面の地点表示を更新（ここでグラフが描画される）
     updateLocation(currentLat, currentLon, currentLabel);
-    
     generateSidebarQRCode();
-
-    // UIボタン等のイベントリスナー登録
-    setupGeneralEvents();
+    setupGeneralEvents(); // UIイベント登録
 }
 
 /**
