@@ -80,7 +80,7 @@ const i18n = {
             btnRestoreDefault: "デフォルトに戻す",
 
             // --- グラフ軸・凡例・その他 ---
-            yAxisWeather: "天気<br>降水量mm",
+            yAxisWeather: "天気<br>降水(mm)",
             yAxisWind: "風向<br>風速(m/s)",
             yAxisTemp: "気温(℃)<br>海水(℃)",
             yAxisMarine: "波高(m)<br>潮位(m)",
@@ -222,13 +222,29 @@ window.addEventListener('DOMContentLoaded', () => {
     const langSelect = document.getElementById('config-language');
     if (langSelect) { langSelect.value = i18n._currentLang; }
 });
-
 const defaultSpots = [
     {lat: 31.337, lon: 130.795, label: "高須沖(鹿児島県)"},
     {lat: 35.30, lon: 139.48, label: "江の島沖(神奈川県)"}
 ];
 
-let mySpots = JSON.parse(localStorage.getItem('pin_weather_spots')) || defaultSpots;
+// 保存データを確認
+const savedSpotsRaw = localStorage.getItem('pin_weather_spots');
+let mySpots = defaultSpots; // 最初からデフォルトを入れておく
+
+try {
+    if (savedSpotsRaw) {
+        const parsed = JSON.parse(savedSpotsRaw);
+        // 空配列 [] でない場合のみ、保存データで上書きする
+        if (Array.isArray(parsed) && parsed.length > 0) {
+            mySpots = parsed;
+        }
+    }
+} catch (e) {
+    console.error("Storage parse error:", e);
+    mySpots = defaultSpots;
+}
+
+// ここで mySpots[0] は必ず存在するため、エラーは出ません
 let currentLat = mySpots[0].lat;
 let currentLon = mySpots[0].lon;
 let currentLabel = mySpots[0].label;
@@ -389,8 +405,8 @@ function syncSliderValues() {
  * サブルーチン：設定の保存と適用
  * localStorageに書き込み、ページをリロードして定数を再定義させる。
  */
-function saveViewSettings() {
-    // UIから値を取得して viewConfig を更新
+async function saveViewSettings() {
+    // 1. UIから値を取得して viewConfig を更新
     viewConfig.hourWidth = parseInt(document.getElementById('input-hourWidth').value);
     viewConfig.windHeight = parseInt(document.getElementById('input-windHeight').value);
     viewConfig.subHeight = parseInt(document.getElementById('input-subHeight').value);
@@ -399,16 +415,33 @@ function saveViewSettings() {
     viewConfig.iconScale = parseFloat(document.getElementById('input-iconScale').value);
     viewConfig.tooltipDuration = parseInt(document.getElementById('input-tooltipDuration').value);
 
-    // [追加] 言語設定を取得
+    // 言語設定を取得
     viewConfig.language = document.getElementById('config-language').value;
 
-    // localStorageに保存（JSON形式）
+    // 2. 【重要】地点データが空（操作不能リスク）の状態かチェック
+    const savedSpots = localStorage.getItem('pin_weather_spots');
+    let hasSpots = false;
+    try {
+        const parsed = JSON.parse(savedSpots);
+        if (parsed && parsed.length > 0) hasSpots = true;
+    } catch(e) { hasSpots = false; }
+
+    // 地点がない場合は、リロード前に現在地を特定・保存して「真っ白」を防ぐ
+    if (!hasSpots) {
+        console.log("No spots found during save. Fetching approximate location...");
+        await setApproximateLocation(); // 既存のIP Geolocation関数を利用
+        // 推定された地点を保存
+        const newSpot = { label: currentLabel, lat: currentLat, lon: currentLon };
+        localStorage.setItem('pin_weather_spots', JSON.stringify([newSpot]));
+    }
+
+    // 3. 表示設定を保存（JSON形式）
     localStorage.setItem('pin_weather_view_config', JSON.stringify(viewConfig));
 
-    // 完了通知を出してリロード
-    // alert('設定を保存しました。再読み込みして反映します。'); 
+    // 4. 完了通知なしでリロード
     location.reload();
 }
+
 /**
  * サブルーチン：設定のリセット処理
  * 定義済みの defaultViewConfig を使用して設定を初期化する
@@ -549,6 +582,12 @@ function applyEnvVisuals() {
  * 3. WelcomeダイアログでGPS/Mapの選択を促す
  */
 async function initApp() {
+    /**
+     * 1. アプリ起動時の初期化：ブラウザに「ここがホーム」だと刻む
+     * スクリプトの読み込み時、または window.onload 等の冒頭で一度だけ実行
+     */
+    window.history.replaceState({ page: 'home' }, "");
+
     const savedData = localStorage.getItem('pin_weather_spots');
     
     // 文字列として存在していても、中身が空配列 "[]" の場合があるためパースして確認
@@ -1133,21 +1172,29 @@ function handleGPSClick() {
     }
 }
 
-
-
 const addBtn = document.getElementById('add-btn');
 if (addBtn) addBtn.onclick = () => openMap();
 
+/**
+ * サブルーチン：地図モーダルを開く
+ */
 function openMap() {
+    // 検索入力欄のクリア
+    const searchInput = document.getElementById('map-search-input');
+    if (searchInput) searchInput.value = '';
+
+    // 【重要】共通サブルーチンでモーダルを開く（履歴が積まれる）
     openModal('map-modal');
+
+    // --- 以下、地図の描画・更新ロジック ---
     if (!map) {
+        // 初回のみ地図オブジェクトを作成
         const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
         const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
         const gsi = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', { attribution: '&copy; 国土地理院' });
         
         map = L.map('map-canvas', { center: [currentLat, currentLon], zoom: 14, layers: [esri] });
         
-        // レイヤー名の多言語化
         const baseMaps = {};
         baseMaps[i18n.t('layerStreet')] = esri;
         baseMaps[i18n.t('layerSatellite')] = satellite;
@@ -1155,23 +1202,80 @@ function openMap() {
         
         L.control.layers(baseMaps).addTo(map);
         map.on('click', onMapClick);
-        fetchAddressInfo(currentLat, currentLon);
     } else {
+        // 二回目以降は表示位置を更新
         map.setView([currentLat, currentLon], 14);
-        fetchAddressInfo(currentLat, currentLon);
     }
+
+    // 住所情報の取得とマーカーの再設置
+    fetchAddressInfo(currentLat, currentLon);
     if (tempMarker) map.removeLayer(tempMarker);
     tempMarker = L.marker([currentLat, currentLon]).addTo(map);
+
+    // モーダル表示後のサイズ崩れ対策
+    setTimeout(() => {
+        if (map) map.invalidateSize();
+    }, 300);
 }
 
-function openModal(id) { 
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'flex'; 
+// ① 起動時の確認
+console.log("DEBUG: App Init - Setting Home State");
+window.history.replaceState({ page: 'home' }, "");
+
+window.onpopstate = function(event) {
+    // 戻るボタンが押されたら必ずこれが表示されるはず
+    console.log("DEBUG: Back Button Pressed!", event.state);
+
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach(m => {
+        if (m.style.display === 'block') {
+            console.log("DEBUG: Closing Modal ->", m.id);
+            m.style.display = 'none';
+        }
+    });
+};
+
+/**
+ * 共通サブルーチン：モーダルを開く
+ */
+function openModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal || modal.style.display === 'block') return;
+    
+    modal.style.display = 'block';
+    // 履歴を「1つ進める」
+    window.history.pushState({ page: 'modal', id: id }, "");
 }
-function closeModal(id) { 
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'none'; 
+
+/**
+ * 共通サブルーチン：モーダルを閉じる
+ */
+function closeModal(id) {
+    const modal = document.getElementById(id);
+    if (modal && modal.style.display === 'block') {
+        modal.style.display = 'none';
+        // 戻る操作で履歴を整合させる
+        if (window.history.state && window.history.state.page === 'modal') {
+            window.history.back();
+        }
+    }
 }
+
+/**
+ * 監視役：ブラウザの「戻る」が押されたら実行
+ */
+window.onpopstate = function(event) {
+    // クラス名が modal-overlay のものも全て含めて非表示にする
+    const targets = document.querySelectorAll('.modal, .modal-overlay, #app-common-modal');
+    targets.forEach(m => {
+        m.style.display = 'none';
+    });
+    
+    // 地図の仮マーカー消去
+    if (typeof tempMarker !== 'undefined' && tempMarker && map) {
+        map.removeLayer(tempMarker);
+    }
+};
 
 // 設定保存時に実行
 function applyStylesToCSS() {
@@ -1384,6 +1488,15 @@ let tooltipTimer = null;
  */
 async function draw() {
     try {
+        // --- 実行前の安全確認：座標が未定義なら即座に初期化へ ---
+        if (typeof currentLat === 'undefined' || currentLat === null || typeof currentLon === 'undefined' || currentLon === null) {
+            console.warn("Location coordinates are undefined. Redirecting to initApp...");
+            if (typeof initApp === 'function') {
+                await initApp();
+            }
+            return;
+        }
+
         allData = await fetchWithCache(currentLat, currentLon);
         const svgW = document.getElementById('svg-weather');
         if (!svgW) return;
@@ -1394,10 +1507,17 @@ async function draw() {
         // --- Y軸ラベルのアイコン設置 ---
         const titles = document.querySelectorAll('.y-axis-title');
         if (titles.length >= 4) {
-            titles[0].innerHTML = `${i18n.t('weather') || '天気'}<br>${i18n.t('precip')}mm`;
-            titles[1].innerHTML = `${baseWindIcon}${i18n.t('windDir')}<br>(${i18n.t('speedunit') || 'm/s'})`;
-            titles[2].innerHTML = `${i18n.t('temp')}(℃)<br>${i18n.t('seawater')}(℃)`;
-            titles[3].innerHTML = `${i18n.t('wave')}(m)<br>${i18n.t('tide')}(m)`;
+            // 【修正箇所】翻訳ファイルの yAxisWeather をそのまま使用。これで「weather」などの混入を防ぎます。
+            titles[0].innerHTML = i18n.t('yAxisWeather');
+            
+            // 風向アイコン＋翻訳ファイルの yAxisWind
+            titles[1].innerHTML = `${baseWindIcon}${i18n.t('yAxisWind')}`;
+            
+            // 翻訳ファイルの yAxisTemp ("気温(℃)<br>海水(℃)")
+            titles[2].innerHTML = i18n.t('yAxisTemp');
+            
+            // 翻訳ファイルの yAxisMarine ("波高(m)<br>潮位(m)")
+            titles[3].innerHTML = i18n.t('yAxisMarine');
         }
 
         // --- 表示開始位置の計算（現在時刻の4時間前から） ---
@@ -1406,13 +1526,12 @@ async function draw() {
         const startIdx = Math.max(0, fullIdx - 4);
         const displayCount = 216 - startIdx;
 
-        // --- 設定値の取得（サイドバーの値：hScaleが全ての基準） ---
+        // --- 設定値の取得 ---
         const hScale = viewConfig.hourWidth; 
         const labelFS = viewConfig.fontSize;
         const iScale = viewConfig.iconScale;
         const gMargin = viewConfig.graphMargin;
         const totalW = hScale * (displayCount - 1);
-        const tooltipDur = viewConfig.tooltipDuration * 1000;    
 
         // --- 各セクションの幅を更新 ---
         const secWind = document.querySelector('.section-wind');
@@ -1430,15 +1549,12 @@ async function draw() {
         
         // --- 天気アイコン・降水量棒グラフ描画 ---
         let wHtml = "";
-        const valContW = document.getElementById('val-svg-weather');
         const pData = allData.data.precipitation ? allData.data.precipitation.slice(startIdx) : [];
-        const pMax = Math.ceil(Math.max(...pData, 1.0) / 5) * 5; // 5mm刻みでスケール
-        const pMin = 0;
-        const pRange = pMax - pMin;
-        const pPlotH = 35; // 棒グラフの表示領域の高さ
-        const pBaseY = 75; // 棒グラフの底辺Y座標
+        const pMax = Math.ceil(Math.max(...pData, 1.0) / 5) * 5; 
+        const pRange = pMax;
+        const pPlotH = 35; 
+        const pBaseY = 75; 
 
-        // 降水量セクションのグリッド線
         for (let v = 0; v <= pMax; v += 5) {
             const gy = pBaseY - (v / pRange) * pPlotH;
             wHtml += `<line x1="0" y1="${gy}" x2="${totalW}" y2="${gy}" class="grid-y-sub" />`;
@@ -1447,10 +1563,8 @@ async function draw() {
         for(let i = startIdx; i < 216; i++) {
             const x = (i - startIdx) * hScale; 
             const icon = weatherIcons[allData.data.weather_code[i]] || "❓";
-            // 天気アイコン
             wHtml += `<text x="${x}" y="32" font-size="28" text-anchor="middle">${icon}</text>`; 
             
-            // 降水量棒グラフ
             const p = allData.data.precipitation ? allData.data.precipitation[i] : 0;
             if (p > 0) {
                 const barH = (p / pRange) * pPlotH;
@@ -1465,16 +1579,16 @@ async function draw() {
         renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, false, false, startIdx, hScale, totalW, labelFS, iScale);
         renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], viewConfig.subHeight, 0.5, false, true, false, startIdx, hScale, totalW, labelFS, iScale);
 
-        // スクロール位置リセット
         resetGraphScroll();
-
-        // スクロール時の日付ラベル追従処理
         initScrollEvent(hScale);
-
-        // ツールチップ・ガイド線イベントの初期化
         initTooltipEvent(startIdx, hScale, totalW, labelFS);
         
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error("Critical Draw Error:", e);
+        if (typeof initApp === 'function') {
+            initApp();
+        }
+    }
 }
 
 /**
@@ -1520,7 +1634,6 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
             const dayIdx = d.getDay();
             let dayColor = (dayIdx === 0) ? "#FF0000" : (dayIdx === 6 ? "#0000FF" : "#000000");
             
-            // --- [修正] 自作サブルーチンを使用して多言語化された日付を取得 ---
             const localizedDateStr = getLocalizedDate(d);
             const labelContent = `<span style="color:${dayColor}; font-size:${labelFS * 1.5}px;" class="notranslate">${localizedDateStr}</span>`;
 
@@ -1540,6 +1653,8 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
 
             if (isLast) {
                 dateDiv.innerHTML = labelContent;
+                // --- [追加] 午前0時（または開始地点）でも「0」を表示する ---
+                html += `<text x="${x}" y="${plotHeight + 15}" class="label-time" font-size="${labelFS}" text-anchor="middle">${d.getHours()}</text>`;
             }
             dateCont.appendChild(dateDiv);
         } else if (i % 3 === 0) {
@@ -1604,24 +1719,6 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
 }
 
 /**
- * サブルーチン：スクロールイベントの初期化
- */
-function initScrollEvent(hScale) {
-    const scrollRoot = document.getElementById('scroll-root');
-    if (scrollRoot) {
-        scrollRoot.onscroll = () => {
-            const sl = scrollRoot.scrollLeft;
-            document.querySelectorAll('.sticky-date').forEach(el => {
-                const x = parseFloat(el.dataset.x);
-                const nextX = x + (24 * hScale);
-                el.style.left = (sl >= x && sl < nextX - 100) ? (sl - 100) + "px" : x + "px";
-            });
-        };
-        scrollRoot.dispatchEvent(new Event('scroll'));
-    }
-}
-
-/**
  * サブルーチン：ツールチップイベントの初期化
  */
 function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
@@ -1640,7 +1737,6 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
             let hourIdx = Math.round(graphX / hScale) + startIdx;
             hourIdx = Math.min(Math.max(hourIdx, startIdx), 215);
 
-            // --- [重要] ここで d を定義。これが無いと ReferenceError で停止します ---
             const d = new Date(allData.data.time[hourIdx]);
 
             const snapX = (hourIdx - startIdx) * hScale + 100;
@@ -1648,31 +1744,22 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
             guide.style.display = "block";
             tooltip.style.display = "block";
             
-            // 既存の自動消去タイマーをクリア
             if (tooltipTimer) clearTimeout(tooltipTimer);
 
+            // 先に X 座標を決定
             const tooltipWidth = 180;
             let tx = (e.clientX > window.innerWidth / 2) ? e.clientX - tooltipWidth - 10 : e.clientX + 10;
             tooltip.style.left = tx + "px";
 
-            let ty = e.clientY + 20;
-            const tooltipHeight = tooltip.offsetHeight || 250; 
-            if (ty + tooltipHeight > window.innerHeight) {
-                ty = window.innerHeight - tooltipHeight - 10; 
-            }
-            tooltip.style.top = ty + "px";
-
-            // 1. 予報時刻の多言語化
+            // --- データの準備 ---
             const localizedDateStr = getLocalizedDate(d);
             const deg = allData.data.wind_direction_10m[hourIdx];
             const wIcon = weatherIcons[allData.data.weather_code[hourIdx]] || "❓";
 
-            // 2. 現在時刻の多言語化
             const n = new Date();
             const nDayStr = i18n.dict[i18n._currentLang].days[n.getDay()];
             const nStr = `${n.getMonth()+1}/${n.getDate()}(${nDayStr}) ${n.getHours()}:${n.getMinutes().toString().padStart(2, '0')}`;
             
-            // 3. データ取得時刻の多言語化
             let ftStr = "--/--(曜) --:--";
             if (allData.timestamp) {
                 const ft = new Date(allData.timestamp);
@@ -1680,6 +1767,7 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
                 ftStr = `${ft.getMonth()+1}/${ft.getDate()}(${ftDayStr}) ${ft.getHours()}:${ft.getMinutes().toString().padStart(2, '0')}`;
             }
 
+            // 【重要】位置計算の前に innerHTML をセットして、ツールチップの「実際の高さ」を確定させる
             tooltip.innerHTML = `
                 <span class="spot-name-tip">📍 ${currentLabel}</span>
                 <b class="notranslate">${localizedDateStr} ${d.getHours()}:00 ${wIcon}</b>
@@ -1696,13 +1784,38 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
                 </div>
             `;
 
-            // スマホ等でのタップ操作を想定し、タイマーをセット
+            // 【重要】中身が入った後に高さを取得し、Y 座標（ty）を計算して適用する
+            let ty = e.clientY + 20;
+            const tooltipHeight = tooltip.offsetHeight; 
+            if (ty + tooltipHeight > window.innerHeight) {
+                ty = window.innerHeight - tooltipHeight - 10; 
+            }
+            tooltip.style.top = ty + "px";
+
             const tooltipDur = viewConfig.tooltipDuration * 1000;    
             tooltipTimer = setTimeout(() => {
                 hideTooltipUI();
             }, tooltipDur);
         };
         stage.onmouseleave = () => { hideTooltipUI(); };
+    }
+}
+
+/**
+ * サブルーチン：スクロールイベントの初期化（変更なし）
+ */
+function initScrollEvent(hScale) {
+    const scrollRoot = document.getElementById('scroll-root');
+    if (scrollRoot) {
+        scrollRoot.onscroll = () => {
+            const sl = scrollRoot.scrollLeft;
+            document.querySelectorAll('.sticky-date').forEach(el => {
+                const x = parseFloat(el.dataset.x);
+                const nextX = x + (24 * hScale);
+                el.style.left = (sl >= x && sl < nextX - 100) ? (sl - 100) + "px" : x + "px";
+            });
+        };
+        scrollRoot.dispatchEvent(new Event('scroll'));
     }
 }
 
