@@ -1166,13 +1166,16 @@ function handleGPSClick() {
     }
 }
 
-
-
 const addBtn = document.getElementById('add-btn');
 if (addBtn) addBtn.onclick = () => openMap();
 
 function openMap() {
+    // ① 検索入力欄をクリアする（IDは一般的な 'map-search-input' と想定、適宜合わせてください）
+    const searchInput = document.getElementById('map-search-input');
+    if (searchInput) searchInput.value = '';
+
     openModal('map-modal');
+
     if (!map) {
         const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
         const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
@@ -1193,9 +1196,18 @@ function openMap() {
         map.setView([currentLat, currentLon], 14);
         fetchAddressInfo(currentLat, currentLon);
     }
+
     if (tempMarker) map.removeLayer(tempMarker);
     tempMarker = L.marker([currentLat, currentLon]).addTo(map);
+
+    // ② 地図が欠ける現象への対策：モーダル表示が安定したタイミングでサイズを再計算させる
+    setTimeout(() => {
+        if (map) {
+            map.invalidateSize();
+        }
+    }, 300); // 300ms待機して確実に描画エリアを確定させる
 }
+
 
 function openModal(id) { 
     const el = document.getElementById(id);
@@ -1563,7 +1575,6 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
             const dayIdx = d.getDay();
             let dayColor = (dayIdx === 0) ? "#FF0000" : (dayIdx === 6 ? "#0000FF" : "#000000");
             
-            // --- [修正] 自作サブルーチンを使用して多言語化された日付を取得 ---
             const localizedDateStr = getLocalizedDate(d);
             const labelContent = `<span style="color:${dayColor}; font-size:${labelFS * 1.5}px;" class="notranslate">${localizedDateStr}</span>`;
 
@@ -1583,6 +1594,8 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
 
             if (isLast) {
                 dateDiv.innerHTML = labelContent;
+                // --- [追加] 午前0時（または開始地点）でも「0」を表示する ---
+                html += `<text x="${x}" y="${plotHeight + 15}" class="label-time" font-size="${labelFS}" text-anchor="middle">${d.getHours()}</text>`;
             }
             dateCont.appendChild(dateDiv);
         } else if (i % 3 === 0) {
@@ -1647,24 +1660,6 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
 }
 
 /**
- * サブルーチン：スクロールイベントの初期化
- */
-function initScrollEvent(hScale) {
-    const scrollRoot = document.getElementById('scroll-root');
-    if (scrollRoot) {
-        scrollRoot.onscroll = () => {
-            const sl = scrollRoot.scrollLeft;
-            document.querySelectorAll('.sticky-date').forEach(el => {
-                const x = parseFloat(el.dataset.x);
-                const nextX = x + (24 * hScale);
-                el.style.left = (sl >= x && sl < nextX - 100) ? (sl - 100) + "px" : x + "px";
-            });
-        };
-        scrollRoot.dispatchEvent(new Event('scroll'));
-    }
-}
-
-/**
  * サブルーチン：ツールチップイベントの初期化
  */
 function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
@@ -1683,7 +1678,6 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
             let hourIdx = Math.round(graphX / hScale) + startIdx;
             hourIdx = Math.min(Math.max(hourIdx, startIdx), 215);
 
-            // --- [重要] ここで d を定義。これが無いと ReferenceError で停止します ---
             const d = new Date(allData.data.time[hourIdx]);
 
             const snapX = (hourIdx - startIdx) * hScale + 100;
@@ -1691,31 +1685,22 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
             guide.style.display = "block";
             tooltip.style.display = "block";
             
-            // 既存の自動消去タイマーをクリア
             if (tooltipTimer) clearTimeout(tooltipTimer);
 
+            // 先に X 座標を決定
             const tooltipWidth = 180;
             let tx = (e.clientX > window.innerWidth / 2) ? e.clientX - tooltipWidth - 10 : e.clientX + 10;
             tooltip.style.left = tx + "px";
 
-            let ty = e.clientY + 20;
-            const tooltipHeight = tooltip.offsetHeight || 250; 
-            if (ty + tooltipHeight > window.innerHeight) {
-                ty = window.innerHeight - tooltipHeight - 10; 
-            }
-            tooltip.style.top = ty + "px";
-
-            // 1. 予報時刻の多言語化
+            // --- データの準備 ---
             const localizedDateStr = getLocalizedDate(d);
             const deg = allData.data.wind_direction_10m[hourIdx];
             const wIcon = weatherIcons[allData.data.weather_code[hourIdx]] || "❓";
 
-            // 2. 現在時刻の多言語化
             const n = new Date();
             const nDayStr = i18n.dict[i18n._currentLang].days[n.getDay()];
             const nStr = `${n.getMonth()+1}/${n.getDate()}(${nDayStr}) ${n.getHours()}:${n.getMinutes().toString().padStart(2, '0')}`;
             
-            // 3. データ取得時刻の多言語化
             let ftStr = "--/--(曜) --:--";
             if (allData.timestamp) {
                 const ft = new Date(allData.timestamp);
@@ -1723,6 +1708,7 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
                 ftStr = `${ft.getMonth()+1}/${ft.getDate()}(${ftDayStr}) ${ft.getHours()}:${ft.getMinutes().toString().padStart(2, '0')}`;
             }
 
+            // 【重要】位置計算の前に innerHTML をセットして、ツールチップの「実際の高さ」を確定させる
             tooltip.innerHTML = `
                 <span class="spot-name-tip">📍 ${currentLabel}</span>
                 <b class="notranslate">${localizedDateStr} ${d.getHours()}:00 ${wIcon}</b>
@@ -1739,13 +1725,38 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
                 </div>
             `;
 
-            // スマホ等でのタップ操作を想定し、タイマーをセット
+            // 【重要】中身が入った後に高さを取得し、Y 座標（ty）を計算して適用する
+            let ty = e.clientY + 20;
+            const tooltipHeight = tooltip.offsetHeight; 
+            if (ty + tooltipHeight > window.innerHeight) {
+                ty = window.innerHeight - tooltipHeight - 10; 
+            }
+            tooltip.style.top = ty + "px";
+
             const tooltipDur = viewConfig.tooltipDuration * 1000;    
             tooltipTimer = setTimeout(() => {
                 hideTooltipUI();
             }, tooltipDur);
         };
         stage.onmouseleave = () => { hideTooltipUI(); };
+    }
+}
+
+/**
+ * サブルーチン：スクロールイベントの初期化（変更なし）
+ */
+function initScrollEvent(hScale) {
+    const scrollRoot = document.getElementById('scroll-root');
+    if (scrollRoot) {
+        scrollRoot.onscroll = () => {
+            const sl = scrollRoot.scrollLeft;
+            document.querySelectorAll('.sticky-date').forEach(el => {
+                const x = parseFloat(el.dataset.x);
+                const nextX = x + (24 * hScale);
+                el.style.left = (sl >= x && sl < nextX - 100) ? (sl - 100) + "px" : x + "px";
+            });
+        };
+        scrollRoot.dispatchEvent(new Event('scroll'));
     }
 }
 
