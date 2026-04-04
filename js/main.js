@@ -40,6 +40,7 @@ const i18n = {
             btnWindConfig: "🎐 風向色付設定",
             btnDetailSettings: "⚙ 表示詳細設定",
             btnResetAll: "♻️ 全リセット",
+            btnFeedback: "💬 ご意見・ご要望",
             shareQR: "スマホで共有",
             btnCopyUrl: "🔗 URLをコピー",
             copySuccess: "✅ コピー完了！",
@@ -118,6 +119,7 @@ const i18n = {
             btnWindConfig: "🎐 Wind Color Settings",
             btnDetailSettings: "⚙ Display Settings",
             btnResetAll: "♻️ Reset All Spots",
+            btnFeedback: "💬 Feedback & Requests",
             shareQR: "Share with Mobile",
             btnCopyUrl: "🔗 Copy URL",
             copySuccess: "✅ Copied!",
@@ -665,8 +667,10 @@ function finalizeInit() {
 
 /**
  * サブルーチン：UIイベントの登録
+ * 画面上の各ボタンや入力欄に、クリック等の動作（イベント）を紐付ける。
  */
 function setupGeneralEvents() {
+    // 1. 地図検索入力欄（Enterキーで検索実行）
     const searchInput = document.getElementById('map-search-input');
     if (searchInput) {
         searchInput.onkeypress = (e) => {
@@ -674,34 +678,49 @@ function setupGeneralEvents() {
         };
     }
     
+    // 2. 地図検索ボタン
     const searchBtn = document.getElementById('map-search-btn');
     if (searchBtn) searchBtn.onclick = executeMapSearch;
     
+    // 3. 風向色付設定ボタン（サイドバー内）
     const windCfgBtn = document.getElementById('wind-cfg-btn');
     if (windCfgBtn) {
         windCfgBtn.onclick = () => {
-            toggleSidebar();
-            openModal('wind-modal');
+            toggleSidebar(); // サイドバーを閉じる
+            openModal('wind-modal'); // 設定モーダルを開く
         };
     }
     
+    // 4. 風向設定の適用ボタン（モーダル内）
     const applyWindBtn = document.getElementById('apply-wind-btn');
     if (applyWindBtn) {
         applyWindBtn.onclick = () => {
             localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
             closeModal('wind-modal');
-            draw();
+            draw(); // グラフを再描画
         };
     }
 
+    // 5. GPSボタン
     const gpsBtn = document.getElementById('gps-btn');
     if (gpsBtn) gpsBtn.onclick = () => handleGPSClick();
     
+    // 6. Mapボタン
     const mapBtn = document.getElementById('map-btn');
     if (mapBtn) {
         mapBtn.onclick = () => { 
             openMap(); 
             renderTabs("Map"); 
+        };
+    }
+
+    // 7. 【追加】ご意見・ご要望ボタン（サイドバー内）
+    const feedbackBtn = document.getElementById('feedback-btn');
+    if (feedbackBtn) {
+        feedbackBtn.onclick = () => {
+            // GoogleフォームなどのURLを指定（例として私の提案時の構成を維持）
+            const formUrl = "https://forms.gle/zdbaJNdodCMzcftK6";
+            window.open(formUrl, '_blank');
         };
     }
 }
@@ -1047,6 +1066,9 @@ if (resetBtn) {
         });
     };
 }
+
+
+
 
 /**
  * サブルーチン：GPSボタンクリック時の処理
