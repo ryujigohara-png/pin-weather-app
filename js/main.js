@@ -582,6 +582,12 @@ function applyEnvVisuals() {
  * 3. WelcomeダイアログでGPS/Mapの選択を促す
  */
 async function initApp() {
+    /**
+     * 1. アプリ起動時の初期化：ブラウザに「ここがホーム」だと刻む
+     * スクリプトの読み込み時、または window.onload 等の冒頭で一度だけ実行
+     */
+    window.history.replaceState({ page: 'home' }, "");
+
     const savedData = localStorage.getItem('pin_weather_spots');
     
     // 文字列として存在していても、中身が空配列 "[]" の場合があるためパースして確認
@@ -1169,21 +1175,26 @@ function handleGPSClick() {
 const addBtn = document.getElementById('add-btn');
 if (addBtn) addBtn.onclick = () => openMap();
 
+/**
+ * サブルーチン：地図モーダルを開く
+ */
 function openMap() {
-    // ① 検索入力欄をクリアする（IDは一般的な 'map-search-input' と想定、適宜合わせてください）
+    // 検索入力欄のクリア
     const searchInput = document.getElementById('map-search-input');
     if (searchInput) searchInput.value = '';
 
+    // 【重要】共通サブルーチンでモーダルを開く（履歴が積まれる）
     openModal('map-modal');
 
+    // --- 以下、地図の描画・更新ロジック ---
     if (!map) {
+        // 初回のみ地図オブジェクトを作成
         const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
         const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
         const gsi = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', { attribution: '&copy; 国土地理院' });
         
         map = L.map('map-canvas', { center: [currentLat, currentLon], zoom: 14, layers: [esri] });
         
-        // レイヤー名の多言語化
         const baseMaps = {};
         baseMaps[i18n.t('layerStreet')] = esri;
         baseMaps[i18n.t('layerSatellite')] = satellite;
@@ -1191,32 +1202,80 @@ function openMap() {
         
         L.control.layers(baseMaps).addTo(map);
         map.on('click', onMapClick);
-        fetchAddressInfo(currentLat, currentLon);
     } else {
+        // 二回目以降は表示位置を更新
         map.setView([currentLat, currentLon], 14);
-        fetchAddressInfo(currentLat, currentLon);
     }
 
+    // 住所情報の取得とマーカーの再設置
+    fetchAddressInfo(currentLat, currentLon);
     if (tempMarker) map.removeLayer(tempMarker);
     tempMarker = L.marker([currentLat, currentLon]).addTo(map);
 
-    // ② 地図が欠ける現象への対策：モーダル表示が安定したタイミングでサイズを再計算させる
+    // モーダル表示後のサイズ崩れ対策
     setTimeout(() => {
-        if (map) {
-            map.invalidateSize();
+        if (map) map.invalidateSize();
+    }, 300);
+}
+
+// ① 起動時の確認
+console.log("DEBUG: App Init - Setting Home State");
+window.history.replaceState({ page: 'home' }, "");
+
+window.onpopstate = function(event) {
+    // 戻るボタンが押されたら必ずこれが表示されるはず
+    console.log("DEBUG: Back Button Pressed!", event.state);
+
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach(m => {
+        if (m.style.display === 'block') {
+            console.log("DEBUG: Closing Modal ->", m.id);
+            m.style.display = 'none';
         }
-    }, 300); // 300ms待機して確実に描画エリアを確定させる
+    });
+};
+
+/**
+ * 共通サブルーチン：モーダルを開く
+ */
+function openModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal || modal.style.display === 'block') return;
+    
+    modal.style.display = 'block';
+    // 履歴を「1つ進める」
+    window.history.pushState({ page: 'modal', id: id }, "");
 }
 
+/**
+ * 共通サブルーチン：モーダルを閉じる
+ */
+function closeModal(id) {
+    const modal = document.getElementById(id);
+    if (modal && modal.style.display === 'block') {
+        modal.style.display = 'none';
+        // 戻る操作で履歴を整合させる
+        if (window.history.state && window.history.state.page === 'modal') {
+            window.history.back();
+        }
+    }
+}
 
-function openModal(id) { 
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'flex'; 
-}
-function closeModal(id) { 
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'none'; 
-}
+/**
+ * 監視役：ブラウザの「戻る」が押されたら実行
+ */
+window.onpopstate = function(event) {
+    // クラス名が modal-overlay のものも全て含めて非表示にする
+    const targets = document.querySelectorAll('.modal, .modal-overlay, #app-common-modal');
+    targets.forEach(m => {
+        m.style.display = 'none';
+    });
+    
+    // 地図の仮マーカー消去
+    if (typeof tempMarker !== 'undefined' && tempMarker && map) {
+        map.removeLayer(tempMarker);
+    }
+};
 
 // 設定保存時に実行
 function applyStylesToCSS() {
