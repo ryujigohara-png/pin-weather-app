@@ -1,7 +1,7 @@
 {
   "lang": "ja",
-  "name": "Pin_Weather! pin spot Weekly Weather Forecast App",
-  "short_name": "PinWeather",
+  "name": "Pin_Weather Pro  - Pin spot Weekly Weather Forecast App",
+  "short_name": "Pin_Weather",
   "description": "好きな場所を登録して、天気・降水量・風速・風向・気温・海水温・波高・潮位を1週間分一気見できる予報アプリ。セーリングやウィングフォイルなど、海で遊ぶ・働く人に最適です。",
   "id": "/index.html",
   "categories": ["weather", "sports"],
