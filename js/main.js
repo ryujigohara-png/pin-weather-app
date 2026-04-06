@@ -1218,54 +1218,18 @@ function openMap() {
     }, 300);
 }
 
-// ① 起動時の確認
+// ① 起動時の基点設定（一度だけ）
 console.log("DEBUG: App Init - Setting Home State");
 window.history.replaceState({ page: 'home' }, "");
 
+/**
+ * 監視役：ブラウザの「戻る」が押されたら実行（一本化）
+ */
 window.onpopstate = function(event) {
-    // 戻るボタンが押されたら必ずこれが表示されるはず
+    // ログを表示して動作を確認できるようにする
     console.log("DEBUG: Back Button Pressed!", event.state);
 
-    const modals = document.querySelectorAll('.modal');
-    modals.forEach(m => {
-        if (m.style.display === 'block') {
-            console.log("DEBUG: Closing Modal ->", m.id);
-            m.style.display = 'none';
-        }
-    });
-};
-
-/**
- * 共通サブルーチン：モーダルを開く
- */
-function openModal(id) {
-    const modal = document.getElementById(id);
-    if (!modal || modal.style.display === 'block') return;
-    
-    modal.style.display = 'block';
-    // 履歴を「1つ進める」
-    window.history.pushState({ page: 'modal', id: id }, "");
-}
-
-/**
- * 共通サブルーチン：モーダルを閉じる
- */
-function closeModal(id) {
-    const modal = document.getElementById(id);
-    if (modal && modal.style.display === 'block') {
-        modal.style.display = 'none';
-        // 戻る操作で履歴を整合させる
-        if (window.history.state && window.history.state.page === 'modal') {
-            window.history.back();
-        }
-    }
-}
-
-/**
- * 監視役：ブラウザの「戻る」が押されたら実行
- */
-window.onpopstate = function(event) {
-    // クラス名が modal-overlay のものも全て含めて非表示にする
+    // HTML構造に合わせて対象を全て含める
     const targets = document.querySelectorAll('.modal, .modal-overlay, #app-common-modal');
     targets.forEach(m => {
         m.style.display = 'none';
@@ -1277,12 +1241,36 @@ window.onpopstate = function(event) {
     }
 };
 
+/**
+ * 共通サブルーチン：モーダルを開く
+ */
+function openModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal || modal.style.display === 'block') return;
+    
+    modal.style.display = 'block';
+    window.history.pushState({ page: 'modal', id: id }, "");
+    console.log("DEBUG: Modal Opened:", id);
+}
+
+/**
+ * 共通サブルーチン：モーダルを閉じる
+ */
+function closeModal(id) {
+    const modal = document.getElementById(id);
+    if (modal && modal.style.display === 'block') {
+        modal.style.display = 'none';
+        
+        if (window.history.state && window.history.state.page === 'modal') {
+            window.history.back();
+        }
+    }
+}
+
 // 設定保存時に実行
 function applyStylesToCSS() {
     const root = document.documentElement;
-    // グラフを包むコンテナ（例：.svg-container）の余白を一括制御
     root.style.setProperty('--graph-margin', `${viewConfig.graphMargin}px`);
-    // ラベル等の共通フォントサイズ
     root.style.setProperty('--label-font-size', `${viewConfig.fontSize}px`);
 }
 
