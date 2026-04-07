@@ -229,6 +229,26 @@ const defaultSpots = [
     {lat: 35.30, lon: 139.48, label: "江の島沖(神奈川県)"}
 ];
 
+/**
+ * ブラウザを閉じる、またはタブを離れる際に古いキャッシュを一括掃除
+ */
+window.addEventListener('beforeunload', () => {
+    const now = Date.now();
+    Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('weather_cache_')) {
+            try {
+                const item = JSON.parse(localStorage.getItem(key));
+                // 4時間以上前のものは削除
+                if (item && item.timestamp && (now - item.timestamp > CACHE_DURATION)) {
+                    localStorage.removeItem(key);
+                }
+            } catch (e) {
+                localStorage.removeItem(key);
+            }
+        }
+    });
+});
+
 // 保存データを確認
 const savedSpotsRaw = localStorage.getItem('pin_weather_spots');
 let mySpots = defaultSpots; // 最初からデフォルトを入れておく
@@ -943,12 +963,42 @@ function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onS
 }
 
 /**
- * サブルーチン：タブのレンダリング処理
+ * サブルーチン：地点登録数の制限チェック
+ * @param {string} newName - 新しく登録しようとしている地点名
+ * @returns {boolean} - 登録可能な場合は true
  */
+/**
+ * サブルーチン：地点登録数の制限チェック
+ */
+function checkSpotLimit(newName) {
+    const alreadyExists = mySpots.some(s => s.label === newName);
+    if (alreadyExists) return true;
+
+    if (mySpots.length >= 10) {
+        // 入力モーダルを閉じる時間を稼いでからエラーを表示
+        setTimeout(() => {
+            showAppDialog({
+                title: i18n.t('limitReachedTitle') || "Limit",
+                messageKey: 'limitReached',
+                // ボタンなし（OKで閉じるだけ）の設定
+            });
+        }, 100); 
+        return false;
+    }
+    return true;
+}
+
+
 function renderTabs(activeOverrideLabel = null) {
     const container = document.getElementById('spot-tabs');
     if (!container) return;
     container.innerHTML = "";
+
+    // 【重要】既存のデータが10個を超えていた場合、このタイミングで10個に絞る（安全装置）
+    if (mySpots.length > 10) {
+        mySpots = mySpots.slice(0, 10);
+        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+    }
 
     const activeLabel = activeOverrideLabel || currentLabel;
     const activeIdx = mySpots.findIndex(s => s.label === activeLabel);
@@ -975,16 +1025,26 @@ function renderTabs(activeOverrideLabel = null) {
         const btn = document.createElement('button');
         const isSelected = (item.id === activeLabel || item.label === activeLabel || item.rawLabel === activeLabel);
         btn.className = 'btn' + (item.id === 'gps' ? ' btn-gps' : item.id === 'map' ? ' btn-map-view' : ' btn-location');
+        
         if (isSelected) {
             btn.classList.add('active');
-            setTimeout(() => btn.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' }), 100);
+            setTimeout(() => {
+                if (btn.classList.contains('active')) {
+                    btn.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+                }
+            }, 150);
         }
         btn.innerText = item.label;
 
-        btn.onclick = () => {
-            if (item.id === 'gps') handleGPSClick();
-            else if (item.id === 'map') { openMap(); renderTabs("Map"); }
-            else {
+        btn.onclick = (e) => {
+            if (e) e.stopPropagation();
+            if (item.id === 'gps') {
+                handleGPSClick();
+            } else if (item.id === 'map') {
+                openMap();
+                currentLabel = "Map";
+                renderTabs("Map");
+            } else {
                 if (!item.isExternal) {
                     const idx = mySpots.findIndex(s => s.label === item.rawLabel);
                     if (idx > -1) {
@@ -994,41 +1054,39 @@ function renderTabs(activeOverrideLabel = null) {
                     }
                 }
                 updateLocation(item.lat, item.lon, item.rawLabel);
+                renderTabs(item.rawLabel); // ここで1回だけ呼ぶ（ループしない）
             }
         };
 
         if (!item.isExternal) {
             const spotIdx = mySpots.findIndex(s => s.label === item.rawLabel);
             const openEditor = (e) => {
-                if (e) e.preventDefault();
+                if (e) { e.preventDefault(); e.stopPropagation(); }
                 showAppDialog({
                     title: item.rawLabel,
                     messageKey: 'editSpotGuide',
                     inputValue: item.rawLabel,
                     onMap: () => { if (typeof openMap === 'function') openMap(item.lat, item.lon); },
+                    // renderTabs 内の編集・保存処理
                     onSave: (newName) => {
                         if (!newName) return;
                         
-                        // --- 10箇所制限チェック（新規保存時のみ） ---
-                        const isActuallyNew = spotIdx === -1 && !mySpots.some(s => s.label === newName);
-                        if (isActuallyNew && mySpots.length >= 10) {
-                            alert(i18n.t('limitReached') || "10箇所までしか登録できません。");
-                            return;
-                        }
+                        // サブルーチンでチェック（ダメならここで終了）
+                        if (!checkSpotLimit(newName)) return;
 
                         if (spotIdx !== -1) {
-                            // 既存更新：インデックス0へ移動
                             const targetSpot = mySpots.splice(spotIdx, 1)[0];
                             targetSpot.label = newName;
                             mySpots.unshift(targetSpot);
                         } else {
-                            // 未登録地点の新規保存：インデックス0へ追加
                             const filtered = mySpots.filter(s => s.label !== newName);
                             mySpots = [{ lat: item.lat, lon: item.lon, label: newName }, ...filtered];
                         }
                         localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                        updateLocation(item.lat, item.lon, newName);
                         renderTabs(newName);
                     },
+                    
                     onDelete: spotIdx !== -1 ? () => {
                         mySpots.splice(spotIdx, 1);
                         localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
@@ -1297,24 +1355,20 @@ async function fetchAddressInfo(lat, lng) {
                     title: defaultName,
                     messageKey: 'mapSavePrompt',
                     inputValue: defaultName,
+                    // fetchAddressInfo 内の地図からの保存処理
                     onSave: (spotName) => {
-                        if (spotName) {
-                            // --- 10箇所制限チェック ---
-                            const isNew = !mySpots.some(s => s.label === spotName);
-                            if (isNew && mySpots.length >= 10) {
-                                alert(i18n.t('limitReached') || "10箇所までしか登録できません。");
-                                return;
-                            }
+                        if (!spotName) return;
 
-                            // --- 0番目固定保存ロジック ---
-                            const filtered = mySpots.filter(s => s.label !== spotName);
-                            mySpots = [{ lat, lon: lng, label: spotName }, ...filtered];
-                            
-                            localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-                            renderTabs(spotName);
-                            updateLocation(lat, lng, spotName);
-                            closeModal('map-modal');
-                        }
+                        // サブルーチンでチェック
+                        if (!checkSpotLimit(spotName)) return;
+
+                        const filtered = mySpots.filter(s => s.label !== spotName);
+                        mySpots = [{ lat, lon: lng, label: spotName }, ...filtered];
+                        
+                        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                        updateLocation(lat, lng, spotName);
+                        renderTabs(spotName);
+                        closeModal('map-modal');
                     }
                 });
             };
@@ -1328,79 +1382,84 @@ async function fetchAddressInfo(lat, lng) {
 }
 
 async function updateLocation(lat, lon, label) {
-    currentLat = lat; currentLon = lon; currentLabel = label;
-    renderTabs(); 
-    await draw(); 
+    const timerLabel = `📊 描画所要時間 [${label}]`;    
+    console.time(timerLabel);
+    currentLat = lat; 
+    currentLon = lon; 
+    currentLabel = label;
+    try {
+        // 実際の描画処理
+        await draw(); 
+    } catch (err) {
+        console.error(`描画エラー [${label}]:`, err);
+    } finally {
+        // 計測終了（コンソールに "📊 描画所要時間 [地点名]: 123.456ms" と表示される）
+        console.timeEnd(timerLabel);
+    }
 }
+
 
 const weatherIcons = { 0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️", 45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "🌦️", 61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "❄️", 73: "❄️", 75: "❄️", 80: "🌦️", 81: "🌦️", 82: "🌦️", 95: "⛈️" };
 function getWindDirText(deg) { return windDirs[Math.round(deg / 22.5) % 16]; }
 
 /**
  * サブルーチン：キャッシュ付きデータ取得
- * 4時間経過した古いキャッシュを自動的に削除するお掃除機能付き。
+ * 効率的なキャッシュ管理とエラーハンドリングを両立
  */
 async function fetchWithCache(lat, lon) {
     const cacheKey = `weather_cache_${lat.toFixed(3)}_${lon.toFixed(3)}`;
     const cached = localStorage.getItem(cacheKey);
     const now = Date.now();
 
-    // ページがリロード（再読み込み）されたかどうかを判定
     const navEntries = performance.getEntriesByType('navigation');
     const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
 
-    // リロードでなく、かつキャッシュが存在し、有効期限内であればキャッシュを返す
-    if (!isReload && cached) {
-        const parsed = JSON.parse(cached);
-        if (now - parsed.timestamp < CACHE_DURATION) {
-            return { timestamp: parsed.timestamp, data: parsed.data };
+    if (cached) {
+        try {
+            const parsed = JSON.parse(cached);
+            // 期限内かつリロードでなければキャッシュを返す
+            if (!isReload && (now - parsed.timestamp < CACHE_DURATION)) {
+                return { timestamp: parsed.timestamp, data: parsed.data };
+            } else {
+                // 【修正】期限切れ、またはリロードなら、この地点のキャッシュを確実に消去
+                localStorage.removeItem(cacheKey);
+            }
+        } catch (e) {
+            localStorage.removeItem(cacheKey);
         }
     }
 
-    // API取得（リロード時、またはキャッシュ切れの場合）
+    // API取得
     const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&forecast_days=9&wind_speed_unit=ms`;
     const mUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto&forecast_days=9&cell_selection=sea`;
 
     try {
         const [wRes, mRes] = await Promise.all([
-            fetch(wUrl).then(r => r.json()),
-            fetch(mUrl).then(r => r.json())
+            fetch(wUrl).then(r => { if(!r.ok) throw new Error(); return r.json(); }),
+            fetch(mUrl).then(r => { if(!r.ok) throw new Error(); return r.json(); })
         ]);
 
         const mergedData = { ...wRes.hourly, ...mRes.hourly };
         const cacheData = { timestamp: now, data: mergedData };
-        
-        // --- 【追加】期限切れ（4時間以上経過）のキャッシュをお掃除 ---
-        Object.keys(localStorage).forEach(key => {
-            if (key.startsWith('weather_cache_')) {
-                try {
-                    const item = JSON.parse(localStorage.getItem(key));
-                    // 保存されている timestamp が 4時間（CACHE_DURATION）以上前なら削除
-                    if (item && item.timestamp && (now - item.timestamp > CACHE_DURATION)) {
-                        localStorage.removeItem(key);
-                    }
-                } catch (e) {
-                    // 解析に失敗するような不正なデータも念のため削除
-                    localStorage.removeItem(key);
-                }
-            }
-        });
-        // ------------------------------------------------------
 
-        // 最新データをキャッシュに保存
+        // 最新データを保存（古いものは上記 removeItem または setItem の上書きで消える）
         localStorage.setItem(cacheKey, JSON.stringify(cacheData));
         return cacheData;
 
     } catch (error) {
         console.error("API取得失敗:", error);
-        // APIが失敗した際、古いキャッシュがあればそれを返す（全滅を防ぐための保険）
         if (cached) {
-            const parsed = JSON.parse(cached);
-            return { timestamp: parsed.timestamp, data: parsed.data };
+            try {
+                const parsed = JSON.parse(cached);
+                return { timestamp: parsed.timestamp, data: parsed.data };
+            } catch (e) {
+                localStorage.removeItem(cacheKey);
+            }
         }
         throw error;
     }
 }
+
 
 /**
  * 外部気象サービスを現在の座標で開く
@@ -1483,17 +1542,27 @@ async function draw() {
         // --- Y軸ラベルのアイコン設置 ---
         const titles = document.querySelectorAll('.y-axis-title');
         if (titles.length >= 4) {
-            // 【修正箇所】翻訳ファイルの yAxisWeather をそのまま使用。これで「weather」などの混入を防ぎます。
             titles[0].innerHTML = i18n.t('yAxisWeather');
-            
-            // 風向アイコン＋翻訳ファイルの yAxisWind
             titles[1].innerHTML = `${baseWindIcon}${i18n.t('yAxisWind')}`;
-            
-            // 翻訳ファイルの yAxisTemp ("気温(℃)<br>海水(℃)")
             titles[2].innerHTML = i18n.t('yAxisTemp');
             
             // 翻訳ファイルの yAxisMarine ("波高(m)<br>潮位(m)")
-            titles[3].innerHTML = i18n.t('yAxisMarine');
+            let marineTitle = i18n.t('yAxisMarine');
+
+            // --- 海上データなし判定とメッセージ追加 ---
+            const now = new Date();
+            const fullIdx = allData.data.time.findIndex(t => new Date(t) > now) - 1;
+            const startIdx = Math.max(0, fullIdx - 4);
+            
+            const waveData = allData.data.wave_height ? allData.data.wave_height.slice(startIdx) : [];
+            const tideData = allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl.slice(startIdx) : [];
+            const hasMarineData = waveData.some(v => v !== 0 && v !== null) || tideData.some(v => v !== 0 && v !== null);
+
+            if (!hasMarineData) {
+                // 指示通り、タイトルの下に「No Marine Data」を赤文字で追加
+                marineTitle += `<br><span style="color:#FF0000; font-weight:bold; font-size:14px; display:block; margin-top:2px;">No Marine Data</span>`;
+            }
+            titles[3].innerHTML = marineTitle;
         }
 
         // --- 表示開始位置の計算（現在時刻の4時間前から） ---
