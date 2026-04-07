@@ -52,6 +52,7 @@ const i18n = {
             btnSaveSpot: "MySpotsに登録",
             btnTempView: "グラフ表示",
             btnClose: "キャンセル", // 共通の「閉じる/キャンセル」
+            limitReached: "10箇所までしか登録できません。これ以上追加する場合は、既存の地点を削除してください。",
             mapStatusFetching: "地点情報を取得中...",
             mapStatusFail: "地点名取得失敗",
             mapNewSpot: "新規地点",
@@ -131,6 +132,7 @@ const i18n = {
             btnSaveSpot: "Save to MySpots",
             btnTempView: "View Graph",
             btnClose: "Cancel",
+            limitReached: "Maximum of 10 spots allowed. Please delete an existing spot to add a new one.",
             mapStatusFetching: "Fetching location info...",
             mapStatusFail: "Failed to get location name",
             mapNewSpot: "New Spot",
@@ -942,7 +944,6 @@ function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onS
 
 /**
  * サブルーチン：タブのレンダリング処理
- * 未登録地点を左端に表示し、isSelected時にスムーズスクロールで左端へ持ってくる。
  */
 function renderTabs(activeOverrideLabel = null) {
     const container = document.getElementById('spot-tabs');
@@ -959,47 +960,21 @@ function renderTabs(activeOverrideLabel = null) {
         activeSpot = displaySpots.splice(activeIdx, 1)[0];
     } else if (activeLabel && !['gps', 'map', 'GPS', 'Map'].includes(activeLabel)) {
         isExternalSpot = true;
-        activeSpot = {
-            label: activeLabel,
-            lat: currentLat,
-            lon: currentLon
-        };
+        activeSpot = { label: activeLabel, lat: currentLat, lon: currentLon };
     }
 
     let items = [];
     if (activeSpot) {
-        items.push({ 
-            id: activeSpot.label, 
-            label: isExternalSpot ? activeSpot.label : `📍 ${activeSpot.label}`, 
-            lat: activeSpot.lat, 
-            lon: activeSpot.lon, 
-            rawLabel: activeSpot.label,
-            isExternal: false // 地点タブなので編集対象にするため false
-        });
+        items.push({ id: activeSpot.label, label: isExternalSpot ? activeSpot.label : `📍 ${activeSpot.label}`, lat: activeSpot.lat, lon: activeSpot.lon, rawLabel: activeSpot.label, isExternal: false });
     }
-
-    // 操作用ボタンは isExternal: true として扱い、編集対象から外す
     items.push({ id: 'gps', label: 'GPS', isSpecial: true, isExternal: true });
     items.push({ id: 'map', label: 'Map', isSpecial: true, isExternal: true });
-    
-    displaySpots.forEach(s => {
-        items.push({ id: s.label, label: `📍 ${s.label}`, lat: s.lat, lon: s.lon, rawLabel: s.label, isExternal: false });
-    });
+    displaySpots.forEach(s => items.push({ id: s.label, label: `📍 ${s.label}`, lat: s.lat, lon: s.lon, rawLabel: s.label, isExternal: false }));
 
     items.forEach((item) => {
         const btn = document.createElement('button');
         const isSelected = (item.id === activeLabel || item.label === activeLabel || item.rawLabel === activeLabel);
-        
-        btn.className = 'btn';
-        if (item.id === 'gps') {
-            btn.classList.add('btn-gps');
-        } else if (item.id === 'map') {
-            btn.classList.add('btn-map-view');
-        } else {
-            btn.classList.add('btn-location');
-            btn.setAttribute('data-raw-label', item.rawLabel);
-        }
-
+        btn.className = 'btn' + (item.id === 'gps' ? ' btn-gps' : item.id === 'map' ? ' btn-map-view' : ' btn-location');
         if (isSelected) {
             btn.classList.add('active');
             setTimeout(() => btn.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' }), 100);
@@ -1007,12 +982,9 @@ function renderTabs(activeOverrideLabel = null) {
         btn.innerText = item.label;
 
         btn.onclick = () => {
-            if (item.id === 'gps') {
-                handleGPSClick();
-            } else if (item.id === 'map') {
-                openMap();
-                renderTabs("Map");
-            } else {
+            if (item.id === 'gps') handleGPSClick();
+            else if (item.id === 'map') { openMap(); renderTabs("Map"); }
+            else {
                 if (!item.isExternal) {
                     const idx = mySpots.findIndex(s => s.label === item.rawLabel);
                     if (idx > -1) {
@@ -1025,37 +997,34 @@ function renderTabs(activeOverrideLabel = null) {
             }
         };
 
-        // 外部サイト連携・操作ボタン以外（＝地点タブすべて）を対象にする
         if (!item.isExternal) {
             const spotIdx = mySpots.findIndex(s => s.label === item.rawLabel);
-            
             const openEditor = (e) => {
                 if (e) e.preventDefault();
-                
                 showAppDialog({
                     title: item.rawLabel,
                     messageKey: 'editSpotGuide',
                     inputValue: item.rawLabel,
-                    // 【ここを追加】地図を表示するコールバックを渡す
-                    onMap: () => {
-                        // 地図を開く関数（既存の openMap）を、その地点の座標で呼び出す
-                        if (typeof openMap === 'function') {
-                            openMap(item.lat, item.lon);
-                        }
-                    },
+                    onMap: () => { if (typeof openMap === 'function') openMap(item.lat, item.lon); },
                     onSave: (newName) => {
                         if (!newName) return;
+                        
+                        // --- 10箇所制限チェック（新規保存時のみ） ---
+                        const isActuallyNew = spotIdx === -1 && !mySpots.some(s => s.label === newName);
+                        if (isActuallyNew && mySpots.length >= 10) {
+                            alert(i18n.t('limitReached') || "10箇所までしか登録できません。");
+                            return;
+                        }
 
                         if (spotIdx !== -1) {
-                            // 1. 既存地点の更新
-                            mySpots[spotIdx].label = newName;
+                            // 既存更新：インデックス0へ移動
+                            const targetSpot = mySpots.splice(spotIdx, 1)[0];
+                            targetSpot.label = newName;
+                            mySpots.unshift(targetSpot);
                         } else {
-                            // 2. GPS地点など、未登録地点を新規保存（永続化）
-                            mySpots.push({ 
-                                lat: item.lat, 
-                                lon: item.lon, 
-                                label: newName 
-                            });
+                            // 未登録地点の新規保存：インデックス0へ追加
+                            const filtered = mySpots.filter(s => s.label !== newName);
+                            mySpots = [{ lat: item.lat, lon: item.lon, label: newName }, ...filtered];
                         }
                         localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
                         renderTabs(newName);
@@ -1067,14 +1036,10 @@ function renderTabs(activeOverrideLabel = null) {
                     } : null 
                 });
             };
-
             btn.oncontextmenu = openEditor;
             let timer;
-            btn.ontouchstart = (e) => { 
-                timer = setTimeout(() => openEditor(e), 800); 
-            };
+            btn.ontouchstart = (e) => { timer = setTimeout(() => openEditor(e), 800); };
             btn.ontouchend = () => clearTimeout(timer);
-            btn.ontouchmove = () => clearTimeout(timer);
         }
         container.appendChild(btn);
     });
@@ -1218,54 +1183,18 @@ function openMap() {
     }, 300);
 }
 
-// ① 起動時の確認
+// ① 起動時の基点設定（一度だけ）
 console.log("DEBUG: App Init - Setting Home State");
 window.history.replaceState({ page: 'home' }, "");
 
+/**
+ * 監視役：ブラウザの「戻る」が押されたら実行（一本化）
+ */
 window.onpopstate = function(event) {
-    // 戻るボタンが押されたら必ずこれが表示されるはず
+    // ログを表示して動作を確認できるようにする
     console.log("DEBUG: Back Button Pressed!", event.state);
 
-    const modals = document.querySelectorAll('.modal');
-    modals.forEach(m => {
-        if (m.style.display === 'block') {
-            console.log("DEBUG: Closing Modal ->", m.id);
-            m.style.display = 'none';
-        }
-    });
-};
-
-/**
- * 共通サブルーチン：モーダルを開く
- */
-function openModal(id) {
-    const modal = document.getElementById(id);
-    if (!modal || modal.style.display === 'block') return;
-    
-    modal.style.display = 'block';
-    // 履歴を「1つ進める」
-    window.history.pushState({ page: 'modal', id: id }, "");
-}
-
-/**
- * 共通サブルーチン：モーダルを閉じる
- */
-function closeModal(id) {
-    const modal = document.getElementById(id);
-    if (modal && modal.style.display === 'block') {
-        modal.style.display = 'none';
-        // 戻る操作で履歴を整合させる
-        if (window.history.state && window.history.state.page === 'modal') {
-            window.history.back();
-        }
-    }
-}
-
-/**
- * 監視役：ブラウザの「戻る」が押されたら実行
- */
-window.onpopstate = function(event) {
-    // クラス名が modal-overlay のものも全て含めて非表示にする
+    // HTML構造に合わせて対象を全て含める
     const targets = document.querySelectorAll('.modal, .modal-overlay, #app-common-modal');
     targets.forEach(m => {
         m.style.display = 'none';
@@ -1277,12 +1206,36 @@ window.onpopstate = function(event) {
     }
 };
 
+/**
+ * 共通サブルーチン：モーダルを開く
+ */
+function openModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal || modal.style.display === 'block') return;
+    
+    modal.style.display = 'block';
+    window.history.pushState({ page: 'modal', id: id }, "");
+    console.log("DEBUG: Modal Opened:", id);
+}
+
+/**
+ * 共通サブルーチン：モーダルを閉じる
+ */
+function closeModal(id) {
+    const modal = document.getElementById(id);
+    if (modal && modal.style.display === 'block') {
+        modal.style.display = 'none';
+        
+        if (window.history.state && window.history.state.page === 'modal') {
+            window.history.back();
+        }
+    }
+}
+
 // 設定保存時に実行
 function applyStylesToCSS() {
     const root = document.documentElement;
-    // グラフを包むコンテナ（例：.svg-container）の余白を一括制御
     root.style.setProperty('--graph-margin', `${viewConfig.graphMargin}px`);
-    // ラベル等の共通フォントサイズ
     root.style.setProperty('--label-font-size', `${viewConfig.fontSize}px`);
 }
 
@@ -1340,19 +1293,26 @@ async function fetchAddressInfo(lat, lng) {
         const saveSpotBtn = document.getElementById('save-spot-btn');
         if (saveSpotBtn) {
             saveSpotBtn.onclick = () => {
-                // prompt を廃止し、自作ダイアログを表示
                 showAppDialog({
-                    title: defaultName,         // 取得した住所を大きく表示
-                    messageKey: 'mapSavePrompt', // 「この地点を保存しますか？」等のガイド
-                    inputValue: defaultName,    // 入力欄にデフォルトの住所をセット
+                    title: defaultName,
+                    messageKey: 'mapSavePrompt',
+                    inputValue: defaultName,
                     onSave: (spotName) => {
-                        // 保存ボタンが押された時の処理
                         if (spotName) {
-                            mySpots.push({lat, lon: lng, label: spotName});
+                            // --- 10箇所制限チェック ---
+                            const isNew = !mySpots.some(s => s.label === spotName);
+                            if (isNew && mySpots.length >= 10) {
+                                alert(i18n.t('limitReached') || "10箇所までしか登録できません。");
+                                return;
+                            }
+
+                            // --- 0番目固定保存ロジック ---
+                            const filtered = mySpots.filter(s => s.label !== spotName);
+                            mySpots = [{ lat, lon: lng, label: spotName }, ...filtered];
+                            
                             localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-                            renderTabs();
+                            renderTabs(spotName);
                             updateLocation(lat, lng, spotName);
-                            // すべて完了してから地図モーダルを閉じる
                             closeModal('map-modal');
                         }
                     }
@@ -1378,7 +1338,7 @@ function getWindDirText(deg) { return windDirs[Math.round(deg / 22.5) % 16]; }
 
 /**
  * サブルーチン：キャッシュ付きデータ取得
- * リロード（再読み込み）時はキャッシュを無視して強制的にAPIを叩く。
+ * 4時間経過した古いキャッシュを自動的に削除するお掃除機能付き。
  */
 async function fetchWithCache(lat, lon) {
     const cacheKey = `weather_cache_${lat.toFixed(3)}_${lon.toFixed(3)}`;
@@ -1410,6 +1370,23 @@ async function fetchWithCache(lat, lon) {
         const mergedData = { ...wRes.hourly, ...mRes.hourly };
         const cacheData = { timestamp: now, data: mergedData };
         
+        // --- 【追加】期限切れ（4時間以上経過）のキャッシュをお掃除 ---
+        Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('weather_cache_')) {
+                try {
+                    const item = JSON.parse(localStorage.getItem(key));
+                    // 保存されている timestamp が 4時間（CACHE_DURATION）以上前なら削除
+                    if (item && item.timestamp && (now - item.timestamp > CACHE_DURATION)) {
+                        localStorage.removeItem(key);
+                    }
+                } catch (e) {
+                    // 解析に失敗するような不正なデータも念のため削除
+                    localStorage.removeItem(key);
+                }
+            }
+        });
+        // ------------------------------------------------------
+
         // 最新データをキャッシュに保存
         localStorage.setItem(cacheKey, JSON.stringify(cacheData));
         return cacheData;
@@ -1424,7 +1401,6 @@ async function fetchWithCache(lat, lon) {
         throw error;
     }
 }
-
 
 /**
  * 外部気象サービスを現在の座標で開く
