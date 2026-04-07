@@ -1542,17 +1542,27 @@ async function draw() {
         // --- Y軸ラベルのアイコン設置 ---
         const titles = document.querySelectorAll('.y-axis-title');
         if (titles.length >= 4) {
-            // 【修正箇所】翻訳ファイルの yAxisWeather をそのまま使用。これで「weather」などの混入を防ぎます。
             titles[0].innerHTML = i18n.t('yAxisWeather');
-            
-            // 風向アイコン＋翻訳ファイルの yAxisWind
             titles[1].innerHTML = `${baseWindIcon}${i18n.t('yAxisWind')}`;
-            
-            // 翻訳ファイルの yAxisTemp ("気温(℃)<br>海水(℃)")
             titles[2].innerHTML = i18n.t('yAxisTemp');
             
             // 翻訳ファイルの yAxisMarine ("波高(m)<br>潮位(m)")
-            titles[3].innerHTML = i18n.t('yAxisMarine');
+            let marineTitle = i18n.t('yAxisMarine');
+
+            // --- 海上データなし判定とメッセージ追加 ---
+            const now = new Date();
+            const fullIdx = allData.data.time.findIndex(t => new Date(t) > now) - 1;
+            const startIdx = Math.max(0, fullIdx - 4);
+            
+            const waveData = allData.data.wave_height ? allData.data.wave_height.slice(startIdx) : [];
+            const tideData = allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl.slice(startIdx) : [];
+            const hasMarineData = waveData.some(v => v !== 0 && v !== null) || tideData.some(v => v !== 0 && v !== null);
+
+            if (!hasMarineData) {
+                // 指示通り、タイトルの下に「No Marine Data」を赤文字で追加
+                marineTitle += `<br><span style="color:#FF0000; font-weight:bold; font-size:14px; display:block; margin-top:2px;">No Marine Data</span>`;
+            }
+            titles[3].innerHTML = marineTitle;
         }
 
         // --- 表示開始位置の計算（現在時刻の4時間前から） ---
