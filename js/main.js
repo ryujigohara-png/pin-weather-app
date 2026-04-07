@@ -962,6 +962,33 @@ function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onS
     modal.style.display = 'flex';
 }
 
+/**
+ * サブルーチン：地点登録数の制限チェック
+ * @param {string} newName - 新しく登録しようとしている地点名
+ * @returns {boolean} - 登録可能な場合は true
+ */
+/**
+ * サブルーチン：地点登録数の制限チェック
+ */
+function checkSpotLimit(newName) {
+    const alreadyExists = mySpots.some(s => s.label === newName);
+    if (alreadyExists) return true;
+
+    if (mySpots.length >= 10) {
+        // 入力モーダルを閉じる時間を稼いでからエラーを表示
+        setTimeout(() => {
+            showAppDialog({
+                title: i18n.t('limitReachedTitle') || "Limit",
+                messageKey: 'limitReached',
+                // ボタンなし（OKで閉じるだけ）の設定
+            });
+        }, 100); 
+        return false;
+    }
+    return true;
+}
+
+
 function renderTabs(activeOverrideLabel = null) {
     const container = document.getElementById('spot-tabs');
     if (!container) return;
@@ -1040,15 +1067,12 @@ function renderTabs(activeOverrideLabel = null) {
                     messageKey: 'editSpotGuide',
                     inputValue: item.rawLabel,
                     onMap: () => { if (typeof openMap === 'function') openMap(item.lat, item.lon); },
+                    // renderTabs 内の編集・保存処理
                     onSave: (newName) => {
                         if (!newName) return;
                         
-                        // 10箇所制限チェック（追加時のみ）
-                        const isActuallyNew = (spotIdx === -1) && !mySpots.some(s => s.label === newName);
-                        if (isActuallyNew && mySpots.length >= 10) {
-                            alert(i18n.t('limitReached') || "10箇所までしか登録できません。");
-                            return;
-                        }
+                        // サブルーチンでチェック（ダメならここで終了）
+                        if (!checkSpotLimit(newName)) return;
 
                         if (spotIdx !== -1) {
                             const targetSpot = mySpots.splice(spotIdx, 1)[0];
@@ -1058,11 +1082,11 @@ function renderTabs(activeOverrideLabel = null) {
                             const filtered = mySpots.filter(s => s.label !== newName);
                             mySpots = [{ lat: item.lat, lon: item.lon, label: newName }, ...filtered];
                         }
-                        
                         localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
                         updateLocation(item.lat, item.lon, newName);
                         renderTabs(newName);
                     },
+                    
                     onDelete: spotIdx !== -1 ? () => {
                         mySpots.splice(spotIdx, 1);
                         localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
@@ -1331,24 +1355,20 @@ async function fetchAddressInfo(lat, lng) {
                     title: defaultName,
                     messageKey: 'mapSavePrompt',
                     inputValue: defaultName,
+                    // fetchAddressInfo 内の地図からの保存処理
                     onSave: (spotName) => {
-                        if (spotName) {
-                            const isNew = !mySpots.some(s => s.label === spotName);
-                            if (isNew && mySpots.length >= 10) {
-                                alert(i18n.t('limitReached') || "10箇所までしか登録できません。");
-                                return;
-                            }
+                        if (!spotName) return;
 
-                            const filtered = mySpots.filter(s => s.label !== spotName);
-                            mySpots = [{ lat, lon: lng, label: spotName }, ...filtered];
-                            
-                            localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-                            
-                            // 1. まず場所を確定し描画（updateLocationがrenderTabsを呼ぶ）
-                            updateLocation(lat, lng, spotName);
-                            // 2. モーダルを閉じる
-                            closeModal('map-modal');
-                        }
+                        // サブルーチンでチェック
+                        if (!checkSpotLimit(spotName)) return;
+
+                        const filtered = mySpots.filter(s => s.label !== spotName);
+                        mySpots = [{ lat, lon: lng, label: spotName }, ...filtered];
+                        
+                        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                        updateLocation(lat, lng, spotName);
+                        renderTabs(spotName);
+                        closeModal('map-modal');
                     }
                 });
             };
