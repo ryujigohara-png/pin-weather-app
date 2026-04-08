@@ -73,12 +73,16 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     box-sizing: border-box; 
     display: flex;
     flex-direction: column; 
+    /* サイドバー自体で溢れた分をスクロール可能にする */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 .sidebar.open { 
     left: 0; 
     box-shadow: 2px 0 10px rgba(0,0,0,0.1); 
 }
-.sidebar-content { flex-grow: 1; overflow-y: auto; } 
+/* コンテンツエリアの高さ制限をなくし、自然に伸ばす */
+.sidebar-content { flex-grow: 0; } 
 .sidebar .btn { width: 100%; margin-bottom: 15px; text-align: left; }
 
 .sidebar-overlay {
@@ -89,7 +93,8 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
 }
 
 .sidebar-qr-area {
-    margin-top: auto;
+    /* margin-top: auto を廃止し、ボタンの下に自然に配置 */
+    margin-top: 10px;
     padding: 15px 0;
     text-align: center;
     border-top: 1px solid #eeeeee;

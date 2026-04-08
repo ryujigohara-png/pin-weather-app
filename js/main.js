@@ -19,8 +19,20 @@ let viewConfig = { ...defaultViewConfig, ...savedConfig };
 
 // ★重要：ここで先に i18n を定義する！！
 const i18n = {
-    _currentLang: 'ja',
-    setLang(lang) { this._currentLang = lang; },
+    _currentLang: viewConfig.language || 'ja',
+    setLang(lang) {
+        this._currentLang = lang;
+        // 設定を保存
+        viewConfig.language = lang;
+        localStorage.setItem('pin_weather_view_config', JSON.stringify(viewConfig));
+        
+        // UIの即時更新とセレクトボックス同期
+        if (typeof updateStaticUI === 'function') updateStaticUI();
+        updateLanguageSelect();
+        
+        // 言語切り替え時はリロードして整合性を確保
+        location.reload();
+    },
     dict: {
         'ja': {
             // --- グラフ・ツールチップ用 ---
@@ -33,10 +45,13 @@ const i18n = {
             seawater: "海水温",
             wave: "波高",
             tide: "潮位",
-            nowTime: "現在時刻",
-            fetchTime: "データ取得",
+            nowTime: "現在時刻(端末)",
+            fetchTime: "データ取得(端末)",
 
             // --- サイドバー・基本UI ---
+            btnPwaInstall: "📲 アプリをインストール",
+            iosInstallTitle: "iPhoneをご利用の方へ",
+            iosInstallGuide: "Safariの「共有ボタン（□に↑）」を押し、「ホーム画面に追加」を選択してください。",
             btnWindConfig: "🎐 風向色付設定",
             btnDetailSettings: "⚙ 表示詳細設定",
             btnResetAll: "♻️ 全リセット",
@@ -51,7 +66,7 @@ const i18n = {
             btnSearch: "検索",
             btnSaveSpot: "MySpotsに登録",
             btnTempView: "グラフ表示",
-            btnClose: "キャンセル", // 共通の「閉じる/キャンセル」
+            btnClose: "キャンセル", 
             limitReached: "10箇所までしか登録できません。これ以上追加する場合は、既存の地点を長押しまたは右クリックして削除してください。",
             mapStatusFetching: "地点情報を取得中...",
             mapStatusFail: "地点名取得失敗",
@@ -113,10 +128,13 @@ const i18n = {
             seawater: "Sea Temp",
             wave: "Wave",
             tide: "Tide",
-            nowTime: "Current",
-            fetchTime: "Fetched",
+            nowTime: "Current(Device)",
+            fetchTime: "Fetched(Device)",
 
             // --- Sidebar & Base UI ---
+            btnPwaInstall: "📲 Install App",
+            iosInstallTitle: "For iPhone Users",
+            iosInstallGuide: "Tap the 'Share button' in Safari and select 'Add to Home Screen'.",
             btnWindConfig: "🎐 Wind Color Settings",
             btnDetailSettings: "⚙ Display Settings",
             btnResetAll: "♻️ Reset All Spots",
@@ -188,8 +206,25 @@ const i18n = {
     }
 };
 
-// 3. 言語設定を即時適用
-i18n.setLang(viewConfig.language || 'ja');
+/**
+ * 言語設定の初期表示を現在の言語に合わせる処理
+ */
+function updateLanguageSelect() {
+    const langSelect = document.getElementById('sidebar-language-select');
+    if (langSelect) {
+        langSelect.value = i18n._currentLang; 
+    }
+}
+
+/**
+ * UIの静的テキストを現在の言語で一斉更新する関数
+ */
+function updateStaticUI() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        el.innerHTML = i18n.t(key);
+    });
+}
 
 // ==========================================
 // 4. 風向マスターと言語互換ロジック
@@ -221,9 +256,11 @@ const CACHE_DURATION = 4 * 60 * 60 * 1000;
 
 window.addEventListener('DOMContentLoaded', () => {
     updateStaticUI();
+    updateLanguageSelect();
     const langSelect = document.getElementById('config-language');
     if (langSelect) { langSelect.value = i18n._currentLang; }
 });
+
 const defaultSpots = [
     {lat: 31.337, lon: 130.795, label: "高須沖(鹿児島県)"},
     {lat: 35.30, lon: 139.48, label: "江の島沖(神奈川県)"}
@@ -1896,6 +1933,68 @@ document.addEventListener('visibilitychange', () => {
     }
 });
 
+// ==========================================
+// PWAインストール制御サブルーチン
+// ==========================================
+let deferredPrompt;
+
+// iOSおよびスタンドアロン起動の判定
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+/**
+ * インストール誘導の初期化
+ */
+function initPwaInstall() {
+    const installContainer = document.getElementById('pwa-install-container');
+    const installBtn = document.getElementById('btn-pwa-install');
+    if (!installContainer || !installBtn) return;
+
+    // すでにアプリとして起動しているなら、何も表示しない
+    if (isStandalone) {
+        installContainer.style.display = 'none';
+        return;
+    }
+
+    // A. Android / PC (Chromeなど) の場合
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        installContainer.style.display = 'block';
+    });
+
+    // B. iOS (Safari) の場合
+    if (isIOS) {
+        // iOSはブラウザイベントが取れないため、最初からガイドボタンとして表示
+        installContainer.style.display = 'block';
+    }
+
+    // ボタンクリック時の挙動をデバイス別に分岐
+    installBtn.onclick = async () => {
+        if (isIOS) {
+            // iOS用のガイドを表示（辞書から取得）
+            alert(`${i18n.t('iosInstallTitle')}\n\n${i18n.t('iosInstallGuide')}`);
+        } else if (deferredPrompt) {
+            // Android/PC用のインストールダイアログ
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                installContainer.style.display = 'none';
+            }
+            deferredPrompt = null;
+        }
+    };
+}
+
+// インストール完了時の自動非表示
+window.addEventListener('appinstalled', () => {
+    const installContainer = document.getElementById('pwa-install-container');
+    if (installContainer) installContainer.style.display = 'none';
+    deferredPrompt = null;
+});
+
+// DOM構築後に実行
+window.addEventListener('DOMContentLoaded', initPwaInstall);
 
 
 initApp();
