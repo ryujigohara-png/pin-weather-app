@@ -43,7 +43,23 @@
         <span style="color: #007bff; font-size: 18px;">⛵ Pin_Weather Pro</span>
         <span class="close-sidebar" onclick="toggleSidebar()" style="cursor: pointer; font-size: 24px; padding: 0 5px;">&times;</span>
     </div>
-    
+
+    <div id="pwa-install-container" style="display: none; padding: 0 5px 15px 5px;">
+        <button id="btn-pwa-install" class="btn" data-i18n="btnPwaInstall" 
+                style="background: #007bff; color: white; width: 100%; padding: 10px; border-radius: 4px; border: none; font-size: 14px; cursor: pointer;">
+            📲 アプリをインストール
+        </button>
+    </div>
+
+    <div class="sidebar-item" style="padding: 0 5px 15px 5px;">
+        <select id="sidebar-language-select" 
+                style="width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #ddd; background: #fff; font-size: 14px; cursor: pointer;"
+                onchange="i18n.setLang(this.value)">
+            <option value="ja">🇯🇵 日本語 (Japanese)</option>
+            <option value="en">🇺🇸 English</option>
+        </select>
+    </div>
+   
     <button class="btn btn-wind-config" id="wind-cfg-btn" data-i18n="btnWindConfig">🎐 風向色付設定</button>
     <button class="btn btn-detailSettings" id="openSettingsBtn" data-i18n="btnDetailSettings">⚙ 表示詳細設定</button>
     <button class="btn btn-reset" id="reset-all-btn" data-i18n="btnResetAll">♻️ 全リセット</button>
@@ -130,16 +146,6 @@
         </div>
         
         <div class="view-settings-body">
-            <div class="config-group">
-                <div class="config-label-area">
-                    <span class="config-title" data-i18n="configLangTitle">Language / 表示言語</span>
-                </div>
-                <select id="config-language" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
-                    <option value="ja">日本語</option>
-                    <option value="en">English</option>
-                </select>
-            </div>
-
             <div class="config-group">
                 <div class="config-label-area">
                     <span class="config-title" data-i18n="cfgHourWidth">1時間の幅 (hScale)</span>
