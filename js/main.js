@@ -3,7 +3,7 @@ let allData = {};
 
 // 2. 詳細設定の初期値
 const defaultViewConfig = {
-    forecastDays: 9,     // 予報日数（最大16日）
+    forecastDays: 14,     // 予報日数（最大16日）
     hourWidth: 20,      // 旧 hScale
     windHeight: 180,    // 風速グラフ高さ
     subHeight: 100,     // 気温・海象グラフ高さ
@@ -1462,17 +1462,24 @@ async function fetchWithCache(lat, lon) {
     const cached = localStorage.getItem(cacheKey);
     const now = Date.now();
 
+    // 予報日数を設定から取得（未定義ならデフォルト9日）
+    const fDays = viewConfig.forecastDays || 9;
+
     const navEntries = performance.getEntriesByType('navigation');
     const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
 
     if (cached) {
         try {
             const parsed = JSON.parse(cached);
-            // 期限内かつリロードでなければキャッシュを返す
-            if (!isReload && (now - parsed.timestamp < CACHE_DURATION)) {
+            
+            // 【重要】期限内かつリロードでなく、かつキャッシュされているデータの日数が現在の設定と同じであればキャッシュを返す
+            // ※日数が変更された場合は、強制的に再取得させる必要があるため
+            if (!isReload && 
+                (now - parsed.timestamp < CACHE_DURATION) && 
+                (parsed.data && parsed.data.time && parsed.data.time.length === fDays * 24)) {
                 return { timestamp: parsed.timestamp, data: parsed.data };
             } else {
-                // 【修正】期限切れ、またはリロードなら、この地点のキャッシュを確実に消去
+                // 期限切れ、リロード、または設定日数変更ならキャッシュを消去
                 localStorage.removeItem(cacheKey);
             }
         } catch (e) {
@@ -1480,9 +1487,9 @@ async function fetchWithCache(lat, lon) {
         }
     }
 
-    // API取得
-    const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&forecast_days=9&wind_speed_unit=ms`;
-    const mUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto&forecast_days=9&cell_selection=sea`;
+    // API取得（forecast_days を動的に設定）
+    const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&forecast_days=${fDays}&wind_speed_unit=ms`;
+    const mUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto&forecast_days=${fDays}&cell_selection=sea`;
 
     try {
         const [wRes, mRes] = await Promise.all([
@@ -1493,7 +1500,7 @@ async function fetchWithCache(lat, lon) {
         const mergedData = { ...wRes.hourly, ...mRes.hourly };
         const cacheData = { timestamp: now, data: mergedData };
 
-        // 最新データを保存（古いものは上記 removeItem または setItem の上書きで消える）
+        // 最新データを保存
         localStorage.setItem(cacheKey, JSON.stringify(cacheData));
         return cacheData;
 
@@ -1510,7 +1517,6 @@ async function fetchWithCache(lat, lon) {
         throw error;
     }
 }
-
 
 /**
  * 外部気象サービスを現在の座標で開く
@@ -1587,6 +1593,9 @@ async function draw() {
         const svgW = document.getElementById('svg-weather');
         if (!svgW) return;
 
+        // ★追加：データの総時間数を取得（動的判定）
+        const totalDataCount = allData.data.time.length;
+
         // 風向アイコンを西(左)に向け、文字と1行に収まるように調整
         const baseWindIcon = `<svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle; margin-right:2px; display:inline-block;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(-90)"/></svg>`;
 
@@ -1610,7 +1619,6 @@ async function draw() {
             const hasMarineData = waveData.some(v => v !== 0 && v !== null) || tideData.some(v => v !== 0 && v !== null);
 
             if (!hasMarineData) {
-                // 指示通り、タイトルの下に「No Marine Data」を赤文字で追加
                 marineTitle += `<br><span style="color:#FF0000; font-weight:bold; font-size:14px; display:block; margin-top:2px;">No Marine Data</span>`;
             }
             titles[3].innerHTML = marineTitle;
@@ -1620,7 +1628,9 @@ async function draw() {
         const now = new Date();
         const fullIdx = allData.data.time.findIndex(t => new Date(t) > now) - 1;
         const startIdx = Math.max(0, fullIdx - 4);
-        const displayCount = 216 - startIdx;
+        
+        // ★修正：固定値 216 を totalDataCount に置き換え
+        const displayCount = totalDataCount - startIdx;
 
         // --- 設定値の取得 ---
         const hScale = viewConfig.hourWidth; 
@@ -1656,7 +1666,8 @@ async function draw() {
             wHtml += `<line x1="0" y1="${gy}" x2="${totalW}" y2="${gy}" class="grid-y-sub" />`;
         }
 
-        for(let i = startIdx; i < 216; i++) {
+        // ★修正：i < 216 を totalDataCount に変更
+        for(let i = startIdx; i < totalDataCount; i++) {
             const x = (i - startIdx) * hScale; 
             const icon = weatherIcons[allData.data.weather_code[i]] || "❓";
             wHtml += `<text x="${x}" y="32" font-size="28" text-anchor="middle">${icon}</text>`; 
@@ -1670,10 +1681,10 @@ async function draw() {
         }
         svgW.innerHTML = wHtml;
 
-        // --- 各グラフセクションの描画実行 ---
-        renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], viewConfig.windHeight, 5.0, true, false, true, startIdx, hScale, totalW, labelFS, iScale);
-        renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, false, false, startIdx, hScale, totalW, labelFS, iScale);
-        renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], viewConfig.subHeight, 0.5, false, true, false, startIdx, hScale, totalW, labelFS, iScale);
+        // --- 各グラフセクションの描画実行（totalDataCountを引数に追加） ---
+        renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], viewConfig.windHeight, 5.0, true, false, true, startIdx, hScale, totalW, labelFS, iScale, totalDataCount);
+        renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, false, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount);
+        renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], viewConfig.subHeight, 0.5, false, true, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount);
 
         resetGraphScroll();
         initScrollEvent(hScale);
@@ -1689,14 +1700,19 @@ async function draw() {
 
 /**
  * サブルーチン：グラフセクション個別描画
+ * @param {number} totalDataCount データの総時間数
  */
-function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLast, isFirst, startIdx, hScale, totalW, labelFS, iScale) {
+function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLast, isFirst, startIdx, hScale, totalW, labelFS, iScale, totalDataCount) {
     const svg = document.getElementById(svgId);
     const dateCont = document.getElementById(dateContId);
     const dateTop = document.getElementById('date-top');
     const valCont = document.getElementById(`val-${svgId}`);
 
     if (!svg || !dateCont) return;
+    
+    // SVGの属性としての幅を明示的に更新（自動拡張を保証）
+    svg.setAttribute('width', totalW);
+    
     dateCont.innerHTML = "";
     if (isFirst && dateTop) dateTop.innerHTML = "";
     
@@ -1719,8 +1735,8 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
         html += `<line x1="0" y1="${yPosSvg}" x2="${totalW}" y2="${yPosSvg}" class="grid-y-sub" />`;
     }
 
-    const weekDays = ["日", "月", "火", "水", "木", "金", "土"];
-    for (let i = startIdx; i < 216; i++) {
+    // ★修正：i < 216 を totalDataCount に変更
+    for (let i = startIdx; i < totalDataCount; i++) {
         const x = (i - startIdx) * hScale;
         const d = new Date(allData.data.time[i]);
         
@@ -1749,7 +1765,6 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
 
             if (isLast) {
                 dateDiv.innerHTML = labelContent;
-                // --- [追加] 午前0時（または開始地点）でも「0」を表示する ---
                 html += `<text x="${x}" y="${plotHeight + 15}" class="label-time" font-size="${labelFS}" text-anchor="middle">${d.getHours()}</text>`;
             }
             dateCont.appendChild(dateDiv);
@@ -1765,14 +1780,18 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
     const startTime = new Date(allData.data.time[startIdx]).getTime();
     const nowTime = new Date().getTime();
     const diffHoursNow = (nowTime - startTime) / (1000 * 60 * 60); 
-    if (diffHoursNow >= 0 && diffHoursNow < (216 - startIdx)) {
+    
+    // ★修正：216 を totalDataCount に変更
+    if (diffHoursNow >= 0 && diffHoursNow < (totalDataCount - startIdx)) {
         const nowX = diffHoursNow * hScale;
         html += `<line x1="${nowX}" y1="0" x2="${nowX}" y2="${plotHeight}" stroke="#0000FF" stroke-width="2.5" stroke-dasharray="4 3" />`;
     }
     if (allData.timestamp) {
         const fetchedTime = new Date(allData.timestamp).getTime();
         const diffHoursFetch = (fetchedTime - startTime) / (1000 * 60 * 60); 
-        if (diffHoursFetch >= 0 && diffHoursFetch < (216 - startIdx)) {
+        
+        // ★修正：216 を totalDataCount に変更
+        if (diffHoursFetch >= 0 && diffHoursFetch < (totalDataCount - startIdx)) {
             const fetchX = diffHoursFetch * hScale;
             html += `<line x1="${fetchX}" y1="0" x2="${fetchX}" y2="${plotHeight}" stroke="#228b22" stroke-width="2.5" stroke-dasharray="3 2" />`;
         }
@@ -1780,7 +1799,8 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
 
     datasets.forEach(ds => {
         if (ds.type === 'bar') {
-            for(let i = startIdx; i < 216; i++){
+            // ★修正：216 を totalDataCount に変更
+            for(let i = startIdx; i < totalDataCount; i++){
                 const val = ds.data[i] || 0;
                 const h = ((val - min) / range) * plotHeight;
                 const x = (i - startIdx) * hScale;
@@ -1802,7 +1822,8 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
             }
         } else {
             let pts = "";
-            for(let i = startIdx; i < 216; i++){
+            // ★修正：216 を totalDataCount に変更
+            for(let i = startIdx; i < totalDataCount; i++){
                 const v = ds.data[i] || 0;
                 const x = (i - startIdx) * hScale;
                 const y = plotHeight - (((v - min) / range) * plotHeight);
