@@ -474,9 +474,6 @@ async function saveViewSettings() {
     viewConfig.iconScale = parseFloat(document.getElementById('input-iconScale').value);
     viewConfig.tooltipDuration = parseInt(document.getElementById('input-tooltipDuration').value);
 
-    // 言語設定を取得
-    viewConfig.language = document.getElementById('config-language').value;
-
     // 2. 【重要】地点データが空（操作不能リスク）の状態かチェック
     const savedSpots = localStorage.getItem('pin_weather_spots');
     let hasSpots = false;
