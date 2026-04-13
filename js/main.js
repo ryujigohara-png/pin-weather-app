@@ -3,6 +3,7 @@ let allData = {};
 
 // 2. 詳細設定の初期値
 const defaultViewConfig = {
+    forecastDays: 9,     // 予報日数（最大16日）
     hourWidth: 20,      // 旧 hScale
     windHeight: 180,    // 風速グラフ高さ
     subHeight: 100,     // 気温・海象グラフ高さ
@@ -84,6 +85,7 @@ const i18n = {
             // --- 表示詳細設定モーダル ---
             settingsTitle: "グラフ表示詳細設定",
             configLangTitle: "Language / 表示言語",
+            cfgForecastDays: "予報日数 (最大16日)",
             cfgHourWidth: "1時間の幅 (hScale)",
             cfgWindHeight: "風速グラフの高さ",
             cfgSubHeight: "気温・海象グラフの高さ",
@@ -167,6 +169,7 @@ const i18n = {
             // --- Detail Settings Modal ---
             settingsTitle: "Detailed Display Settings",
             configLangTitle: "Language",
+            cfgForecastDays: "Forecast Days (Max 16)",
             cfgHourWidth: "Hour Width (hScale)",
             cfgWindHeight: "Wind Graph Height",
             cfgSubHeight: "Sub Graph Height",
@@ -414,7 +417,7 @@ function initViewSettings() {
         });
     }
 
-    // 【追加】 4. リセットボタンのイベント紐付け
+    // 4. リセットボタンのイベント紐付け
     if (resetBtn) {
         resetBtn.addEventListener('click', () => {
             resetViewSettings();
@@ -422,16 +425,23 @@ function initViewSettings() {
     }
 
     // 5. スライダーを動かした時の数値リアルタイム表示
-    const configIds = ['hourWidth', 'windHeight', 'subHeight', 'margin', 'fontSize', 'iconScale', 'tooltipDuration'];
+    // forecastDays を配列に追加
+    const configIds = ['hourWidth', 'windHeight', 'subHeight', 'margin', 'fontSize', 'iconScale', 'tooltipDuration', 'forecastDays'];
     configIds.forEach(id => {
         const input = document.getElementById(`input-${id}`);
         if (input) {
             input.oninput = () => {
                 const valSpan = document.getElementById(`val-${id}`);
                 if (valSpan) {
-                    valSpan.textContent = (id === 'iconScale') ? input.value : input.value + "px";
-                    if (id === 'tooltipDuration') {
+                    // 単位の判定ロジックを整理
+                    if (id === 'iconScale') {
+                        valSpan.textContent = input.value;
+                    } else if (id === 'tooltipDuration') {
                         valSpan.textContent = input.value + "s";
+                    } else if (id === 'forecastDays') {
+                        valSpan.textContent = input.value + "日";
+                    } else {
+                        valSpan.textContent = input.value + "px";
                     }
                 }
             };
@@ -443,22 +453,31 @@ function initViewSettings() {
  * 内部サブルーチン：現在の viewConfig の値をスライダーとラベルに反映させる
  */
 function syncSliderValues() {
-    const configIds = ['hourWidth', 'windHeight', 'subHeight', 'margin', 'fontSize', 'iconScale', 'tooltipDuration'];
+    // forecastDays を配列に追加
+    const configIds = ['hourWidth', 'windHeight', 'subHeight', 'margin', 'fontSize', 'iconScale', 'tooltipDuration', 'forecastDays'];
     configIds.forEach(id => {
-        const val = viewConfig[id === 'margin' ? 'graphMargin' : id]; // 念のため名称不一致を吸収
+        // 名称不一致（margin -> graphMargin）と、初期値がない場合の予報日数(9)を考慮
+        let val = viewConfig[id === 'margin' ? 'graphMargin' : id];
+        if (id === 'forecastDays' && val === undefined) val = 9;
+
         const input = document.getElementById(`input-${id}`);
         const valSpan = document.getElementById(`val-${id}`);
         
         if (input) input.value = val;
         if (valSpan) {
-            valSpan.textContent = (id === 'iconScale') ? val : val + "px";
-            if (id === 'tooltipDuration') {
+            // 単位の表示反映
+            if (id === 'iconScale') {
+                valSpan.textContent = val;
+            } else if (id === 'tooltipDuration') {
                 valSpan.textContent = val + "s";
-            }   
+            } else if (id === 'forecastDays') {
+                valSpan.textContent = val + "日";
+            } else {
+                valSpan.textContent = val + "px";
+            }
         }
     });
 }
-
 
 /**
  * サブルーチン：設定の保存と適用
@@ -466,6 +485,7 @@ function syncSliderValues() {
  */
 async function saveViewSettings() {
     // 1. UIから値を取得して viewConfig を更新
+    viewConfig.forecastDays = parseInt(document.getElementById('input-forecastDays').value);
     viewConfig.hourWidth = parseInt(document.getElementById('input-hourWidth').value);
     viewConfig.windHeight = parseInt(document.getElementById('input-windHeight').value);
     viewConfig.subHeight = parseInt(document.getElementById('input-subHeight').value);
