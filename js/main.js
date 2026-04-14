@@ -3,7 +3,7 @@ let allData = {};
 
 // 2. 詳細設定の初期値
 const defaultViewConfig = {
-    forecastDays: 14,     // 予報日数（最大16日）
+    forecastDays: 16,     // 予報日数（最大16日）
     hourWidth: 20,      // 旧 hScale
     windHeight: 180,    // 風速グラフ高さ
     subHeight: 100,     // 気温・海象グラフ高さ
@@ -1593,7 +1593,7 @@ async function draw() {
         const svgW = document.getElementById('svg-weather');
         if (!svgW) return;
 
-        // ★追加：データの総時間数を取得（動的判定）
+        // ★データの総時間数を取得（動的判定）
         const totalDataCount = allData.data.time.length;
 
         // 風向アイコンを西(左)に向け、文字と1行に収まるように調整
@@ -1616,7 +1616,7 @@ async function draw() {
             
             const waveData = allData.data.wave_height ? allData.data.wave_height.slice(startIdx) : [];
             const tideData = allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl.slice(startIdx) : [];
-            const hasMarineData = waveData.some(v => v !== 0 && v !== null) || tideData.some(v => v !== 0 && v !== null);
+            const hasMarineData = waveData.some(v => v !== 0 && v !== null);
 
             if (!hasMarineData) {
                 marineTitle += `<br><span style="color:#FF0000; font-weight:bold; font-size:14px; display:block; margin-top:2px;">No Marine Data</span>`;
@@ -1629,7 +1629,6 @@ async function draw() {
         const fullIdx = allData.data.time.findIndex(t => new Date(t) > now) - 1;
         const startIdx = Math.max(0, fullIdx - 4);
         
-        // ★修正：固定値 216 を totalDataCount に置き換え
         const displayCount = totalDataCount - startIdx;
 
         // --- 設定値の取得 ---
@@ -1666,14 +1665,13 @@ async function draw() {
             wHtml += `<line x1="0" y1="${gy}" x2="${totalW}" y2="${gy}" class="grid-y-sub" />`;
         }
 
-        // ★修正：i < 216 を totalDataCount に変更
         for(let i = startIdx; i < totalDataCount; i++) {
             const x = (i - startIdx) * hScale; 
             const icon = weatherIcons[allData.data.weather_code[i]] || "❓";
             wHtml += `<text x="${x}" y="32" font-size="28" text-anchor="middle">${icon}</text>`; 
             
             const p = allData.data.precipitation ? allData.data.precipitation[i] : 0;
-            if (p > 0) {
+            if (p !== null && p > 0) {
                 const barH = (p / pRange) * pPlotH;
                 wHtml += `<rect x="${x - (hScale*0.3)}" y="${pBaseY - barH}" width="${hScale*0.6}" height="${barH}" fill="#0059ff" opacity="0.7" />`;
                 wHtml += `<text x="${x}" y="${pBaseY - barH - 2}" font-size="${labelFS - 2}" font-weight="bold" fill="#0000FF" text-anchor="middle">${p.toFixed(1)}</text>`;
@@ -1681,7 +1679,7 @@ async function draw() {
         }
         svgW.innerHTML = wHtml;
 
-        // --- 各グラフセクションの描画実行（totalDataCountを引数に追加） ---
+        // --- 各グラフセクションの描画実行 ---
         renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], viewConfig.windHeight, 5.0, true, false, true, startIdx, hScale, totalW, labelFS, iScale, totalDataCount);
         renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, false, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount);
         renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], viewConfig.subHeight, 0.5, false, true, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount);
@@ -1700,7 +1698,6 @@ async function draw() {
 
 /**
  * サブルーチン：グラフセクション個別描画
- * @param {number} totalDataCount データの総時間数
  */
 function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLast, isFirst, startIdx, hScale, totalW, labelFS, iScale, totalDataCount) {
     const svg = document.getElementById(svgId);
@@ -1710,13 +1707,11 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
 
     if (!svg || !dateCont) return;
     
-    // SVGの属性としての幅を明示的に更新（自動拡張を保証）
     svg.setAttribute('width', totalW);
-    
     dateCont.innerHTML = "";
     if (isFirst && dateTop) dateTop.innerHTML = "";
     
-    const allVals = datasets.flatMap(ds => ds.data ? ds.data.slice(startIdx) : []);
+    const allVals = datasets.flatMap(ds => ds.data ? ds.data.slice(startIdx).filter(v => v !== null) : []);
     if (allVals.length === 0) return;
     
     let max = Math.ceil(Math.max(...allVals) / stepY) * stepY;
@@ -1735,17 +1730,14 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
         html += `<line x1="0" y1="${yPosSvg}" x2="${totalW}" y2="${yPosSvg}" class="grid-y-sub" />`;
     }
 
-    // ★修正：i < 216 を totalDataCount に変更
     for (let i = startIdx; i < totalDataCount; i++) {
         const x = (i - startIdx) * hScale;
         const d = new Date(allData.data.time[i]);
         
         if (i % 24 === 0 || i === startIdx) {
             html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight}" class="grid-day" />`;
-            
             const dayIdx = d.getDay();
             let dayColor = (dayIdx === 0) ? "#FF0000" : (dayIdx === 6 ? "#0000FF" : "#000000");
-            
             const localizedDateStr = getLocalizedDate(d);
             const labelContent = `<span style="color:${dayColor}; font-size:${labelFS * 1.5}px;" class="notranslate">${localizedDateStr}</span>`;
 
@@ -1776,12 +1768,9 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
         }
     }
 
-    // 縦線描画（現在時刻・データ取得時刻）
     const startTime = new Date(allData.data.time[startIdx]).getTime();
     const nowTime = new Date().getTime();
     const diffHoursNow = (nowTime - startTime) / (1000 * 60 * 60); 
-    
-    // ★修正：216 を totalDataCount に変更
     if (diffHoursNow >= 0 && diffHoursNow < (totalDataCount - startIdx)) {
         const nowX = diffHoursNow * hScale;
         html += `<line x1="${nowX}" y1="0" x2="${nowX}" y2="${plotHeight}" stroke="#0000FF" stroke-width="2.5" stroke-dasharray="4 3" />`;
@@ -1789,8 +1778,6 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
     if (allData.timestamp) {
         const fetchedTime = new Date(allData.timestamp).getTime();
         const diffHoursFetch = (fetchedTime - startTime) / (1000 * 60 * 60); 
-        
-        // ★修正：216 を totalDataCount に変更
         if (diffHoursFetch >= 0 && diffHoursFetch < (totalDataCount - startIdx)) {
             const fetchX = diffHoursFetch * hScale;
             html += `<line x1="${fetchX}" y1="0" x2="${fetchX}" y2="${plotHeight}" stroke="#228b22" stroke-width="2.5" stroke-dasharray="3 2" />`;
@@ -1798,10 +1785,12 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
     }
 
     datasets.forEach(ds => {
+        if (!ds.data) return;
         if (ds.type === 'bar') {
-            // ★修正：216 を totalDataCount に変更
             for(let i = startIdx; i < totalDataCount; i++){
-                const val = ds.data[i] || 0;
+                const val = ds.data[i];
+                if (val === null || typeof val === 'undefined') break; // ★データが切れたら終了
+
                 const h = ((val - min) / range) * plotHeight;
                 const x = (i - startIdx) * hScale;
                 const deg = allData.data.wind_direction_10m[i];
@@ -1821,15 +1810,17 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                 }
             }
         } else {
-            let pts = "";
-            // ★修正：216 を totalDataCount に変更
+            let pts = [];
             for(let i = startIdx; i < totalDataCount; i++){
-                const v = ds.data[i] || 0;
+                const v = ds.data[i];
+                if (v === null || typeof v === 'undefined') break; // ★データが切れたら終了
                 const x = (i - startIdx) * hScale;
                 const y = plotHeight - (((v - min) / range) * plotHeight);
-                pts += `${x},${y} `;
+                pts.push(`${x},${y}`);
             }
-            html += `<polyline class="${ds.cls}" points="${pts.trim()}" />`;
+            if (pts.length > 0) {
+                html += `<polyline class="${ds.cls}" points="${pts.join(' ')}" />`;
+            }
         }
     });
     svg.innerHTML = html;
