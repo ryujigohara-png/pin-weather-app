@@ -1851,8 +1851,10 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
                 hideTooltipUI(); return;
             }
 
+            // ★ データの総数を取得して、215 という固定値を動的に変更
+            const maxIdx = allData.data.time.length - 1;
             let hourIdx = Math.round(graphX / hScale) + startIdx;
-            hourIdx = Math.min(Math.max(hourIdx, startIdx), 215);
+            hourIdx = Math.min(Math.max(hourIdx, startIdx), maxIdx);
 
             const d = new Date(allData.data.time[hourIdx]);
 
