@@ -1580,42 +1580,49 @@ let tooltipTimer = null;
  */
 async function draw() {
     try {
-        // --- 実行前の安全確認：座標が未定義なら即座に初期化へ ---
+        // --- 実行前の安全確認 ---
         if (typeof currentLat === 'undefined' || currentLat === null || typeof currentLon === 'undefined' || currentLon === null) {
-            console.warn("Location coordinates are undefined. Redirecting to initApp...");
-            if (typeof initApp === 'function') {
-                await initApp();
-            }
+            console.warn("Location coordinates are undefined.");
+            if (typeof initApp === 'function') await initApp();
             return;
         }
 
-        allData = await fetchWithCache(currentLat, currentLon);
+        // --- 描画前の初期化（古いグラフを消去） ---
         const svgW = document.getElementById('svg-weather');
-        if (!svgW) return;
+        const titles = document.querySelectorAll('.y-axis-title');
+        const dateTop = document.getElementById('date-top');
+        if (svgW) svgW.innerHTML = "";
+        if (dateTop) dateTop.innerHTML = "";
+        // 各セクションのSVGとラベルも空にする
+        ["svg-wind", "svg-temps", "svg-marine"].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = "";
+            const valEl = document.getElementById(`val-${id}`);
+            if (valEl) valEl.innerHTML = "";
+        });
+        ["date-wind", "date-temp", "date-marine"].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = "";
+        });
 
-        // ★データの総時間数を取得（動的判定）
+        allData = await fetchWithCache(currentLat, currentLon);
+        if (!svgW || !allData || !allData.data) return;
+
         const totalDataCount = allData.data.time.length;
-
-        // 風向アイコンを西(左)に向け、文字と1行に収まるように調整
         const baseWindIcon = `<svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle; margin-right:2px; display:inline-block;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(-90)"/></svg>`;
 
-        // --- Y軸ラベルのアイコン設置 ---
-        const titles = document.querySelectorAll('.y-axis-title');
+        // --- Y軸ラベルの更新 ---
         if (titles.length >= 4) {
             titles[0].innerHTML = i18n.t('yAxisWeather');
             titles[1].innerHTML = `${baseWindIcon}${i18n.t('yAxisWind')}`;
             titles[2].innerHTML = i18n.t('yAxisTemp');
             
-            // 翻訳ファイルの yAxisMarine ("波高(m)<br>潮位(m)")
             let marineTitle = i18n.t('yAxisMarine');
-
-            // --- 海上データなし判定とメッセージ追加 ---
             const now = new Date();
             const fullIdx = allData.data.time.findIndex(t => new Date(t) > now) - 1;
             const startIdx = Math.max(0, fullIdx - 4);
             
             const waveData = allData.data.wave_height ? allData.data.wave_height.slice(startIdx) : [];
-            const tideData = allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl.slice(startIdx) : [];
             const hasMarineData = waveData.some(v => v !== 0 && v !== null);
 
             if (!hasMarineData) {
@@ -1624,35 +1631,29 @@ async function draw() {
             titles[3].innerHTML = marineTitle;
         }
 
-        // --- 表示開始位置の計算（現在時刻の4時間前から） ---
         const now = new Date();
         const fullIdx = allData.data.time.findIndex(t => new Date(t) > now) - 1;
         const startIdx = Math.max(0, fullIdx - 4);
-        
         const displayCount = totalDataCount - startIdx;
 
-        // --- 設定値の取得 ---
         const hScale = viewConfig.hourWidth; 
         const labelFS = viewConfig.fontSize;
         const iScale = viewConfig.iconScale;
         const gMargin = viewConfig.graphMargin;
         const totalW = hScale * (displayCount - 1);
 
-        // --- 各セクションの幅を更新 ---
+        // --- セクション幅の更新 ---
         const secWind = document.querySelector('.section-wind');
         const secTemp = document.querySelector('.section-temp');
         const secMarine = document.querySelector('.section-marine');
         const sections = [document.querySelector('.section-weather'), secWind, secTemp, secMarine];
         
-        sections.forEach(sec => {
-            if(sec) sec.style.width = totalW + "px"; 
-        });
-
+        sections.forEach(sec => { if(sec) sec.style.width = totalW + "px"; });
         if (secWind) { secWind.style.height = viewConfig.windHeight + "px"; secWind.style.marginBottom = gMargin + "px"; }
         if (secTemp) { secTemp.style.height = viewConfig.subHeight + "px"; secTemp.style.marginBottom = gMargin + "px"; }
         if (secMarine) { secMarine.style.height = viewConfig.subHeight + "px"; }
         
-        // --- 天気アイコン・降水量棒グラフ描画 ---
+        // --- 天気・降水量描画 ---
         let wHtml = "";
         const pData = allData.data.precipitation ? allData.data.precipitation.slice(startIdx) : [];
         const pMax = Math.ceil(Math.max(...pData, 1.0) / 5) * 5; 
@@ -1669,7 +1670,6 @@ async function draw() {
             const x = (i - startIdx) * hScale; 
             const icon = weatherIcons[allData.data.weather_code[i]] || "❓";
             wHtml += `<text x="${x}" y="32" font-size="28" text-anchor="middle">${icon}</text>`; 
-            
             const p = allData.data.precipitation ? allData.data.precipitation[i] : 0;
             if (p !== null && p > 0) {
                 const barH = (p / pRange) * pPlotH;
@@ -1679,7 +1679,7 @@ async function draw() {
         }
         svgW.innerHTML = wHtml;
 
-        // --- 各グラフセクションの描画実行 ---
+        // --- 各セクション描画 ---
         renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], viewConfig.windHeight, 5.0, true, false, true, startIdx, hScale, totalW, labelFS, iScale, totalDataCount);
         renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, false, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount);
         renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], viewConfig.subHeight, 0.5, false, true, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount);
@@ -1690,9 +1690,7 @@ async function draw() {
         
     } catch (e) { 
         console.error("Critical Draw Error:", e);
-        if (typeof initApp === 'function') {
-            initApp();
-        }
+        if (typeof initApp === 'function') initApp();
     }
 }
 
@@ -1707,13 +1705,16 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
 
     if (!svg || !dateCont) return;
     
-    svg.setAttribute('width', totalW);
+    // ★ 描画前に必ずクリア
+    svg.innerHTML = "";
     dateCont.innerHTML = "";
     if (isFirst && dateTop) dateTop.innerHTML = "";
-    
+    if (valCont) valCont.innerHTML = "";
+
     const allVals = datasets.flatMap(ds => ds.data ? ds.data.slice(startIdx).filter(v => v !== null) : []);
-    if (allVals.length === 0) return;
+    if (allVals.length === 0) return; // データがない場合はクリアした状態で終了
     
+    svg.setAttribute('width', totalW);
     let max = Math.ceil(Math.max(...allVals) / stepY) * stepY;
     let min = Math.floor(Math.min(...allVals) / stepY) * stepY;
     if (isWind) min = 0;
@@ -1733,28 +1734,21 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
     for (let i = startIdx; i < totalDataCount; i++) {
         const x = (i - startIdx) * hScale;
         const d = new Date(allData.data.time[i]);
-        
         if (i % 24 === 0 || i === startIdx) {
             html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight}" class="grid-day" />`;
             const dayIdx = d.getDay();
             let dayColor = (dayIdx === 0) ? "#FF0000" : (dayIdx === 6 ? "#0000FF" : "#000000");
-            const localizedDateStr = getLocalizedDate(d);
-            const labelContent = `<span style="color:${dayColor}; font-size:${labelFS * 1.5}px;" class="notranslate">${localizedDateStr}</span>`;
-
+            const labelContent = `<span style="color:${dayColor}; font-size:${labelFS * 1.5}px;" class="notranslate">${getLocalizedDate(d)}</span>`;
             const dateDiv = document.createElement('div');
             dateDiv.className = 'sticky-date';
             dateDiv.style.left = `${x}px`;
-            dateDiv.dataset.x = x;
-
             if (isFirst && dateTop) {
                 const topDiv = document.createElement('div');
                 topDiv.className = 'sticky-date';
                 topDiv.style.left = `${x}px`;
-                topDiv.dataset.x = x;
                 topDiv.innerHTML = labelContent;
                 dateTop.appendChild(topDiv);
             }
-
             if (isLast) {
                 dateDiv.innerHTML = labelContent;
                 html += `<text x="${x}" y="${plotHeight + 15}" class="label-time" font-size="${labelFS}" text-anchor="middle">${d.getHours()}</text>`;
@@ -1762,26 +1756,16 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
             dateCont.appendChild(dateDiv);
         } else if (i % 3 === 0) {
             html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight}" class="grid-3h" />`;
-            if (isLast) {
-                html += `<text x="${x}" y="${plotHeight + 15}" class="label-time" font-size="${labelFS}" text-anchor="middle">${d.getHours()}</text>`;
-            }
+            if (isLast) html += `<text x="${x}" y="${plotHeight + 15}" class="label-time" font-size="${labelFS}" text-anchor="middle">${d.getHours()}</text>`;
         }
     }
 
+    // 現在時刻線など
     const startTime = new Date(allData.data.time[startIdx]).getTime();
     const nowTime = new Date().getTime();
     const diffHoursNow = (nowTime - startTime) / (1000 * 60 * 60); 
     if (diffHoursNow >= 0 && diffHoursNow < (totalDataCount - startIdx)) {
-        const nowX = diffHoursNow * hScale;
-        html += `<line x1="${nowX}" y1="0" x2="${nowX}" y2="${plotHeight}" stroke="#0000FF" stroke-width="2.5" stroke-dasharray="4 3" />`;
-    }
-    if (allData.timestamp) {
-        const fetchedTime = new Date(allData.timestamp).getTime();
-        const diffHoursFetch = (fetchedTime - startTime) / (1000 * 60 * 60); 
-        if (diffHoursFetch >= 0 && diffHoursFetch < (totalDataCount - startIdx)) {
-            const fetchX = diffHoursFetch * hScale;
-            html += `<line x1="${fetchX}" y1="0" x2="${fetchX}" y2="${plotHeight}" stroke="#228b22" stroke-width="2.5" stroke-dasharray="3 2" />`;
-        }
+        html += `<line x1="${diffHoursNow * hScale}" y1="0" x2="${diffHoursNow * hScale}" y2="${plotHeight}" stroke="#0000FF" stroke-width="2.5" stroke-dasharray="4 3" />`;
     }
 
     datasets.forEach(ds => {
@@ -1789,38 +1773,23 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
         if (ds.type === 'bar') {
             for(let i = startIdx; i < totalDataCount; i++){
                 const val = ds.data[i];
-                if (val === null || typeof val === 'undefined') break; // ★データが切れたら終了
-
+                if (val === null || typeof val === 'undefined') break;
                 const h = ((val - min) / range) * plotHeight;
                 const x = (i - startIdx) * hScale;
                 const deg = allData.data.wind_direction_10m[i];
                 const dirText = getWindDirText(deg);
-                let color;
-                if (targetWindDirections.includes(dirText)) {
-                    if (val >= 10.0) color = '#dc143c';
-                    else if (val >= 5.0) color = '#ffa500';
-                    else if (val >= 3.0) color = '#87CEEB';
-                    else color = '#ccc';
-                } else {
-                    color = (val >= 10.0 ? 'rgba(220, 20, 60, 0.4)' : '#ccc');
-                }
+                let color = targetWindDirections.includes(dirText) ? (val >= 10.0 ? '#dc143c' : val >= 5.0 ? '#ffa500' : val >= 3.0 ? '#87CEEB' : '#ccc') : (val >= 10.0 ? 'rgba(220, 20, 60, 0.4)' : '#ccc');
                 html += `<rect x="${x - (hScale*0.4)}" y="${plotHeight-h}" width="${hScale*0.8}" height="${h}" fill="${color}" />`;
-                if (isWind) {
-                    html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-25}) rotate(${(deg+180)%360}) scale(${1.6 * iScale})" class="wind-arrow" />`;
-                }
+                if (isWind) html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-25}) rotate(${(deg+180)%360}) scale(${1.6 * iScale})" class="wind-arrow" />`;
             }
         } else {
             let pts = [];
             for(let i = startIdx; i < totalDataCount; i++){
                 const v = ds.data[i];
-                if (v === null || typeof v === 'undefined') break; // ★データが切れたら終了
-                const x = (i - startIdx) * hScale;
-                const y = plotHeight - (((v - min) / range) * plotHeight);
-                pts.push(`${x},${y}`);
+                if (v === null || typeof v === 'undefined') break;
+                pts.push(`${(i - startIdx) * hScale},${plotHeight - (((v - min) / range) * plotHeight)}`);
             }
-            if (pts.length > 0) {
-                html += `<polyline class="${ds.cls}" points="${pts.join(' ')}" />`;
-            }
+            if (pts.length > 0) html += `<polyline class="${ds.cls}" points="${pts.join(' ')}" />`;
         }
     });
     svg.innerHTML = html;
@@ -1842,13 +1811,11 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
                 hideTooltipUI(); return;
             }
 
-            // ★ データの総数を取得して、215 という固定値を動的に変更
             const maxIdx = allData.data.time.length - 1;
             let hourIdx = Math.round(graphX / hScale) + startIdx;
             hourIdx = Math.min(Math.max(hourIdx, startIdx), maxIdx);
 
             const d = new Date(allData.data.time[hourIdx]);
-
             const snapX = (hourIdx - startIdx) * hScale + 100;
             guide.style.left = snapX + "px"; 
             guide.style.display = "block";
@@ -1856,15 +1823,26 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
             
             if (tooltipTimer) clearTimeout(tooltipTimer);
 
-            // 先に X 座標を決定
-            const tooltipWidth = 180;
-            let tx = (e.clientX > window.innerWidth / 2) ? e.clientX - tooltipWidth - 10 : e.clientX + 10;
+            const tooltipWidth = 220;
+            let tx = (e.clientX > window.innerWidth / 2) ? e.clientX - tooltipWidth - 20 : e.clientX + 20;
             tooltip.style.left = tx + "px";
 
-            // --- データの準備 ---
+            // --- データの準備と undefined 対策 ---
             const localizedDateStr = getLocalizedDate(d);
             const deg = allData.data.wind_direction_10m[hourIdx];
             const wIcon = weatherIcons[allData.data.weather_code[hourIdx]] || "❓";
+
+            // 各値の存在チェックとフォーマット
+            const getVal = (val, unit, fixed = 1) => {
+                return (val !== null && typeof val !== 'undefined') ? val.toFixed(fixed) + unit : "---";
+            };
+
+            const precipVal = getVal(allData.data.precipitation ? allData.data.precipitation[hourIdx] : null, "mm");
+            const windVal = getVal(allData.data.wind_speed_10m ? allData.data.wind_speed_10m[hourIdx] : null, "m/s");
+            const tempVal = getVal(allData.data.temperature_2m ? allData.data.temperature_2m[hourIdx] : null, "℃");
+            const seaTempVal = getVal(allData.data.sea_surface_temperature ? allData.data.sea_surface_temperature[hourIdx] : null, "℃");
+            const waveVal = getVal(allData.data.wave_height ? allData.data.wave_height[hourIdx] : null, "m", 2);
+            const tideVal = getVal(allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl[hourIdx] : null, "m", 2);
 
             const n = new Date();
             const nDayStr = i18n.dict[i18n._currentLang].days[n.getDay()];
@@ -1877,24 +1855,24 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
                 ftStr = `${ft.getMonth()+1}/${ft.getDate()}(${ftDayStr}) ${ft.getHours()}:${ft.getMinutes().toString().padStart(2, '0')}`;
             }
 
-            // 【重要】位置計算の前に innerHTML をセットして、ツールチップの「実際の高さ」を確定させる
+            // --- HTMLの構築 ---
             tooltip.innerHTML = `
                 <span class="spot-name-tip">📍 ${currentLabel}</span>
+                <span class="coord-tip notranslate">${currentLat.toFixed(3)}, ${currentLon.toFixed(3)}</span>
                 <b class="notranslate">${localizedDateStr} ${d.getHours()}:00 ${wIcon}</b>
-                <div class="icon-box"><span class="legend-bar" style="background:#0000FF; margin-right:0;"></span></div>${i18n.t('precip')}: ${allData.data.precipitation ? allData.data.precipitation[hourIdx]?.toFixed(1) : "0.0"}mm<br>
-                <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${(deg+180)%360})"/></svg></div>${i18n._currentLang === 'ja' ? '風向' : 'Wind'}: ${getWindDirText(deg)} (${deg}°)<br>
-                <div class="icon-box">🚩</div>${i18n._currentLang === 'ja' ? '風速' : 'Speed'}: ${allData.data.wind_speed_10m[hourIdx]?.toFixed(1) || "0.0"}m/s<br>
-                <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>${i18n.t('temp')}: ${allData.data.temperature_2m[hourIdx]?.toFixed(1) || "0.0"}℃<br>
-                <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>${i18n.t('seawater')}: ${allData.data.sea_surface_temperature ? allData.data.sea_surface_temperature[hourIdx]?.toFixed(1) : "---"}℃<br>
-                <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>${i18n.t('wave')}: ${allData.data.wave_height ? allData.data.wave_height[hourIdx]?.toFixed(2) : "0.00"}m<br>
-                <div class="icon-box"><span class="legend-line" style="background:#1e90ff; margin-right:0;"></span></div>${i18n.t('tide')}: ${allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl[hourIdx]?.toFixed(2) : "0.00"}m
-                <div style="margin-top:6px; border-top:1px solid #444; padding-top:4px; font-size:10px; color:#ccc; line-height:1.4;" class="notranslate">
+                <div class="icon-box"><span class="legend-bar" style="background:#0000FF; margin-right:0;"></span></div>${i18n.t('precip')}: ${precipVal}<br>
+                <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${(deg+180)%360})"/></svg></div>${i18n._currentLang === 'ja' ? '風向' : 'Wind'}: ${deg !== null ? getWindDirText(deg) + ' (' + deg + '°)' : '---'}<br>
+                <div class="icon-box">🚩</div>${i18n._currentLang === 'ja' ? '風速' : 'Speed'}: ${windVal}<br>
+                <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>${i18n.t('temp')}: ${tempVal}<br>
+                <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>${i18n.t('seawater')}: ${seaTempVal}<br>
+                <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>${i18n.t('wave')}: ${waveVal}<br>
+                <div class="icon-box"><span class="legend-line" style="background:#1e90ff; margin-right:0;"></span></div>${i18n.t('tide')}: ${tideVal}
+                <div style="margin-top:6px; border-top:1px solid #444; padding-top:4px; font-size:11px; color:#ccc; line-height:1.4;" class="notranslate">
                     <span style="display:inline-block; width:15px; border-top:4px dotted #0000FF; vertical-align:middle; margin-right:4px;"></span>${i18n.t('nowTime')} ${nStr}<br>
                     <span style="display:inline-block; width:15px; border-top:4px dotted #228b22; vertical-align:middle; margin-right:4px;"></span>${i18n.t('fetchTime')} ${ftStr}
                 </div>
             `;
-
-            // 【重要】中身が入った後に高さを取得し、Y 座標（ty）を計算して適用する
+            
             let ty = e.clientY + 20;
             const tooltipHeight = tooltip.offsetHeight; 
             if (ty + tooltipHeight > window.innerHeight) {

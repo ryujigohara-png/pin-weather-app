@@ -258,7 +258,6 @@ svg { width: 100%; display: block; overflow: visible; }
     right: 5px;
 }
 
-
 /* ツールチップ */
 .tooltip {
     position: fixed; background: rgba(0,0,0,0.85); color: white;
@@ -268,7 +267,27 @@ svg { width: 100%; display: block; overflow: visible; }
     white-space: nowrap;
 }
 .tooltip b { display: block; margin-bottom: 6px; font-size: 16px; border-bottom: 1px solid #666; padding-bottom: 2px; }
-.tooltip .spot-name-tip { color: #00d4ff; font-size: 16px; font-weight: bold; border-bottom: 1px dashed #666; margin-bottom: 4px; padding-bottom: 2px; display: block; }
+.tooltip .spot-name-tip { 
+    color: #00d4ff; 
+    font-size: 16px; 
+    font-weight: bold; 
+    /* 破線をここから削除 */
+    border-bottom: none; 
+    margin-bottom: 0px; 
+    padding-bottom: 0px; 
+    display: block; 
+}
+
+/* 緯度経度表示：ここに破線と余白を設定 */
+.tooltip .coord-tip {
+    display: block;
+    font-size: 14px;
+    color: #aaa;
+    border-bottom: 1px dashed #666; /* 破線を場所の下（緯度経度の下）に配置 */
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    line-height: 1.2;
+}
 
 .icon-box { display: inline-block; width: 24px; text-align: center; vertical-align: middle; margin-right: 4px; }
 .legend-bar { display: inline-block; width: 12px; height: 12px; vertical-align: middle; }
