@@ -1821,8 +1821,7 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
 
         const d = new Date(rawTime);
         
-        // ガイド線の位置計算：
-        // stage内での絶対座標(snapX)を計算。
+        // ガイド線の位置計算
         const snapX = (validIdx - sIdx) * hs + 100;
         
         guide.style.left = snapX + "px"; 
@@ -1877,16 +1876,25 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
         tooltip.style.transform = "none";
 
         if (isAutoScroll) {
-            // 見た目上の固定位置（y軸から3時間後）
+            // スクロール時のみ下端に固定
             tooltip.style.left = (100 + hs * 3) + "px";
-            tooltip.style.top = "180px"; 
+            tooltip.style.bottom = "20px"; 
+            tooltip.style.top = "auto";
         } else {
+            // 通常時（マウスオーバー・タップ時）
             const tooltipWidth = tooltip.offsetWidth || 220;
             let tx = (clientX > window.innerWidth / 2) ? clientX - tooltipWidth - 20 : clientX + 20;
             tooltip.style.left = tx + "px";
+            
             let ty = clientY + 20;
-            if (ty + tooltip.offsetHeight > window.innerHeight) ty = window.innerHeight - tooltip.offsetHeight - 10;
-            tooltip.style.top = ty + "px";
+            if (ty + tooltip.offsetHeight > window.innerHeight) {
+                // 画面外に出る場合は下基準に切り替え
+                tooltip.style.bottom = "10px";
+                tooltip.style.top = "auto";
+            } else {
+                tooltip.style.top = ty + "px";
+                tooltip.style.bottom = "auto";
+            }
         }
 
         const tooltipDur = viewConfig.tooltipDuration * 1000;    
@@ -1924,7 +1932,6 @@ function initScrollEvent(hScale, startIdx) {
             const hs = Number(hScale);
             const sIdx = Number(startIdx);
             
-            // 日付ラベル固定
             document.querySelectorAll('.sticky-date').forEach(el => {
                 const x = parseFloat(el.dataset.x);
                 const nextX = x + (24 * hs);
@@ -1932,8 +1939,6 @@ function initScrollEvent(hScale, startIdx) {
             });
 
             if (typeof window.updateTooltipFromScroll === 'function' && !isNaN(hs) && !isNaN(sIdx)) {
-                // スクロール量に基づいたインデックス計算
-                // 「見た目上のy軸(100px)から2時間分(hs*2)右」のデータを取り出す
                 const visualOffset = hs * 2; 
                 const targetX = sl + visualOffset; 
                 const hourIdx = (targetX / hs) + sIdx;
@@ -1941,7 +1946,6 @@ function initScrollEvent(hScale, startIdx) {
                 window.updateTooltipFromScroll(hourIdx, 0, 0, true, sl);
             }
         };
-        // 初期実行
         scrollRoot.dispatchEvent(new Event('scroll'));
     }
 }
@@ -1953,7 +1957,11 @@ function hideTooltipUI() {
     const guide = document.getElementById('hover-guide');
     const tooltip = document.getElementById('tooltip');
     if (guide) guide.style.display = "none";
-    if (tooltip) tooltip.style.display = "none";
+    if (tooltip) {
+        tooltip.style.display = "none";
+        tooltip.style.bottom = "auto";
+        tooltip.style.top = "auto";
+    }
     if (tooltipTimer) {
         clearTimeout(tooltipTimer);
         tooltipTimer = null;
