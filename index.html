@@ -156,6 +156,22 @@
 
             <div class="config-group">
                 <div class="config-label-area">
+                    <span class="config-title" data-i18n="cfgTooltipDuration">ツールチップ表示時間</span>
+                    <span id="val-tooltipDuration" class="config-value">3s</span>
+                </div>
+                <input type="range" id="input-tooltipDuration" class="config-slider" min="1" max="10" step="1" value="3">
+            </div>
+
+            <div class="config-group">
+                <div class="config-label-area">
+                    <span class="config-title" data-i18n="cfgIconScale">風向アイコン倍率</span>
+                    <span id="val-iconScale" class="config-value">0.8</span>
+                </div>
+                <input type="range" id="input-iconScale" class="config-slider" min="0.5" max="1.5" step="0.1" value="0.8">
+            </div>
+
+            <div class="config-group">
+                <div class="config-label-area">
                     <span class="config-title" data-i18n="cfgHourWidth">1時間の幅 (hScale)</span>
                     <span id="val-hourWidth" class="config-value">32px</span>
                 </div>
@@ -191,23 +207,7 @@
                     <span class="config-title" data-i18n="cfgFontSize">ラベル文字サイズ</span>
                     <span id="val-fontSize" class="config-value">12px</span>
                 </div>
-                <input type="range" id="input-fontSize" class="config-slider" min="8" max="24" step="1" value="12">
-            </div>
-
-            <div class="config-group">
-                <div class="config-label-area">
-                    <span class="config-title" data-i18n="cfgIconScale">風向アイコン倍率</span>
-                    <span id="val-iconScale" class="config-value">0.8</span>
-                </div>
-                <input type="range" id="input-iconScale" class="config-slider" min="0.5" max="1.5" step="0.1" value="0.8">
-            </div>
-
-            <div class="config-group">
-                <div class="config-label-area">
-                    <span class="config-title" data-i18n="cfgTooltipDuration">ツールチップ表示時間</span>
-                    <span id="val-tooltipDuration" class="config-value">3s</span>
-                </div>
-                <input type="range" id="input-tooltipDuration" class="config-slider" min="1" max="10" step="1" value="3">
+                <input type="range" id="input-fontSize" class="config-slider" min="8" max="16" step="1" value="12">
             </div>
 
         </div>
