@@ -617,7 +617,7 @@ function applyEnvVisuals() {
     } else {
         config = {
             titleSuffix: "",
-            headerColor: "#007bff", 
+            headerColor: "#00c8ff", 
             envName: "Main版"
         };
     }
