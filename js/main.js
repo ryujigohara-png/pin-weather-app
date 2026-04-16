@@ -1652,8 +1652,8 @@ async function draw() {
         const pData = allData.data.precipitation ? allData.data.precipitation.slice(startIdx) : [];
         const pMax = Math.ceil(Math.max(...pData, 1.0) / 5) * 5; 
         const pRange = pMax;
-        const pPlotH = 35; 
-        const pBaseY = 75; 
+        const pPlotH = 40; 
+        const pBaseY = 100; 
 
         for (let v = 0; v <= pMax; v += 5) {
             const gy = pBaseY - (v / pRange) * pPlotH;
@@ -1663,7 +1663,7 @@ async function draw() {
         for(let i = startIdx; i < totalDataCount; i++) {
             const x = (i - startIdx) * hScale; 
             const icon = weatherIcons[allData.data.weather_code[i]] || "❓";
-            wHtml += `<text x="${x}" y="32" font-size="28" text-anchor="middle">${icon}</text>`; 
+            wHtml += `<text x="${x}" y="52" font-size="28" text-anchor="middle">${icon}</text>`; 
             
             const p = allData.data.precipitation ? allData.data.precipitation[i] : 0;
             if (p > 0) {
@@ -1710,11 +1710,13 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
     const svg = document.getElementById(svgId);
     const dateCont = document.getElementById(dateContId);
     const dateTop = document.getElementById('date-top');
+    const timeTop = document.getElementById('time-top'); // 新設コンテナの取得
     const valCont = document.getElementById(`val-${svgId}`);
 
     if (!svg || !dateCont) return;
     dateCont.innerHTML = "";
     if (isFirst && dateTop) dateTop.innerHTML = "";
+    if (isFirst && timeTop) timeTop.innerHTML = ""; // 初期化
     
     const allVals = datasets.flatMap(ds => ds.data ? ds.data.slice(startIdx) : []);
     if (allVals.length === 0) return;
@@ -1760,6 +1762,16 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                 topDiv.dataset.x = x;
                 topDiv.innerHTML = labelContent;
                 dateTop.appendChild(topDiv);
+
+                // 時刻コンテナ(time-top)に「時」を追加
+                const topTimeDiv = document.createElement('div');
+                topTimeDiv.className = 'sticky-date';
+                topTimeDiv.style.left = `${x}px`;
+                // 【重要】文字の半分だけ左に戻して中央に合わせる
+                topTimeDiv.style.transform = 'translateX(-50%)';
+                topTimeDiv.dataset.x = x;
+                topTimeDiv.innerHTML = `<span class="label-time" style="font-size:${labelFS+4}px; display: inline-block; width: 2em; text-align: center;">${d.getHours()}</span>`;
+                timeTop.appendChild(topTimeDiv);
             }
 
             if (isLast) {
@@ -1769,6 +1781,19 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
             dateCont.appendChild(dateDiv);
         } else if (i % 3 === 0) {
             html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight}" class="grid-3h" />`;
+            
+            // 3時間おきの時刻を time-top に追加
+            if (isFirst && timeTop) {
+                const topTimeDiv = document.createElement('div');
+                topTimeDiv.className = 'sticky-date';
+                topTimeDiv.style.left = `${x}px`;
+                // 【重要】文字の半分だけ左に戻して中央に合わせる
+                topTimeDiv.style.transform = 'translateX(-50%)';
+                topTimeDiv.dataset.x = x;
+                topTimeDiv.innerHTML = `<span class="label-time" style="font-size:${labelFS+4}px; display: inline-block; width: 2em; text-align: center;">${d.getHours()}</span>`;
+                timeTop.appendChild(topTimeDiv);
+            }
+
             if (isLast) {
                 html += `<text x="${x}" y="${plotHeight + 15}" class="label-time" font-size="${labelFS}" text-anchor="middle">${d.getHours()}</text>`;
             }
@@ -1810,7 +1835,6 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
             let currentPoints = [];
             for(let i = startIdx; i < totalDataCount; i++){
                 const v = ds.data[i];
-                // データが null または undefined の場合はセグメントを分ける
                 if (v === null || typeof v === 'undefined') {
                     if (currentPoints.length > 1) {
                         html += `<polyline class="${ds.cls}" points="${currentPoints.join(' ')}" />`;
