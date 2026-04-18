@@ -1765,11 +1765,10 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                 topDiv.innerHTML = labelContent;
                 dateTop.appendChild(topDiv);
 
-                // 時刻コンテナ(time-top)に「時」を追加
+                // 時刻コンテナ(time-top)に「時」を追加（スティッキーを解除し絶対配置のみとする）
                 const topTimeDiv = document.createElement('div');
-                topTimeDiv.className = 'sticky-date';
+                topTimeDiv.style.position = 'absolute';
                 topTimeDiv.style.left = `${x}px`;
-                // 【重要】文字の半分だけ左に戻して中央に合わせる
                 topTimeDiv.style.transform = 'translateX(-50%)';
                 topTimeDiv.dataset.x = x;
                 topTimeDiv.innerHTML = `<span class="label-time" style="font-size:${labelFS+4}px; display: inline-block; width: 2em; text-align: center;">${d.getHours()}</span>`;
@@ -1784,12 +1783,11 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
         } else if (i % 3 === 0) {
             html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight}" class="grid-3h" />`;
             
-            // 3時間おきの時刻を time-top に追加
+            // 3時間おきの時刻を time-top に追加（スティッキーを解除し絶対配置のみとする）
             if (isFirst && timeTop) {
                 const topTimeDiv = document.createElement('div');
-                topTimeDiv.className = 'sticky-date';
+                topTimeDiv.style.position = 'absolute';
                 topTimeDiv.style.left = `${x}px`;
-                // 【重要】文字の半分だけ左に戻して中央に合わせる
                 topTimeDiv.style.transform = 'translateX(-50%)';
                 topTimeDiv.dataset.x = x;
                 topTimeDiv.innerHTML = `<span class="label-time" style="font-size:${labelFS+4}px; display: inline-block; width: 2em; text-align: center;">${d.getHours()}</span>`;
