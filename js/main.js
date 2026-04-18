@@ -10,7 +10,7 @@ const defaultViewConfig = {
     graphMargin: 0,    // グラフ間余白
     fontSize: 12,       // ラベルフォントサイズ
     iconScale: 0.7,     // 風向アイコン倍率
-    tooltipDuration: 5, // ツールチップ表示時間（s）
+    tooltipDuration: 3, // ツールチップ表示時間（s）
     language: 'ja'      // [追加] 言語設定の初期値
 };
 
@@ -1615,10 +1615,11 @@ async function draw() {
             titles[1].innerHTML = `${baseWindIcon}${i18n.t('yAxisWind')}`;
             titles[2].innerHTML = i18n.t('yAxisTemp');
             
-            // 翻訳ファイルの yAxisMarine ("波高(m)<br>潮位(m)")
-            let marineTitle = i18n.t('yAxisMarine');
-
-            if (!hasMarineData) {
+            // 翻訳ファイルの yAxisMarine ("波高(m)<br>潮位(m)") i18n.t('yAxisMarine')
+            if (hasMarineData) {
+                marineTitle = i18n.t('yAxisMarine');
+            } else {
+                marineTitle = "";
                 marineTitle += `<br><span style="color:#FF0000; font-weight:bold; font-size:14px; display:block; margin-top:2px;">No Marine Data</span>`;
             }
             titles[3].innerHTML = marineTitle;
@@ -1676,7 +1677,7 @@ async function draw() {
 
         // --- 各グラフセクションの描画実行 ---
         renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], viewConfig.windHeight, 5.0, true, false, true, startIdx, hScale, totalW, labelFS, iScale, totalDataCount);
-        renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, false, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount);
+        renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, !hasMarineData, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount);
         
         // 海洋データがある場合のみ描画
         if (hasMarineData) {
@@ -1718,7 +1719,8 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
     if (isFirst && dateTop) dateTop.innerHTML = "";
     if (isFirst && timeTop) timeTop.innerHTML = ""; // 初期化
     
-    const allVals = datasets.flatMap(ds => ds.data ? ds.data.slice(startIdx) : []);
+    const allVals = datasets.flatMap(ds => ds.data ? ds.data.slice(startIdx) : [])
+                            .filter(v => typeof v === 'number' && !isNaN(v));
     if (allVals.length === 0) return;
     
     let max = Math.ceil(Math.max(...allVals) / stepY) * stepY;
