@@ -471,20 +471,31 @@ function initViewSettings() {
 }
 
 /**
- * 内部サブルーチン：現在の viewConfig の値を反映（単位表示追加版）
+ * 内部サブルーチン：現在の viewConfig の値をスライダーとラベルに反映させる
  */
 function syncSliderValues() {
+    // 1. 各種 ID リスト
     const configIds = [
         'hourWidth', 'windHeight', 'subHeight', 'margin', 'fontSize', 
         'iconScale', 'tooltipDuration', 'forecastDays', 'tempUnit', 'windUnit',
         'windThresholdHigh', 'windThresholdMid', 'windThresholdLow'
     ];
 
-    // 現在選択されている風速単位のテキストを取得 (例: "m/s", "kn")
-    // input-windUnit は select 要素なので、表示用テキストを取得します
-    const windUnitSelect = document.getElementById('input-windUnit');
-    const currentUnitText = windUnitSelect ? windUnitSelect.options[windUnitSelect.selectedIndex].text : viewConfig.windSpeedUnit;
+    // 2. 風速単位の表示を先に同期する
+    const windUnitInput = document.getElementById('input-windUnit');
+    if (windUnitInput) {
+        // viewConfig に保存されている単位をセレクトボックスにセット
+        windUnitInput.value = viewConfig.windSpeedUnit;
+        
+        // 選択された単位のテキスト（例: "kn (ノット)"）を取得してしきい値ラベルに反映
+        const thresholdUnitSpan = document.getElementById('val-windThresholds');
+        if (thresholdUnitSpan) {
+            const unitText = windUnitInput.options[windUnitInput.selectedIndex].text;
+            thresholdUnitSpan.textContent = `(${unitText})`;
+        }
+    }
 
+    // 3. 全ての値を入力欄に反映
     configIds.forEach(id => {
         let configKey = id;
         if (id === 'margin') configKey = 'graphMargin';
@@ -495,8 +506,11 @@ function syncSliderValues() {
         if (id === 'forecastDays' && val === undefined) val = 9;
 
         const input = document.getElementById(`input-${id}`);
-        if (input) input.value = val;
+        if (input) {
+            input.value = val;
+        }
         
+        // 数値表示ラベル（スライダー横）の更新
         const valSpan = document.getElementById(`val-${id}`);
         if (valSpan) {
             if (id === 'iconScale') {
@@ -510,12 +524,6 @@ function syncSliderValues() {
             }
         }
     });
-
-    // 【追加】閾値タイトルの横に現在の単位を表示
-    const thresholdUnitSpan = document.getElementById('val-windThresholds');
-    if (thresholdUnitSpan) {
-        thresholdUnitSpan.textContent = `(${currentUnitText})`;
-    }
 }
 
 /**
