@@ -149,7 +149,7 @@
             <div class="config-group">
                 <div class="config-label-area">
                     <span class="config-title" data-i18n="cfgForecastDays">予報日数</span>
-                    <span id="val-forecastDays" class="config-value">9日</span>
+                    <span id="val-forecastDays" class="config-value">9days</span>
                 </div>
                 <input type="range" id="input-forecastDays" class="config-slider" min="7" max="16" step="1" value="9">
             </div>
@@ -160,6 +160,28 @@
                     <span id="val-tooltipDuration" class="config-value">3s</span>
                 </div>
                 <input type="range" id="input-tooltipDuration" class="config-slider" min="1" max="10" step="1" value="3">
+            </div>
+
+            <div class="config-group">
+                <div class="config-label-area">
+                    <span class="config-title" data-i18n="cfgTempUnit">温度単位</span>
+                </div>
+                <select id="input-tempUnit" class="config-select">
+                    <option value="celsius">°C (摂氏)</option>
+                    <option value="fahrenheit">°F (華氏)</option>
+                </select>
+            </div>
+
+            <div class="config-group">
+                <div class="config-label-area">
+                    <span class="config-title" data-i18n="cfgWindUnit">風速単位</span>
+                </div>
+                <select id="input-windUnit" class="config-select">
+                    <option value="ms">m/s</option>
+                    <option value="kmh">km/h</option>
+                    <option value="kn">kn (ノット)</option>
+                    <option value="mph">mph</option>
+                </select>
             </div>
 
             <div class="config-group">

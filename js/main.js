@@ -3,15 +3,17 @@ let allData = {};
 
 // 2. 詳細設定の初期値
 const defaultViewConfig = {
-    forecastDays: 16,     // 予報日数（最大16日）
-    hourWidth: 20,      // 旧 hScale
-    windHeight: 180,    // 風速グラフ高さ
-    subHeight: 100,     // 気温・海象グラフ高さ
-    graphMargin: 0,    // グラフ間余白
-    fontSize: 12,       // ラベルフォントサイズ
-    iconScale: 0.7,     // 風向アイコン倍率
-    tooltipDuration: 3, // ツールチップ表示時間（s）
-    language: 'ja'      // [追加] 言語設定の初期値
+    forecastDays: 16,           // 予報日数（最大16日）
+    hourWidth: 20,              // 旧 hScale
+    windHeight: 180,            // 風速グラフ高さ
+    subHeight: 100,             // 気温・海象グラフ高さ
+    graphMargin: 0,             // グラフ間余白
+    fontSize: 12,               // ラベルフォントサイズ
+    iconScale: 0.7,             // 風向アイコン倍率
+    tooltipDuration: 3,         // ツールチップ表示時間（s）
+    language: 'ja',             // [追加] 言語設定の初期値
+    temperatureUnit: 'celsius', // 気温単位（celsius または fahrenheit）
+    windSpeedUnit: 'ms'         // 風速単位（ms または kmh または kn または mph）
 };
 
 // 3. localStorage からの読み込みとマージ
@@ -93,17 +95,19 @@ const i18n = {
             cfgFontSize: "ラベル文字サイズ",
             cfgIconScale: "風向アイコン倍率",
             cfgTooltipDuration: "ツールチップ表示時間",
+            cfgTempUnit: "温度単位",
+            cfgWindUnit: "風速単位",
             saveGuideText: "※保存するとページが再読み込みされ、設定が反映されます。",
             btnSaveSettings: "設定を保存",
             btnRestoreDefault: "デフォルトに戻す",
 
-            // --- グラフ軸・凡例・その他 ---
+            // --- グラフ軸・凡例・その他（動的対応版） ---
             yAxisWeather: "天気<br>降水(mm)",
-            yAxisWind: "風向<br>風速(m/s)",
-            yAxisTemp: "気温(℃)<br>海水(℃)",
+            yAxisWind: `風向<br>風速(${viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph'})`,
+            yAxisTemp: `気温(${viewConfig.temperatureUnit === 'celsius' ? '℃' : '℉'})<br>海水(${viewConfig.temperatureUnit === 'celsius' ? '℃' : '℉'})`,
             yAxisMarine: "波高(m)<br>潮位(m)",
             legendWindTitle: "風向色付：",
-            speedunit: "m/s",
+            speedunit: viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph',
             disclaimer: "【免責事項】海上気象データは予測モデルに基づく「最寄りの海上地点」の数値であり、実際の局地的な地形や潮流による影響を反映しきれない場合があります。",
             
             // --- メッセージ類 ---
@@ -178,18 +182,19 @@ const i18n = {
             cfgFontSize: "Font Size",
             cfgIconScale: "Icon Scale",
             cfgTooltipDuration: "Tooltip Duration",
+            cfgTempUnit: "Temperature Unit",
+            cfgWindUnit: "Wind Speed Unit",
             saveGuideText: "*Saving will reload the page to apply settings.",
             btnSaveSettings: "Save Settings",
             btnRestoreDefault: "Restore Default",
 
-            // --- Axes, Legends, etc. ---
+            // --- Axes, Legends, etc.（動的対応版） ---
             yAxisWeather: "Weather<br>Precip(mm)",
-            yAxisWind: "Wind Dir<br>Speed(m/s)",
-            yAxisTemp: "Temp(°C)<br>Sea(°C)",
+            yAxisWind: `Wind Dir<br>Speed(${viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph'})`,
+            yAxisTemp: `Temp(${viewConfig.temperatureUnit === 'celsius' ? '°C' : '°F'})<br>Sea(${viewConfig.temperatureUnit === 'celsius' ? '°C' : '°F'})`,
             yAxisMarine: "Wave(m)<br>Tide(m)",
             legendWindTitle: "Wind Color:",
-            speedunit: "m/s",
-            disclaimer: "[Disclaimer] Marine weather data is based on forecast models for the 'nearest sea point' and may not reflect local terrain or tidal effects.",
+            speedunit: viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph',            disclaimer: "[Disclaimer] Marine weather data is based on forecast models for the 'nearest sea point' and may not reflect local terrain or tidal effects.",
 
             // --- Messages ---
             welcomeGuide: "Please register the locations you want to display. You can get your current location or select a place from the map. To register, long-press or right-click on the location tab at the top of the screen.",
@@ -454,17 +459,22 @@ function initViewSettings() {
  * 内部サブルーチン：現在の viewConfig の値をスライダーとラベルに反映させる
  */
 function syncSliderValues() {
-    // forecastDays を配列に追加
-    const configIds = ['hourWidth', 'windHeight', 'subHeight', 'margin', 'fontSize', 'iconScale', 'tooltipDuration', 'forecastDays'];
+    const configIds = ['hourWidth', 'windHeight', 'subHeight', 'margin', 'fontSize', 'iconScale', 'tooltipDuration', 'forecastDays', 'tempUnit', 'windUnit'];
     configIds.forEach(id => {
-        // 名称不一致（margin -> graphMargin）と、初期値がない場合の予報日数(9)を考慮
-        let val = viewConfig[id === 'margin' ? 'graphMargin' : id];
+        // マッピング
+        let configKey = id;
+        if (id === 'margin') configKey = 'graphMargin';
+        if (id === 'tempUnit') configKey = 'temperatureUnit';
+        if (id === 'windUnit') configKey = 'windSpeedUnit';
+
+        let val = viewConfig[configKey];
         if (id === 'forecastDays' && val === undefined) val = 9;
 
         const input = document.getElementById(`input-${id}`);
-        const valSpan = document.getElementById(`val-${id}`);
-        
         if (input) input.value = val;
+        
+        // valSpan の更新ロジック（スライダーのみ）
+        const valSpan = document.getElementById(`val-${id}`);
         if (valSpan) {
             // 単位の表示反映
             if (id === 'iconScale') {
@@ -472,7 +482,7 @@ function syncSliderValues() {
             } else if (id === 'tooltipDuration') {
                 valSpan.textContent = val + "s";
             } else if (id === 'forecastDays') {
-                valSpan.textContent = val + "日";
+                valSpan.textContent = val + "days";
             } else {
                 valSpan.textContent = val + "px";
             }
@@ -494,6 +504,9 @@ async function saveViewSettings() {
     viewConfig.fontSize = parseInt(document.getElementById('input-fontSize').value);
     viewConfig.iconScale = parseFloat(document.getElementById('input-iconScale').value);
     viewConfig.tooltipDuration = parseInt(document.getElementById('input-tooltipDuration').value);
+    // 温度単位と風速単位を取得
+    viewConfig.temperatureUnit = document.getElementById('input-tempUnit').value;
+    viewConfig.windSpeedUnit = document.getElementById('input-windUnit').value;
 
     // 2. 【重要】地点データが空（操作不能リスク）の状態かチェック
     const savedSpots = localStorage.getItem('pin_weather_spots');
@@ -1465,6 +1478,9 @@ async function fetchWithCache(lat, lon) {
 
     // 予報日数を設定から取得（未定義ならデフォルト9日）
     const fDays = viewConfig.forecastDays || 9;
+    // 温度・風速単位を設定から取得
+    const tUnit = viewConfig.temperatureUnit || 'celsius';
+    const wUnit = viewConfig.windSpeedUnit || 'ms';
 
     const navEntries = performance.getEntriesByType('navigation');
     const isReload = navEntries.length > 0 && navEntries[0].type === 'reload';
@@ -1473,14 +1489,16 @@ async function fetchWithCache(lat, lon) {
         try {
             const parsed = JSON.parse(cached);
             
-            // 【重要】期限内かつリロードでなく、かつキャッシュされているデータの日数が現在の設定と同じであればキャッシュを返す
-            // ※日数が変更された場合は、強制的に再取得させる必要があるため
+            // 【重要】期限内かつリロードでなく、かつキャッシュされているデータの日数・単位が現在の設定と同じであればキャッシュを返す
+            // ※日数や単位が変更された場合は、強制的に再取得させる必要があるため
             if (!isReload && 
                 (now - parsed.timestamp < CACHE_DURATION) && 
-                (parsed.data && parsed.data.time && parsed.data.time.length === fDays * 24)) {
+                (parsed.data && parsed.data.time && parsed.data.time.length === fDays * 24) &&
+                parsed.tUnit === tUnit &&
+                parsed.wUnit === wUnit) {
                 return { timestamp: parsed.timestamp, data: parsed.data };
             } else {
-                // 期限切れ、リロード、または設定日数変更ならキャッシュを消去
+                // 期限切れ、リロード、または設定（日数・単位）変更ならキャッシュを消去
                 localStorage.removeItem(cacheKey);
             }
         } catch (e) {
@@ -1488,9 +1506,9 @@ async function fetchWithCache(lat, lon) {
         }
     }
 
-    // API取得（forecast_days を動的に設定）
-    const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&forecast_days=${fDays}&wind_speed_unit=ms`;
-    const mUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto&forecast_days=${fDays}&cell_selection=sea`;
+    // API取得（forecast_days, temperature_unit, wind_speed_unit を動的に設定）
+    const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&forecast_days=${fDays}&temperature_unit=${tUnit}&wind_speed_unit=${wUnit}`;
+    const mUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto&forecast_days=${fDays}&temperature_unit=${tUnit}&cell_selection=sea`;
 
     try {
         const [wRes, mRes] = await Promise.all([
@@ -1499,7 +1517,13 @@ async function fetchWithCache(lat, lon) {
         ]);
 
         const mergedData = { ...wRes.hourly, ...mRes.hourly };
-        const cacheData = { timestamp: now, data: mergedData };
+        // キャッシュデータに現在の単位設定を保存
+        const cacheData = { 
+            timestamp: now, 
+            data: mergedData,
+            tUnit: tUnit,
+            wUnit: wUnit
+        };
 
         // 最新データを保存
         localStorage.setItem(cacheKey, JSON.stringify(cacheData));
@@ -1616,6 +1640,7 @@ async function draw() {
             titles[2].innerHTML = i18n.t('yAxisTemp');
             
             // 翻訳ファイルの yAxisMarine ("波高(m)<br>潮位(m)") i18n.t('yAxisMarine')
+            let marineTitle = "";
             if (hasMarineData) {
                 marineTitle = i18n.t('yAxisMarine');
             } else {
@@ -1676,7 +1701,9 @@ async function draw() {
         svgW.innerHTML = wHtml;
 
         // --- 各グラフセクションの描画実行 ---
+        // 風速（stepYは単位が ms 以外なら少し大きめの刻みを検討できるが、既存通り 5.0 を維持しつつ単位反映）
         renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], viewConfig.windHeight, 5.0, true, false, true, startIdx, hScale, totalW, labelFS, iScale, totalDataCount);
+        // 気温（stepY 5.0）
         renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, !hasMarineData, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount);
         
         // 海洋データがある場合のみ描画
@@ -1728,6 +1755,7 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
     if (isWind) min = 0;
 
     if (valCont) {
+        // 単位に応じてラベルの小数点以下の表示を調整（ms 以外や華氏なら整数表示の方がスッキリする場合があるが、既存のロジックを尊重）
         valCont.innerHTML = `<div class="y-max">${max.toFixed(isWind ? 0 : 1)}</div><div class="y-min">${min.toFixed(isWind ? 0 : 1)}</div>`;
     }
     const range = (max - min) || 1;
@@ -1765,7 +1793,7 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                 topDiv.innerHTML = labelContent;
                 dateTop.appendChild(topDiv);
 
-                // 時刻コンテナ(time-top)に「時」を追加（スティッキーを解除し絶対配置のみとする）
+                // 時刻コンテナ(time-top)に「時」を追加
                 const topTimeDiv = document.createElement('div');
                 topTimeDiv.style.position = 'absolute';
                 topTimeDiv.style.left = `${x}px`;
@@ -1783,7 +1811,6 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
         } else if (i % 3 === 0) {
             html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight}" class="grid-3h" />`;
             
-            // 3時間おきの時刻を time-top に追加（スティッキーを解除し絶対配置のみとする）
             if (isFirst && timeTop) {
                 const topTimeDiv = document.createElement('div');
                 topTimeDiv.style.position = 'absolute';
@@ -1825,6 +1852,7 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                 const x = (i - startIdx) * hScale;
                 const deg = allData.data.wind_direction_10m[i];
                 const dirText = getWindDirText(deg);
+                // 色分けロジック（ここも単位が ms であることを前提に 10.0 や 5.0 を判定しているため、将来的にノット等で閾値を変える場合は修正検討が必要ですが、現状はそのまま維持）
                 let color = targetWindDirections.includes(dirText) ? (val >= 10.0 ? '#dc143c' : val >= 5.0 ? '#ffa500' : val >= 3.0 ? '#87CEEB' : '#ccc') : (val >= 10.0 ? 'rgba(220, 20, 60, 0.4)' : '#ccc');
                 html += `<rect x="${x - (hScale*0.4)}" y="${plotHeight-h}" width="${hScale*0.8}" height="${h}" fill="${color}" />`;
                 if (isWind) {
@@ -1889,10 +1917,14 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
         const wIcon = weatherIcons[allData.data.weather_code[validIdx]] || "❓";
         const getVal = (val, unit, fixed = 1) => (val !== null && typeof val !== 'undefined' && !isNaN(val)) ? val.toFixed(fixed) + unit : "---";
 
+        // 設定に基づいた単位の取得
+        const tUnit = viewConfig.temperatureUnit === 'celsius' ? '℃' : '℉';
+        const wUnit = i18n.t('speedunit'); // i18n側の動的定義を使用
+
         const precipVal = getVal(allData.data.precipitation ? allData.data.precipitation[validIdx] : null, "mm");
-        const windVal = getVal(allData.data.wind_speed_10m ? allData.data.wind_speed_10m[validIdx] : null, "m/s");
-        const tempVal = getVal(allData.data.temperature_2m ? allData.data.temperature_2m[validIdx] : null, "℃");
-        const seaTempVal = getVal(allData.data.sea_surface_temperature ? allData.data.sea_surface_temperature[validIdx] : null, "℃");
+        const windVal = getVal(allData.data.wind_speed_10m ? allData.data.wind_speed_10m[validIdx] : null, wUnit);
+        const tempVal = getVal(allData.data.temperature_2m ? allData.data.temperature_2m[validIdx] : null, tUnit);
+        const seaTempVal = getVal(allData.data.sea_surface_temperature ? allData.data.sea_surface_temperature[validIdx] : null, tUnit);
         const waveVal = getVal(allData.data.wave_height ? allData.data.wave_height[validIdx] : null, "m", 2);
         const tideVal = getVal(allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl[validIdx] : null, "m", 2);
 
@@ -1913,8 +1945,8 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
             <span class="coord-tip notranslate">${currentLat.toFixed(3)}, ${currentLon.toFixed(3)}</span>
             <b class="notranslate">${localizedDateStr} ${d.getHours()}:00 ${wIcon}</b>
             <div class="icon-box"><span class="legend-bar" style="background:#0000FF; margin-right:0;"></span></div>${i18n.t('precip')}: ${precipVal}<br>
-            <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${rotateDeg})"/></svg></div>${i18n._currentLang === 'ja' ? '風向' : 'Wind'}: ${deg !== null && !isNaN(deg) ? getWindDirText(deg) + ' (' + deg + '°)' : '---'}<br>
-            <div class="icon-box">🚩</div>${i18n._currentLang === 'ja' ? '風速' : 'Speed'}: ${windVal}<br>
+            <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${rotateDeg})"/></svg></div>${i18n.t('windDir')}: ${deg !== null && !isNaN(deg) ? getWindDirText(deg) + ' (' + deg + '°)' : '---'}<br>
+            <div class="icon-box">🚩</div>${i18n.t('windSpeed')}: ${windVal}<br>
             <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>${i18n.t('temp')}: ${tempVal}<br>
             <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>${i18n.t('seawater')}: ${seaTempVal}<br>
             <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>${i18n.t('wave')}: ${waveVal}<br>
