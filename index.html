@@ -156,7 +156,7 @@
 
             <div class="config-group">
                 <div class="config-label-area">
-                    <span class="config-title" data-i18n="cfgTooltipDuration">ツールチップ表示時間</span>
+                    <span class="config-title" data-i18n="cfgTooltipDuration">詳細情報の表示時間</span>
                     <span id="val-tooltipDuration" class="config-value">3s</span>
                 </div>
                 <input type="range" id="input-tooltipDuration" class="config-slider" min="1" max="10" step="1" value="3">
@@ -186,16 +186,16 @@
 
             <div class="config-group">
                 <div class="config-label-area">
-                    <span class="config-title" data-i18n="cfgWindThresholds">風速色付けのしきい値</span>
+                    <span class="config-title" data-i18n="cfgWindThresholds">風速色付しきい値</span>
                     <span id="val-windThresholds" class="config-value">(m/s)</span>
                 </div>
                 <div style="display: flex; gap: 5px; margin-top: 5px;">
-                    <input type="number" id="input-windThresholdHigh" class="config-select" style="width: 33%; border-bottom: 3px solid #dc143c;" step="0.1" placeholder="High">
-                    <input type="number" id="input-windThresholdMid" class="config-select" style="width: 33%; border-bottom: 3px solid #ffa500;" step="0.1" placeholder="Mid">
-                    <input type="number" id="input-windThresholdLow" class="config-select" style="width: 33%; border-bottom: 3px solid #87ceeb;" step="0.1" placeholder="Low">
+                    <input type="number" id="input-windThresholdHigh" class="config-select" style="width: 33%; border-bottom: 10px solid #dc143c;" step="0.1" placeholder="High">
+                    <input type="number" id="input-windThresholdMid" class="config-select" style="width: 33%; border-bottom: 10px solid #ffa500;" step="0.1" placeholder="Mid">
+                    <input type="number" id="input-windThresholdLow" class="config-select" style="width: 33%; border-bottom: 10px solid #87ceeb;" step="0.1" placeholder="Low">
                 </div>
                 <div style="display: flex; justify-content: space-around; font-size: 10px; color: #666; margin-top: 2px;">
-                    <span>High</span><span>Mid</span><span>Low</span>
+                    <span>>High</span><span>>Mid</span><span>>Low</span>
                 </div>
             </div>
 
@@ -220,7 +220,7 @@
                     <span class="config-title" data-i18n="cfgWindHeight">風速グラフの高さ</span>
                     <span id="val-windHeight" class="config-value">280px</span>
                 </div>
-                <input type="range" id="input-windHeight" class="config-slider" min="150" max="500" step="10" value="280">
+                <input type="range" id="input-windHeight" class="config-slider" min="150" max="200" step="10" value="180">
             </div>
 
             <div class="config-group">
@@ -228,7 +228,7 @@
                     <span class="config-title" data-i18n="cfgSubHeight">気温・海象グラフの高さ</span>
                     <span id="val-subHeight" class="config-value">160px</span>
                 </div>
-                <input type="range" id="input-subHeight" class="config-slider" min="80" max="300" step="10" value="160">
+                <input type="range" id="input-subHeight" class="config-slider" min="80" max="150" step="10" value="100">
             </div>
 
             <div class="config-group">
@@ -236,7 +236,7 @@
                     <span class="config-title" data-i18n="cfgMargin">グラフ間の余白</span>
                     <span id="val-margin" class="config-value">15px</span>
                 </div>
-                <input type="range" id="input-margin" class="config-slider" min="0" max="50" step="1" value="15">
+                <input type="range" id="input-margin" class="config-slider" min="0" max="20" step="1" value="0">
             </div>
 
             <div class="config-group">
@@ -324,7 +324,7 @@
     </div>
 </div>
 
-<div class="footer-info">
+<div class="footer-info" style="padding-bottom: 70px;">
     <div class="weather-links" style="display: flex; gap: 12px; padding: 10px 20px; justify-content: center; background: #ffffff; border-bottom: 10px solid #eaeaea; box-shadow: 0 2px 5px rgba(0,0,0,0.02);">
         <button class="btn weather-link-btn" onclick="openExternalWeather('yahoo')" 
                 style="background: linear-gradient(135deg, #0056b3 0%, #004099 100%); border: none; padding: 8px 18px; border-radius: 25px; cursor: pointer; display: flex; align-items: center; gap: 9px; box-shadow: 0 4px 6px rgba(0,64,153,0.3); transition: transform 0.1s, box-shadow: 0.1s;">
