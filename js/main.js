@@ -64,6 +64,7 @@ const i18n = {
             btnDetailSettings: "⚙ 表示詳細設定",
             btnResetAll: "♻️ 全リセット",
             btnFeedback: "💬 ご意見・ご要望",
+            linkAboutAndPrivacy: "運営者情報 ＆ プライバシーポリシー",
             shareQR: "スマホで共有",
             btnCopyUrl: "🔗 URLをコピー",
             copySuccess: "✅ コピー完了！",
@@ -151,6 +152,7 @@ const i18n = {
             btnDetailSettings: "⚙ Display Settings",
             btnResetAll: "♻️ Reset All Spots",
             btnFeedback: "💬 Feedback & Requests",
+            linkAboutAndPrivacy: "About & Privacy Policy",    
             shareQR: "Share with Mobile",
             btnCopyUrl: "🔗 Copy URL",
             copySuccess: "✅ Copied!",
@@ -903,18 +905,36 @@ function setupGeneralEvents() {
     }
 }
 
-
+/**
+ * サイドバーの開閉制御
+ * 戻るボタン対策と、表示状態の不整合を修正した完全版
+ */
 function toggleSidebar() {
     const sb = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
     if (!sb || !overlay) return;
-    const isOpen = sb.classList.contains('open');
+
+    // style.display と classList の不整合を防ぐため、実際の表示状態で判定
+    const isOpen = sb.classList.contains('open') && sb.style.display !== 'none';
+
     if (isOpen) {
+        // --- 閉じる処理 ---
         sb.classList.remove('open');
+        sb.style.display = 'none'; // 明示的に非表示
         overlay.style.display = 'none';
+
+        // 手動で閉じた場合、積んだ履歴を1つ戻す
+        if (window.history.state && window.history.state.page === 'sidebar') {
+            window.history.back();
+        }
     } else {
+        // --- 開く処理 ---
         sb.classList.add('open');
+        sb.style.display = 'block'; // 明示的に表示
         overlay.style.display = 'block';
+
+        // 履歴に状態を追加（これで戻るボタンでアプリが終了しなくなる）
+        window.history.pushState({ page: 'sidebar' }, "");
     }
 }
 
@@ -1357,13 +1377,15 @@ window.history.replaceState({ page: 'home' }, "");
  * 監視役：ブラウザの「戻る」が押されたら実行（一本化）
  */
 window.onpopstate = function(event) {
-    // ログを表示して動作を確認できるようにする
     console.log("DEBUG: Back Button Pressed!", event.state);
 
-    // HTML構造に合わせて対象を全て含める
-    const targets = document.querySelectorAll('.modal, .modal-overlay, #app-common-modal');
+    // 全ての要素を確実に非表示にし、クラスも除去する
+    const targets = document.querySelectorAll('.modal, .modal-overlay, #app-common-modal, .sidebar, .sidebar-overlay');
     targets.forEach(m => {
         m.style.display = 'none';
+        if (m.classList.contains('open')) {
+            m.classList.remove('open');
+        }
     });
     
     // 地図の仮マーカー消去
@@ -1374,13 +1396,20 @@ window.onpopstate = function(event) {
 
 /**
  * 共通サブルーチン：モーダルを開く
+ * 履歴を積むことで、ブラウザの「戻る」ボタンで閉じられるように制御する
  */
 function openModal(id) {
     const modal = document.getElementById(id);
+    
+    // モーダルが存在しない、または既に表示されている場合は何もしない
     if (!modal || modal.style.display === 'block') return;
     
+    // 表示状態に変更
     modal.style.display = 'block';
+    
+    // 履歴に状態を追加（戻るボタンでアプリが終了するのを防ぐ）
     window.history.pushState({ page: 'modal', id: id }, "");
+    
     console.log("DEBUG: Modal Opened:", id);
 }
 
@@ -1396,6 +1425,15 @@ function closeModal(id) {
             window.history.back();
         }
     }
+}
+
+/**
+ * 共通サブルーチン：サイドバーを開く際に履歴を積む
+ * サイドバーを表示させる関数（既存）の直後に追加して使用してください。
+ */
+function pushSidebarState() {
+    window.history.pushState({ page: 'sidebar' }, "");
+    console.log("DEBUG: Sidebar State Pushed");
 }
 
 // 設定保存時に実行
