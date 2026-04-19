@@ -102,7 +102,7 @@ const i18n = {
             cfgTooltipDuration: "ツールチップ表示時間",
             cfgTempUnit: "温度単位",
             cfgWindUnit: "風速単位",
-            cfgWindThresholds: "風速色付けのしきい値",
+            cfgWindThresholds: "風速色付しきい値",
             saveGuideText: "※保存するとページが再読み込みされ、設定が反映されます。",
             btnSaveSettings: "設定を保存",
             btnRestoreDefault: "デフォルトに戻す",
