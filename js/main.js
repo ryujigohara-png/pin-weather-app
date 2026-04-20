@@ -849,11 +849,17 @@ function setupGeneralEvents() {
     if (searchBtn) searchBtn.onclick = executeMapSearch;
     
     // 3. 風向色付設定ボタン（サイドバー内）
+    // 競合回避のため、toggleSidebar を介さず openModalFromSidebar を使用
     const windCfgBtn = document.getElementById('wind-cfg-btn');
     if (windCfgBtn) {
         windCfgBtn.onclick = () => {
-            toggleSidebar(); // サイドバーを閉じる
-            openModal('wind-modal'); // 設定モーダルを開く
+            if (typeof openModalFromSidebar === 'function') {
+                openModalFromSidebar('wind-modal');
+            } else {
+                // 万が一関数がない場合のフォールバック（動作安定のため）
+                toggleSidebar();
+                openModal('wind-modal');
+            }
         };
     }
     
@@ -884,7 +890,6 @@ function setupGeneralEvents() {
     const feedbackBtn = document.getElementById('feedback-btn');
     if (feedbackBtn) {
         feedbackBtn.onclick = () => {
-            // GoogleフォームなどのURLを指定（例として私の提案時の構成を維持）
             const formUrl = "https://forms.gle/zdbaJNdodCMzcftK6";
             window.open(formUrl, '_blank');
         };
@@ -895,10 +900,6 @@ function setupGeneralEvents() {
     if (privacyLink) {
         privacyLink.onclick = (e) => {
             e.preventDefault(); // 画面遷移を防ぐ
-            // 公開時は、アップロードしたprivacy.htmlのURLを指定してください
-            //const privacyUrl = "https://あなたのドメイン/privacy.html"; 
-            // テスト用には、相対パス（同じサーバー内に privacy.html がある場合）
-            // これなら、beta版で開けばbetaの、main版で開けばmainのポリシーが開きます。
             const privacyUrl = "./privacy.html";
             window.open(privacyUrl, '_blank');
         };
@@ -938,6 +939,35 @@ function toggleSidebar() {
     }
 }
 
+/**
+ * サイドバー内のボタンからモーダルを呼び出す専用関数
+ * 戻るボタンの競合（一瞬で消える現象）を防ぐための完全版
+ */
+function openModalFromSidebar(modalId) {
+    const sb = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const modal = document.getElementById(modalId);
+
+    if (!sb || !modal) return;
+
+    // 1. サイドバーを閉じる（履歴を戻さずに直接非表示にする）
+    sb.classList.remove('open');
+    sb.style.display = 'none';
+    if (overlay) overlay.style.display = 'none';
+
+    // 2. サイドバー用に積んでいた履歴を「モーダル用」として再利用（上書き）
+    // これにより popstate が発火せず、一瞬で消える現象を回避する
+    window.history.replaceState({ page: 'modal', id: modalId }, "");
+
+    // 3. モーダルを表示
+    modal.style.display = 'block';
+
+    // 風向設定モーダルの場合はUIを初期化
+    if (modalId === 'wind-modal') {
+        initCompassUI();
+    }
+}
+
 function initCompassUI() {
     const container = document.getElementById('compass-ui');
     if (!container) return;
@@ -955,7 +985,6 @@ function initCompassUI() {
         const y = centerY + radius * Math.sin(angle) - 15;
 
         const el = document.createElement('div');
-        // ここでの dir と targetWindDirections の中身が同じ言語（日本語同士 or 英語同士）になるため、正しく active が付きます
         el.className = 'compass-label' + (targetWindDirections.includes(dir) ? ' active' : '');
         el.style.left = `${x}px`;
         el.style.top = `${y}px`;
