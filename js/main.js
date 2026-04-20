@@ -717,6 +717,9 @@ function applyEnvVisuals() {
  * 3. WelcomeダイアログでGPS/Mapの選択を促す
  */
 async function initApp() {
+    // 【追加】まず最初にドメイン移行が必要かチェックする
+    checkDomainMigration();
+
     window.history.replaceState({ page: 'home' }, "");
 
     const savedData = localStorage.getItem('pin_weather_spots');
@@ -2289,6 +2292,63 @@ window.addEventListener('appinstalled', () => {
 
 // DOM構築後に実行
 window.addEventListener('DOMContentLoaded', initPwaInstall);
+
+/**
+ * サブルーチン：新ドメイン移行案内の表示
+ * 古いURL（onrender.com）でアクセスしているユーザーにのみ、新ドメインへの移行を促す。
+ */
+function checkDomainMigration() {
+    const currentHost = window.location.hostname;
+    // 実際に取得された新ドメイン
+    const newDomain = "pin-weather.pro"; 
+
+    // 現在のホスト名に 'onrender.com' が含まれているか判定
+    if (currentHost.includes("onrender.com")) {
+        const banner = document.createElement('div');
+        banner.id = 'migration-banner';
+        
+        // デザイン数値は維持しつつ、視認性の高いスタイルを設定
+        banner.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: #d32f2f;
+            color: white;
+            text-align: center;
+            padding: 12px 5px;
+            z-index: 10000;
+            font-size: 14px;
+            line-height: 1.5;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        `;
+
+        banner.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 5px;">【重要】URLが変わりました</div>
+            <div style="margin-bottom: 8px;">
+                これからは <strong>${newDomain}</strong> をご利用ください。
+            </div>
+            <button onclick="window.location.href='https://${newDomain}'" style="
+                background-color: white;
+                color: #d32f2f;
+                border: none;
+                padding: 8px 15px;
+                border-radius: 4px;
+                font-weight: bold;
+                cursor: pointer;
+            ">新しいURLへ移動する</button>
+            <div style="font-size: 11px; margin-top: 8px; opacity: 0.9;">
+                ※移動後、改めて「ホーム画面に追加」をお願いします。
+            </div>
+        `;
+
+        document.body.prepend(banner);
+        
+        // 既存のUI（finalizeInitで描画される内容）がバナーの下に隠れないよう
+        // body全体の余白を調整します
+        document.body.style.paddingTop = "120px"; 
+    }
+}
 
 
 initApp();
