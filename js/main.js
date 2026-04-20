@@ -2294,60 +2294,79 @@ window.addEventListener('appinstalled', () => {
 window.addEventListener('DOMContentLoaded', initPwaInstall);
 
 /**
- * サブルーチン：新ドメイン移行案内の表示
- * 古いURL（onrender.com）でアクセスしているユーザーにのみ、新ドメインへの移行を促す。
+ * サブルーチン：新ドメイン移行案内の表示（データ引継ぎ機能付き）
  */
 function checkDomainMigration() {
     const currentHost = window.location.hostname;
-    // 実際に取得された新ドメイン
     const newDomain = "pin-weather.pro"; 
 
-    // 現在のホスト名に 'onrender.com' が含まれているか判定
+    // 1. 古いドメインにいる場合：データを新ドメインに送る準備
     if (currentHost.includes("onrender.com")) {
-        const banner = document.createElement('div');
-        banner.id = 'migration-banner';
+        // ローカルストレージからデータを取得（文字列のまま）
+        const savedData = localStorage.getItem('pin_weather_spots');
         
-        // デザイン数値は維持しつつ、視認性の高いスタイルを設定
+        // 移動ボタンのクリックイベント
+        window.goNewDomain = function() {
+            let targetUrl = `https://${newDomain}`;
+            if (savedData) {
+                // データをURLセーフな形式に変換してパラメータに付与
+                targetUrl += `?data=${encodeURIComponent(savedData)}`;
+            }
+            window.location.href = targetUrl;
+        };
+
+        const banner = document.createElement('div');
         banner.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            background-color: #d32f2f;
-            color: white;
-            text-align: center;
-            padding: 12px 5px;
-            z-index: 10000;
-            font-size: 14px;
-            line-height: 1.5;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            position: fixed; top: 0; left: 0; width: 100%;
+            background-color: #d32f2f; color: white; text-align: center;
+            padding: 15px 10px; z-index: 10000; font-size: 14px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         `;
 
         banner.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 5px;">【重要】URLが変わりました</div>
-            <div style="margin-bottom: 8px;">
-                これからは <strong>${newDomain}</strong> をご利用ください。
+            <div style="font-weight: bold; margin-bottom: 5px;">【重要】新URLへの移行とデータ引継ぎ</div>
+            <div style="margin-bottom: 10px; font-size: 12px; line-height: 1.4;">
+                専門ドメインへ移動します。登録地点も自動で引き継がれます。<br>
+                移動後、ホーム画面に再登録（古いアイコンは削除）をお願いします。
             </div>
-            <button onclick="window.location.href='https://${newDomain}'" style="
-                background-color: white;
-                color: #d32f2f;
-                border: none;
-                padding: 8px 15px;
-                border-radius: 4px;
-                font-weight: bold;
-                cursor: pointer;
-            ">新しいURLへ移動する</button>
-            <div style="font-size: 11px; margin-top: 8px; opacity: 0.9;">
-                ※移動後、改めて「ホーム画面に追加」をお願いします。
-            </div>
+            <button onclick="goNewDomain()" style="
+                background-color: white; color: #d32f2f; border: none;
+                padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer;
+            ">地点データを保持して移動する</button>
         `;
-
         document.body.prepend(banner);
-        
-        // 既存のUI（finalizeInitで描画される内容）がバナーの下に隠れないよう
-        // body全体の余白を調整します
-        document.body.style.paddingTop = "120px"; 
+        document.body.style.paddingTop = "130px";
     }
+
+    // 2. 新しいドメインに届いた場合：データを受け取って保存する
+    // 【修正版】新ドメインに届いた時の処理（既存のPWA誘導ボタンへ繋げる）
+    if (currentHost === newDomain || currentHost === `www.${newDomain}`) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const dataToImport = urlParams.get('data');
+        
+        if (dataToImport) {
+            localStorage.setItem('pin_weather_spots', decodeURIComponent(dataToImport));
+            
+            const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+            window.history.replaceState({}, document.title, cleanUrl);
+            
+            // 既存の showAppDialog や i18n を活用した丁寧な案内
+            if (typeof showAppDialog === 'function') {
+                showAppDialog({
+                    title: "データ引継ぎ完了",
+                    message: "お気に入りの地点を引き継ぎました。\n\n最後に、この新しいURLを「ホーム画面に追加」し、古い方のアイコンは削除してください。",
+                    onSave: () => {
+                        // 既存のインストール案内ボタンへスクロール、またはボタンをクリックさせる
+                        const installBtn = document.getElementById('btn-pwa-install');
+                        if (installBtn) installBtn.click(); // そのまま既存のインストール処理へ繋ぐ
+                    }
+                });
+            } else {
+                alert("地点データを引き継ぎました！\n新しいURLで再登録をお願いします。");
+            }
+        }
+    }
+
 }
 
 
