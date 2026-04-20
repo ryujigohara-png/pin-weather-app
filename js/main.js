@@ -2292,7 +2292,6 @@ window.addEventListener('appinstalled', () => {
 
 // DOM構築後に実行
 window.addEventListener('DOMContentLoaded', initPwaInstall);
-
 /**
  * サブルーチン：新ドメイン移行案内の表示（データ引継ぎ機能付き）
  */
@@ -2302,16 +2301,26 @@ function checkDomainMigration() {
 
     // 1. 古いドメインにいる場合：データを新ドメインに送る準備
     if (currentHost.includes("onrender.com")) {
-        // ローカルストレージからデータを取得（文字列のまま）
-        const savedData = localStorage.getItem('pin_weather_spots');
+        // 各データを取得
+        const spotsData = localStorage.getItem('pin_weather_spots');
+        const viewConfigData = localStorage.getItem('pin_weather_view_config');
+        const windFilterData = localStorage.getItem('pin_weather_wind_filter');
         
         // 移動ボタンのクリックイベント
         window.goNewDomain = function() {
             let targetUrl = `https://${newDomain}`;
-            if (savedData) {
-                // データをURLセーフな形式に変換してパラメータに付与
-                targetUrl += `?data=${encodeURIComponent(savedData)}`;
-            }
+            
+            // データを一つのオブジェクトにまとめる
+            const migrationPackage = {
+                spots: spotsData,
+                viewConfig: viewConfigData,
+                windFilter: windFilterData
+            };
+            
+            // 文字列化してURLパラメータに付与
+            const dataString = encodeURIComponent(JSON.stringify(migrationPackage));
+            targetUrl += `?migration_all=${dataString}`;
+            
             window.location.href = targetUrl;
         };
 
@@ -2339,14 +2348,28 @@ function checkDomainMigration() {
     }
 
     // 2. 新しいドメインに届いた場合：データを受け取って保存する
-    // 【修正版】新ドメインに届いた時の処理（既存のPWA誘導ボタンへ繋げる）
     if (currentHost === newDomain || currentHost === `www.${newDomain}`) {
         const urlParams = new URLSearchParams(window.location.search);
-        const dataToImport = urlParams.get('data');
+        const migrationAll = urlParams.get('migration_all');
         
-        if (dataToImport) {
-            localStorage.setItem('pin_weather_spots', decodeURIComponent(dataToImport));
-            
+        if (migrationAll) {
+            try {
+                const parsed = JSON.parse(decodeURIComponent(migrationAll));
+                
+                // それぞれのデータが存在する場合のみ個別に保存
+                if (parsed.spots) {
+                    localStorage.setItem('pin_weather_spots', parsed.spots);
+                }
+                if (parsed.viewConfig) {
+                    localStorage.setItem('pin_weather_view_config', parsed.viewConfig);
+                }
+                if (parsed.windFilter) {
+                    localStorage.setItem('pin_weather_wind_filter', parsed.windFilter);
+                }
+            } catch (e) {
+                console.error("Data migration failed", e);
+            }
+
             const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
             window.history.replaceState({}, document.title, cleanUrl);
             
@@ -2366,7 +2389,6 @@ function checkDomainMigration() {
             }
         }
     }
-
 }
 
 
