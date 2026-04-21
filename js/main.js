@@ -2334,7 +2334,7 @@ function checkDomainMigration() {
 
         banner.innerHTML = `
             <div style="font-weight: bold; margin-bottom: 5px;">【重要】新URLへの移行とデータ引継ぎ</div>
-            <div style="margin-bottom: 10px; font-size: 12px; line-height: 1.4;">
+            <div style="margin-bottom: 10px; font-size: 14px; line-height: 1.4;">
                 専門ドメインへ移動します。登録地点も自動で引き継がれます。<br>
                 移動後、ホーム画面に再登録（古いアイコンは削除）をお願いします。
             </div>
