@@ -2092,7 +2092,7 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
             let tx = (clientX > window.innerWidth / 2) ? clientX - tooltipWidth - 20 : clientX + 20;
             tooltip.style.left = tx + "px";
             let ty = clientY + 20;
-            // 画面外（下方向）へのはみ出し判定を広告枠分（+80px）余裕を持たせる
+            // 画面外（下方向）へのはみ出し判定を広告枠分（+70px）余裕を持たせる
             if (ty + tooltip.offsetHeight + 70 > window.innerHeight) {
                 // 画面下部に張り付く位置を 70px に変更
                 tooltip.style.bottom = "70px"; 
