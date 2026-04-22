@@ -2326,9 +2326,9 @@ function checkDomainMigration() {
         banner.id = 'migration-banner';
         banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background-color:#d32f2f;color:white;text-align:center;padding:15px 10px;z-index:10000;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,0.3);';
         banner.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 5px;">【重要】URL移動とデータ引継ぎ</div>
+            <div style="font-weight: bold; margin-bottom: 5px;">【重要】新URLへの移動とデータ引継ぎ</div>
             <div style="margin-bottom: 10px; font-size: 14px; line-height: 1.4;">
-                専門ドメインに転居しました。<br>登録地点は自動で引き継ぎます。<br>
+                新サイトpin-weather.proに転居しました。<br>登録地点は自動で引き継ぎます。<br>
                 新サイトに移動してください。
             </div>
             <button onclick="goNewDomain()" style="background-color: white; color: #d32f2f; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer;">地点データを保持して移動する</button>
@@ -2401,7 +2401,8 @@ function checkDomainMigration() {
             installGuide.innerHTML = `
                 「ホーム画面に追加」⇒次からワンクリックで開けます！<br>
                 <span style="font-size: 11px; font-weight: normal;">
-                    左上の≡メニュー内「インストール」または、android: Chrome ⋮ メニューから/iPhone: Safari 共有 から<br>「ホーム画面に追加
+                    左上の≡メニュー内「インストール」または、<br>
+                     Chrome ⋮ メニューから / Safari 共有 から<br>「ホーム画面に追加」
                 </span>
             `;
             document.body.prepend(installGuide);
