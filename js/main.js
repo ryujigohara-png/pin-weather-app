@@ -2294,13 +2294,26 @@ window.addEventListener('appinstalled', () => {
 window.addEventListener('DOMContentLoaded', initPwaInstall);
 
 /**
- * サブルーチン：新ドメイン移行案内の表示（データ引継ぎ機能付き）
+ * サブルーチン：新ドメイン移行案内の表示（デバッグ表示・履歴完全抹消版）
  */
 function checkDomainMigration() {
     const currentHost = window.location.hostname;
     const newDomain = "pin-weather.pro"; 
 
-    // 1. 古いドメインにいる場合：データを新ドメインに送る準備
+    // デバッグ用ログ表示関数
+    const logDebug = (msg) => {
+        let debugDiv = document.getElementById('migration-debug');
+        if (!debugDiv) {
+            debugDiv = document.createElement('div');
+            debugDiv.id = 'migration-debug';
+            debugDiv.style.cssText = 'position:fixed;bottom:0;left:0;width:100%;background:rgba(0,0,0,0.8);color:#0f0;font-family:monospace;font-size:10px;z-index:20000;padding:5px;pointer-events:none;';
+            document.body.appendChild(debugDiv);
+        }
+        debugDiv.innerHTML += `> ${msg}<br>`;
+        console.log(`[Migration] ${msg}`);
+    };
+
+    // 1. 古いドメインにいる場合
     if (currentHost.includes("onrender.com")) {
         const spotsData = localStorage.getItem('pin_weather_spots');
         const viewConfigData = localStorage.getItem('pin_weather_view_config');
@@ -2316,74 +2329,68 @@ function checkDomainMigration() {
             const dataString = encodeURIComponent(JSON.stringify(migrationPackage));
             targetUrl += `?migration_all=${dataString}`;
             
-            // 重要：replaceを使うことで「古いドメイン」を履歴から消し、戻れなくする
+            // replaceを使用して、この「古いドメイン」を履歴から消し去る
             window.location.replace(targetUrl);
         };
 
         const banner = document.createElement('div');
-        banner.style.cssText = `
-            position: fixed; top: 0; left: 0; width: 100%;
-            background-color: #d32f2f; color: white; text-align: center;
-            padding: 15px 10px; z-index: 10000; font-size: 14px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        `;
-
+        banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background-color:#d32f2f;color:white;text-align:center;padding:15px 10px;z-index:10000;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,0.3);';
         banner.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 5px;">【重要】新URLへの移行とデータ引継ぎ</div>
-            <div style="margin-bottom: 10px; font-size: 14px; line-height: 1.4;">
-                専門ドメインへ移動します。<br>登録地点も自動で引き継がれます。<br>
-                移動後、ホーム画面に再登録（古いアイコンは削除）<br>をお願いします。
-            </div>
-            <button onclick="goNewDomain()" style="
-                background-color: white; color: #d32f2f; border: none;
-                padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer;
-            ">地点データを保持して移動する</button>
+            <div style="font-weight:bold;margin-bottom:5px;">【重要】URL移行とデータ引継ぎ</div>
+            <div style="margin-bottom:10px;line-height:1.4;">専門ドメインへ移動します。地点データも自動で保持されます。</div>
+            <button onclick="goNewDomain()" style="background-color:white;color:#d32f2f;border:none;padding:10px 20px;border-radius:5px;font-weight:bold;cursor:pointer;">データを保持して移動する</button>
         `;
         document.body.prepend(banner);
         document.body.style.paddingTop = "130px";
     }
 
-    // 2. 新しいドメインに届いた場合：データを受け取って保存する
+    // 2. 新しいドメインに届いた場合
     if (currentHost === newDomain || currentHost === `www.${newDomain}`) {
         const urlParams = new URLSearchParams(window.location.search);
         const migrationAll = urlParams.get('migration_all');
         
         if (migrationAll) {
+            logDebug("データ受信開始...");
             try {
                 const parsed = JSON.parse(decodeURIComponent(migrationAll));
                 
-                if (parsed.spots) localStorage.setItem('pin_weather_spots', parsed.spots);
+                if (parsed.spots) {
+                    localStorage.setItem('pin_weather_spots', parsed.spots);
+                    logDebug("地点データ保存完了");
+                }
                 if (parsed.viewConfig) localStorage.setItem('pin_weather_view_config', parsed.viewConfig);
                 if (parsed.windFilter) localStorage.setItem('pin_weather_wind_filter', parsed.windFilter);
 
-                // セッションストレージに完了フラグを立てる
                 sessionStorage.setItem('migration_complete_flag', 'true');
+                logDebug("フラグセット完了。リロードします...");
 
-                // 重要：パラメータなしのURLに差し替えてリロード。履歴も上書き。
+                // 履歴を上書きし、かつ「戻る」履歴を抹殺してリロード
                 const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
                 window.location.replace(cleanUrl);
-                
-                // リロードを確実にするため、ここで処理を完全に止める
                 return; 
 
             } catch (e) {
-                console.error("Data migration failed", e);
+                logDebug(`エラー発生: ${e.message}`);
+                console.error("Migration error", e);
             }
         }
 
-        // 引継ぎ完了後の案内（リロード後のクリーンな状態で実行される）
+        // リロード後の正常起動確認
         if (sessionStorage.getItem('migration_complete_flag') === 'true') {
+            logDebug("移行後の正常起動を確認");
             sessionStorage.removeItem('migration_complete_flag');
 
             if (typeof showAppDialog === 'function') {
                 showAppDialog({
                     title: "データ引継ぎ完了",
-                    message: "お気に入りの地点を引き継ぎました。\n\n最後に、この新しいURLを「ホーム画面に追加」し、古い方のアイコンは削除してください。",
+                    message: "地点データを引き継ぎました。新しいURLをホーム画面に追加してください。",
                     onSave: () => {
                         const installBtn = document.getElementById('btn-pwa-install');
                         if (installBtn) installBtn.click();
                     }
                 });
+            } else {
+                logDebug("案内ダイアログの表示を試行...");
             }
         }
     }
