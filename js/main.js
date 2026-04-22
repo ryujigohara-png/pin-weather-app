@@ -2316,7 +2316,7 @@ function checkDomainMigration() {
             const dataString = encodeURIComponent(JSON.stringify(migrationPackage));
             targetUrl += `?migration_all=${dataString}`;
             
-            // 履歴を残さず移動
+            // 重要：replaceを使うことで「古いドメイン」を履歴から消し、戻れなくする
             window.location.replace(targetUrl);
         };
 
@@ -2356,15 +2356,14 @@ function checkDomainMigration() {
                 if (parsed.viewConfig) localStorage.setItem('pin_weather_view_config', parsed.viewConfig);
                 if (parsed.windFilter) localStorage.setItem('pin_weather_wind_filter', parsed.windFilter);
 
-                // 強制リロード前に履歴を現在のURLで完全に上書き（「戻る」の死滅）
-                const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-                window.history.replaceState(null, "", cleanUrl);
-                
-                // リロード後にメッセージを出すためのフラグ
+                // セッションストレージに完了フラグを立てる
                 sessionStorage.setItem('migration_complete_flag', 'true');
 
-                // 物理的なリロードを実行してグラフ描画を確実にする
-                window.location.href = cleanUrl;
+                // 重要：パラメータなしのURLに差し替えてリロード。履歴も上書き。
+                const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                window.location.replace(cleanUrl);
+                
+                // リロードを確実にするため、ここで処理を完全に止める
                 return; 
 
             } catch (e) {
@@ -2372,7 +2371,7 @@ function checkDomainMigration() {
             }
         }
 
-        // 引継ぎ完了後のダイアログ表示
+        // 引継ぎ完了後の案内（リロード後のクリーンな状態で実行される）
         if (sessionStorage.getItem('migration_complete_flag') === 'true') {
             sessionStorage.removeItem('migration_complete_flag');
 
