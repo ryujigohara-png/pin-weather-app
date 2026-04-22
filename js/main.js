@@ -2389,40 +2389,43 @@ function checkDomainMigration() {
         }
     }
 
-    // 4. インストールを促すバナーの表示条件判定
-    const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-    const isNewDomain = currentHost === newDomain || currentHost === `www.${newDomain}`;
-    
-    // バナー表示関数
-    const showInstallBanner = () => {
+    // 4. インストールバナー表示（誤判定防止強化版）
+    const runInstallGuide = () => {
+        // 二重表示防止
         if (document.getElementById('pwa-install-banner')) return;
-        if (sessionStorage.getItem('migration_final_alert')) return;
 
-        const installGuide = document.createElement('div');
-        installGuide.id = 'pwa-install-banner';
-        installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5; z-index: 9999; position: relative;';
-        installGuide.innerHTML = `
-            「ホーム画面に追加」すると次からワンクリックで開けます！<br>
-            <span style="font-size: 11px; font-weight: normal;">
-                左上の≡メニュー内「インストール」または、ブラウザの「ホーム画面に追加」から
-            </span>
-        `;
-        document.body.prepend(installGuide);
+        // PWA判定（複数の手法でスタンドアロン状態をチェック）
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
+                          || window.navigator.standalone 
+                          || document.referrer.includes('android-app://');
+
+        const isNewDomain = currentHost === newDomain || currentHost === `www.${newDomain}`;
+        const isMigrationActive = sessionStorage.getItem('migration_final_alert') === 'true';
+
+        // 条件：新ドメインである AND PWAとして起動していない AND 移行アラート中ではない
+        if (isNewDomain && !isStandalone && !isMigrationActive) {
+            const installGuide = document.createElement('div');
+            installGuide.id = 'pwa-install-banner';
+            installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5; z-index: 9999; position: relative;';
+            installGuide.innerHTML = `
+                「ホーム画面に追加」すると次からワンクリックで開けます！<br>
+                <span style="font-size: 11px; font-weight: normal;">
+                    左上の≡メニュー内「インストール」または、ブラウザの「ホーム画面に追加」から
+                </span>
+            `;
+            
+            // bodyの先頭に安全に挿入
+            if (document.body) {
+                document.body.prepend(installGuide);
+            }
+        }
     };
 
-    // 新ドメインかつPWAとして起動されていない場合
-    if (isNewDomain && !isPWA) {
-        // インストール可能なイベント（未インストール状態）を検知した場合に表示
-        window.addEventListener('beforeinstallprompt', (e) => {
-            // イベントをキャッチできた＝インストールされていない
-            showInstallBanner();
-        });
-
-        // iOSや一部ブラウザでは上記イベントが動かないため、
-        // 判定から1秒後に念のためチェックして表示（補完措置）
-        setTimeout(() => {
-            showInstallBanner();
-        }, 1000);
+    // DOMの読み込み状態に応じて実行タイミングを調整
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', runInstallGuide);
+    } else {
+        runInstallGuide();
     }
 }
 initApp();
