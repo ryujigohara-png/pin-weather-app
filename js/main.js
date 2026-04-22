@@ -64,6 +64,7 @@ const i18n = {
             btnDetailSettings: "⚙ 表示詳細設定",
             btnResetAll: "♻️ 全リセット",
             btnFeedback: "💬 ご意見・ご要望",
+            linkAboutAndPrivacy: "運営者情報 ＆ プライバシーポリシー",
             shareQR: "スマホで共有",
             btnCopyUrl: "🔗 URLをコピー",
             copySuccess: "✅ コピー完了！",
@@ -151,6 +152,7 @@ const i18n = {
             btnDetailSettings: "⚙ Display Settings",
             btnResetAll: "♻️ Reset All Spots",
             btnFeedback: "💬 Feedback & Requests",
+            linkAboutAndPrivacy: "About & Privacy Policy",    
             shareQR: "Share with Mobile",
             btnCopyUrl: "🔗 Copy URL",
             copySuccess: "✅ Copied!",
@@ -715,6 +717,9 @@ function applyEnvVisuals() {
  * 3. WelcomeダイアログでGPS/Mapの選択を促す
  */
 async function initApp() {
+    // 【追加】まず最初にドメイン移行が必要かチェックする
+    checkDomainMigration();
+
     window.history.replaceState({ page: 'home' }, "");
 
     const savedData = localStorage.getItem('pin_weather_spots');
@@ -847,11 +852,17 @@ function setupGeneralEvents() {
     if (searchBtn) searchBtn.onclick = executeMapSearch;
     
     // 3. 風向色付設定ボタン（サイドバー内）
+    // 競合回避のため、toggleSidebar を介さず openModalFromSidebar を使用
     const windCfgBtn = document.getElementById('wind-cfg-btn');
     if (windCfgBtn) {
         windCfgBtn.onclick = () => {
-            toggleSidebar(); // サイドバーを閉じる
-            openModal('wind-modal'); // 設定モーダルを開く
+            if (typeof openModalFromSidebar === 'function') {
+                openModalFromSidebar('wind-modal');
+            } else {
+                // 万が一関数がない場合のフォールバック（動作安定のため）
+                toggleSidebar();
+                openModal('wind-modal');
+            }
         };
     }
     
@@ -882,7 +893,6 @@ function setupGeneralEvents() {
     const feedbackBtn = document.getElementById('feedback-btn');
     if (feedbackBtn) {
         feedbackBtn.onclick = () => {
-            // GoogleフォームなどのURLを指定（例として私の提案時の構成を維持）
             const formUrl = "https://forms.gle/zdbaJNdodCMzcftK6";
             window.open(formUrl, '_blank');
         };
@@ -893,28 +903,71 @@ function setupGeneralEvents() {
     if (privacyLink) {
         privacyLink.onclick = (e) => {
             e.preventDefault(); // 画面遷移を防ぐ
-            // 公開時は、アップロードしたprivacy.htmlのURLを指定してください
-            //const privacyUrl = "https://あなたのドメイン/privacy.html"; 
-            // テスト用には、相対パス（同じサーバー内に privacy.html がある場合）
-            // これなら、beta版で開けばbetaの、main版で開けばmainのポリシーが開きます。
             const privacyUrl = "./privacy.html";
             window.open(privacyUrl, '_blank');
         };
     }
 }
 
-
+/**
+ * サイドバーの開閉制御
+ * 戻るボタン対策と、表示状態の不整合を修正した完全版
+ */
 function toggleSidebar() {
     const sb = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
     if (!sb || !overlay) return;
-    const isOpen = sb.classList.contains('open');
+
+    // style.display と classList の不整合を防ぐため、実際の表示状態で判定
+    const isOpen = sb.classList.contains('open') && sb.style.display !== 'none';
+
     if (isOpen) {
+        // --- 閉じる処理 ---
         sb.classList.remove('open');
+        sb.style.display = 'none'; // 明示的に非表示
         overlay.style.display = 'none';
+
+        // 手動で閉じた場合、積んだ履歴を1つ戻す
+        if (window.history.state && window.history.state.page === 'sidebar') {
+            window.history.back();
+        }
     } else {
+        // --- 開く処理 ---
         sb.classList.add('open');
+        sb.style.display = 'block'; // 明示的に表示
         overlay.style.display = 'block';
+
+        // 履歴に状態を追加（これで戻るボタンでアプリが終了しなくなる）
+        window.history.pushState({ page: 'sidebar' }, "");
+    }
+}
+
+/**
+ * サイドバー内のボタンからモーダルを呼び出す専用関数
+ * 戻るボタンの競合（一瞬で消える現象）を防ぐための完全版
+ */
+function openModalFromSidebar(modalId) {
+    const sb = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const modal = document.getElementById(modalId);
+
+    if (!sb || !modal) return;
+
+    // 1. サイドバーを閉じる（履歴を戻さずに直接非表示にする）
+    sb.classList.remove('open');
+    sb.style.display = 'none';
+    if (overlay) overlay.style.display = 'none';
+
+    // 2. サイドバー用に積んでいた履歴を「モーダル用」として再利用（上書き）
+    // これにより popstate が発火せず、一瞬で消える現象を回避する
+    window.history.replaceState({ page: 'modal', id: modalId }, "");
+
+    // 3. モーダルを表示
+    modal.style.display = 'block';
+
+    // 風向設定モーダルの場合はUIを初期化
+    if (modalId === 'wind-modal') {
+        initCompassUI();
     }
 }
 
@@ -935,7 +988,6 @@ function initCompassUI() {
         const y = centerY + radius * Math.sin(angle) - 15;
 
         const el = document.createElement('div');
-        // ここでの dir と targetWindDirections の中身が同じ言語（日本語同士 or 英語同士）になるため、正しく active が付きます
         el.className = 'compass-label' + (targetWindDirections.includes(dir) ? ' active' : '');
         el.style.left = `${x}px`;
         el.style.top = `${y}px`;
@@ -1357,13 +1409,15 @@ window.history.replaceState({ page: 'home' }, "");
  * 監視役：ブラウザの「戻る」が押されたら実行（一本化）
  */
 window.onpopstate = function(event) {
-    // ログを表示して動作を確認できるようにする
     console.log("DEBUG: Back Button Pressed!", event.state);
 
-    // HTML構造に合わせて対象を全て含める
-    const targets = document.querySelectorAll('.modal, .modal-overlay, #app-common-modal');
+    // 全ての要素を確実に非表示にし、クラスも除去する
+    const targets = document.querySelectorAll('.modal, .modal-overlay, #app-common-modal, .sidebar, .sidebar-overlay');
     targets.forEach(m => {
         m.style.display = 'none';
+        if (m.classList.contains('open')) {
+            m.classList.remove('open');
+        }
     });
     
     // 地図の仮マーカー消去
@@ -1374,13 +1428,20 @@ window.onpopstate = function(event) {
 
 /**
  * 共通サブルーチン：モーダルを開く
+ * 履歴を積むことで、ブラウザの「戻る」ボタンで閉じられるように制御する
  */
 function openModal(id) {
     const modal = document.getElementById(id);
+    
+    // モーダルが存在しない、または既に表示されている場合は何もしない
     if (!modal || modal.style.display === 'block') return;
     
+    // 表示状態に変更
     modal.style.display = 'block';
+    
+    // 履歴に状態を追加（戻るボタンでアプリが終了するのを防ぐ）
     window.history.pushState({ page: 'modal', id: id }, "");
+    
     console.log("DEBUG: Modal Opened:", id);
 }
 
@@ -1396,6 +1457,15 @@ function closeModal(id) {
             window.history.back();
         }
     }
+}
+
+/**
+ * 共通サブルーチン：サイドバーを開く際に履歴を積む
+ * サイドバーを表示させる関数（既存）の直後に追加して使用してください。
+ */
+function pushSidebarState() {
+    window.history.pushState({ page: 'sidebar' }, "");
+    console.log("DEBUG: Sidebar State Pushed");
 }
 
 // 設定保存時に実行
@@ -2192,23 +2262,24 @@ function initPwaInstall() {
 
     // B. iOS (Safari) の場合
     if (isIOS) {
-        // iOSはブラウザイベントが取れないため、最初からガイドボタンとして表示
         installContainer.style.display = 'block';
     }
 
-    // ボタンクリック時の挙動をデバイス別に分岐
+    // ボタンクリック時の挙動
     installBtn.onclick = async () => {
         if (isIOS) {
-            // iOS用のガイドを表示（辞書から取得）
             alert(`${i18n.t('iosInstallTitle')}\n\n${i18n.t('iosInstallGuide')}`);
         } else if (deferredPrompt) {
-            // Android/PC用のインストールダイアログ
             deferredPrompt.prompt();
             const { outcome } = await deferredPrompt.userChoice;
             if (outcome === 'accepted') {
                 installContainer.style.display = 'none';
             }
             deferredPrompt = null;
+        } else {
+            // 【重要】ブラウザがボタンを自動で出さない場合の救済策
+            // 古いアイコンがあっても、ブラウザのメニューから直接インストールは可能です
+            alert("新しいURLでアプリを登録します。\n\nブラウザ右上のメニュー（︙）から「アプリをインストール」または「ホーム画面に追加」を選択してください。");
         }
     };
 }
@@ -2223,5 +2294,121 @@ window.addEventListener('appinstalled', () => {
 // DOM構築後に実行
 window.addEventListener('DOMContentLoaded', initPwaInstall);
 
+/**
+ * サブルーチン：新ドメイン移行案内の表示
+ * 概要：旧ドメインから新ドメインへのデータ引継ぎを行い、完了後はユーザーにアプリを閉じてブラウザで開き直すよう促す。
+ * 新ドメイン起動時は、未インストールのユーザーに対してホーム画面追加（PWA）の手順を表示する。
+ */
+function checkDomainMigration() {
+    const currentHost = window.location.hostname;
+    const newDomain = "pin-weather.pro"; 
+
+    // 1. 旧ドメイン（onrender.com）での処理
+    if (currentHost.includes("onrender.com")) {
+        window.goNewDomain = function() {
+            const spotsData = localStorage.getItem('pin_weather_spots');
+            const viewConfigData = localStorage.getItem('pin_weather_view_config');
+            const windFilterData = localStorage.getItem('pin_weather_wind_filter');
+            
+            let targetUrl = `https://${newDomain}/`;
+            const migrationPackage = {
+                spots: spotsData,
+                viewConfig: viewConfigData,
+                windFilter: windFilterData
+            };
+            const dataString = encodeURIComponent(JSON.stringify(migrationPackage));
+            targetUrl += `?migration_all=${dataString}`;
+            
+            window.location.replace(targetUrl);
+        };
+
+        const banner = document.createElement('div');
+        banner.id = 'migration-banner';
+        banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background-color:#d32f2f;color:white;text-align:center;padding:15px 10px;z-index:10000;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,0.3);';
+        banner.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 5px;">【重要】新URLへの移動とデータ引継ぎ</div>
+            <div style="margin-bottom: 10px; font-size: 14px; line-height: 1.4;">
+                新サイトpin-weather.proに転居しました。<br>登録地点は自動で引き継ぎます。<br>
+                新サイトに移動してください。
+            </div>
+            <button onclick="goNewDomain()" style="background-color: white; color: #d32f2f; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer;">地点データを保持して移動する</button>
+        `;
+        document.body.prepend(banner);
+        document.body.style.paddingTop = "130px";
+    }
+
+    // 2. 新ドメイン（pin-weather.pro）に届いた直後の処理
+    if (currentHost === newDomain || currentHost === `www.${newDomain}`) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const migrationAll = urlParams.get('migration_all');
+        const isExplicitBrowser = urlParams.get('mode') === 'browser'; // ブラウザ表示モードの判定
+        
+        if (migrationAll) {
+            try {
+                const parsed = JSON.parse(decodeURIComponent(migrationAll));
+                if (parsed.spots) localStorage.setItem('pin_weather_spots', parsed.spots);
+                if (parsed.viewConfig) localStorage.setItem('pin_weather_view_config', parsed.viewConfig);
+                if (parsed.windFilter) localStorage.setItem('pin_weather_wind_filter', parsed.windFilter);
+
+                // 保存が完了したら、パラメータのないクリーンなURLへ差し替え
+                sessionStorage.setItem('migration_final_alert', 'true');
+                window.location.replace(window.location.origin + window.location.pathname);
+                return; 
+            } catch (e) {
+                console.error("Migration error", e);
+            }
+        }
+
+        // 3. パラメータが消えた後、ユーザーに案内を表示
+        if (sessionStorage.getItem('migration_final_alert') === 'true') {
+            setTimeout(() => {
+                sessionStorage.removeItem('migration_final_alert');
+                
+                if (typeof showAppDialog === 'function') {
+                    showAppDialog({
+                        title: "データ引継ぎ完了",
+                        message: "データの移行に成功しました。\n下記のリンクをタップしてブラウザで開き直し、ホーム画面への再登録をお願いします。",
+                        onSave: () => {
+                            document.body.innerHTML = `
+                                <div style="padding:50px; text-align:center; font-family:sans-serif;">
+                                    <h3>移行準備が整いました</h3>
+                                    <p style="margin-top:20px; line-height:1.6;">
+                                        以下のリンクをタップして<br>新サイトをブラウザで開き直してください。<br><br>
+                                        新サイトをワンクリックで開けるようにするときは、<br>
+                                        <b>・≡サイドバーメニューから「インストール」</b>するか<br>
+                                        ・AndroidはChrome等「ホーム画面に追加」<br>
+                                        ・iPhoneはSafari「共有」⇒「ホーム画面に追加」<br>
+                                        をしてPWAをインストールしてください。<br><br>
+                                        <a href="https://pin-weather.pro/?mode=browser" style="display:inline-block; background-color:#d32f2f; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold;">新サイトをブラウザで開く</a>
+                                    </p>
+                                    <p style="margin-top:20px; color:#666;">このPWA（古いサイト）は閉じてください。</p>
+                                </div>`;
+                        }
+                    });
+                }
+            }, 1000);
+        }
+
+        // 4. インストールを促すバナーの表示条件判定
+        const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+        const isNewDomain = currentHost === newDomain || currentHost === `www.${newDomain}`;
+        
+        // 【修正】PWA起動中であっても、URLに mode=browser が含まれている場合は強制表示する
+        if (isNewDomain && (!isPWA || isExplicitBrowser) && !sessionStorage.getItem('migration_final_alert')) {
+            const installGuide = document.createElement('div');
+            installGuide.id = 'pwa-install-banner';
+            // z-index を 100 に下げてサイドバーの下に隠れるように修正
+            installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5; z-index: 100; position: relative;';
+            installGuide.innerHTML = `
+                「ホーム画面に追加」⇒次からワンクリックで開けます！<br>
+                <span style="font-size: 11px; font-weight: normal;">
+                    左上の≡メニュー内「インストール」または、<br>
+                    Chrome ⋮ メニューから / Safari 共有 から<br>「ホーム画面に追加」
+                </span>
+            `;
+            document.body.prepend(installGuide);
+        }
+    }
+}
 
 initApp();
