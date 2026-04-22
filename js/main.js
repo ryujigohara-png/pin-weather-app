@@ -2411,4 +2411,58 @@ function checkDomainMigration() {
     }
 }
 
+/**
+ * サブルーチン：AdMobバナー広告の初期化（既存フッター対応版）
+ */
+function initAdMob() {
+    // 1. Google 広告ライブラリの動的読み込み
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-app-pub-9150851667382123";
+    script.crossOrigin = "anonymous";
+    document.head.appendChild(script);
+
+    // 2. 広告を表示するコンテナを作成
+    // 既存の padding-bottom: 70px の範囲内に収まるように配置します
+    const adContainer = document.createElement('div');
+    adContainer.id = "ad-banner-bottom";
+    adContainer.style.cssText = `
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        text-align: center;
+        z-index: 9999;
+        background: #ffffff; /* フッター背景と合わせる */
+        height: 60px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-top: 1px solid #eaeaea;
+    `;
+
+    // 3. 広告ユニットの挿入（ユニットID: 5919866110）
+    adContainer.innerHTML = `
+        <ins class="adsbygoogle"
+             style="display:inline-block;width:320px;height:50px"
+             data-ad-client="ca-app-pub-9150851667382123"
+             data-ad-slot="5919866110"></ins>
+    `;
+
+    document.body.appendChild(adContainer);
+
+    // 4. 実行（ライブラリ読み込み完了後にプッシュ）
+    script.onload = () => {
+        try {
+            (adsbygoogle = window.adsbygoogle || []).push({});
+        } catch (e) {
+            console.log("AdMob: 審査待ちまたはローカル環境のため広告は非表示です");
+        }
+    };
+}
+
+// アプリ起動時に実行
+window.addEventListener('DOMContentLoaded', initAdMob);
+
+
 initApp();
