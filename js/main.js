@@ -2294,24 +2294,11 @@ window.addEventListener('appinstalled', () => {
 window.addEventListener('DOMContentLoaded', initPwaInstall);
 
 /**
- * サブルーチン：新ドメイン移行案内の表示（デバッグ表示・履歴完全抹消版）
+ * サブルーチン：新ドメイン移行案内の表示（エラー回避・自動リロード版）
  */
 function checkDomainMigration() {
     const currentHost = window.location.hostname;
     const newDomain = "pin-weather.pro"; 
-
-    // デバッグ用ログ表示関数
-    const logDebug = (msg) => {
-        let debugDiv = document.getElementById('migration-debug');
-        if (!debugDiv) {
-            debugDiv = document.createElement('div');
-            debugDiv.id = 'migration-debug';
-            debugDiv.style.cssText = 'position:fixed;bottom:0;left:0;width:100%;background:rgba(0,0,0,0.8);color:#0f0;font-family:monospace;font-size:10px;z-index:20000;padding:5px;pointer-events:none;';
-            document.body.appendChild(debugDiv);
-        }
-        debugDiv.innerHTML += `> ${msg}<br>`;
-        console.log(`[Migration] ${msg}`);
-    };
 
     // 1. 古いドメインにいる場合
     if (currentHost.includes("onrender.com")) {
@@ -2320,7 +2307,7 @@ function checkDomainMigration() {
         const windFilterData = localStorage.getItem('pin_weather_wind_filter');
         
         window.goNewDomain = function() {
-            let targetUrl = `https://${newDomain}`;
+            let targetUrl = `https://${newDomain}/`;
             const migrationPackage = {
                 spots: spotsData,
                 viewConfig: viewConfigData,
@@ -2329,19 +2316,19 @@ function checkDomainMigration() {
             const dataString = encodeURIComponent(JSON.stringify(migrationPackage));
             targetUrl += `?migration_all=${dataString}`;
             
-            // replaceを使用して、この「古いドメイン」を履歴から消し去る
+            // 履歴を残さず新ドメインへ。PWAの「×」で戻るのを防ぐ
             window.location.replace(targetUrl);
         };
 
         const banner = document.createElement('div');
-        banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background-color:#d32f2f;color:white;text-align:center;padding:15px 10px;z-index:10000;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,0.3);';
+        banner.id = 'migration-banner';
+        banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background-color:#d32f2f;color:white;text-align:center;padding:15px 10px;z-index:10000;font-size:14px;';
         banner.innerHTML = `
             <div style="font-weight:bold;margin-bottom:5px;">【重要】URL移行とデータ引継ぎ</div>
-            <div style="margin-bottom:10px;line-height:1.4;">専門ドメインへ移動します。地点データも自動で保持されます。</div>
             <button onclick="goNewDomain()" style="background-color:white;color:#d32f2f;border:none;padding:10px 20px;border-radius:5px;font-weight:bold;cursor:pointer;">データを保持して移動する</button>
         `;
         document.body.prepend(banner);
-        document.body.style.paddingTop = "130px";
+        document.body.style.paddingTop = "100px";
     }
 
     // 2. 新しいドメインに届いた場合
@@ -2350,48 +2337,42 @@ function checkDomainMigration() {
         const migrationAll = urlParams.get('migration_all');
         
         if (migrationAll) {
-            logDebug("データ受信開始...");
             try {
                 const parsed = JSON.parse(decodeURIComponent(migrationAll));
                 
-                if (parsed.spots) {
-                    localStorage.setItem('pin_weather_spots', parsed.spots);
-                    logDebug("地点データ保存完了");
-                }
+                // データを保存
+                if (parsed.spots) localStorage.setItem('pin_weather_spots', parsed.spots);
                 if (parsed.viewConfig) localStorage.setItem('pin_weather_view_config', parsed.viewConfig);
                 if (parsed.windFilter) localStorage.setItem('pin_weather_wind_filter', parsed.windFilter);
 
-                sessionStorage.setItem('migration_complete_flag', 'true');
-                logDebug("フラグセット完了。リロードします...");
+                // 次回起動時にダイアログを出すためのフラグ
+                sessionStorage.setItem('migration_success', 'true');
 
-                // 履歴を上書きし、かつ「戻る」履歴を抹殺してリロード
-                const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                // 重要：クリーンなURLへ差し替え。これにより「戻る」履歴を抹消し、アプリを正常初期化させる
+                const cleanUrl = window.location.origin + window.location.pathname;
                 window.location.replace(cleanUrl);
                 return; 
 
             } catch (e) {
-                logDebug(`エラー発生: ${e.message}`);
-                console.error("Migration error", e);
+                console.error("Migration parse error", e);
             }
         }
 
-        // リロード後の正常起動確認
-        if (sessionStorage.getItem('migration_complete_flag') === 'true') {
-            logDebug("移行後の正常起動を確認");
-            sessionStorage.removeItem('migration_complete_flag');
-
-            if (typeof showAppDialog === 'function') {
-                showAppDialog({
-                    title: "データ引継ぎ完了",
-                    message: "地点データを引き継ぎました。新しいURLをホーム画面に追加してください。",
-                    onSave: () => {
-                        const installBtn = document.getElementById('btn-pwa-install');
-                        if (installBtn) installBtn.click();
-                    }
-                });
-            } else {
-                logDebug("案内ダイアログの表示を試行...");
-            }
+        // リロード後、DOMが完全に整ってからダイアログを表示（setTimeoutで安全策）
+        if (sessionStorage.getItem('migration_success') === 'true') {
+            setTimeout(() => {
+                sessionStorage.removeItem('migration_success');
+                if (typeof showAppDialog === 'function') {
+                    showAppDialog({
+                        title: "データ引継ぎ完了",
+                        message: "地点データを引き継ぎました。\nこの新しいURLをホーム画面に追加してください。",
+                        onSave: () => {
+                            const installBtn = document.getElementById('btn-pwa-install');
+                            if (installBtn) installBtn.click();
+                        }
+                    });
+                }
+            }, 1000); // 1秒待機して確実に描画を優先させる
         }
     }
 }
