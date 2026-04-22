@@ -2373,12 +2373,11 @@ function checkDomainMigration() {
                                 <div style="padding:50px; text-align:center; font-family:sans-serif;">
                                     <h3>移行準備が整いました</h3>
                                     <p style="margin-top:20px;">
-                                        以下のリンクをタップして<br>新サイトをブラウザで開き直してください。<br>
-                                        新サイトをワンクリックで開けるようにするためには、<br>
-                                        新サイトでサイドバーメニューからインストールするか<br>
-                                        ブラウザのメニューから<br>
-                                        ・androidは、ブラウザ(chrome等)の「ホーム画面に追加」<br>
-                                        ・iphoneは、safariの「共有」から「ホーム画面に追加」<br>
+                                        以下のリンクをタップして<br>新サイトをブラウザで開き直してください。<br><br>
+                                        新サイトをワンクリックで開けるようにするために、<br>
+                                        ・三サイドバーメニューから「インストール」<br>
+                                        ・androidは、chrome等の「ホーム画面に追加」<br>
+                                        ・iphoneは、safariの「共有」⇒「ホーム画面に追加」<br>
                                         をしてPWAをインストールしてください。<br><br>
                                         <a href="https://pin-weather.pro" target="_blank" rel="noopener noreferrer" style="display:inline-block; background-color:#d32f2f; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold;">新サイトをブラウザで開く</a>
                                     </p>
