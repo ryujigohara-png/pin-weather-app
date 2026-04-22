@@ -2393,9 +2393,11 @@ function checkDomainMigration() {
     const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
     const isNewDomain = currentHost === newDomain || currentHost === `www.${newDomain}`;
     
-    // 表示条件：
-    // 「新ドメインを表示している」が、「PWAとして起動されていない（ブラウザで見ている、または旧PWAの枠内で新ドメインを見ている）」場合
-    if (isNewDomain && !isPWA && !sessionStorage.getItem('migration_final_alert')) {
+    // バナー表示関数
+    const showInstallBanner = () => {
+        if (document.getElementById('pwa-install-banner')) return;
+        if (sessionStorage.getItem('migration_final_alert')) return;
+
         const installGuide = document.createElement('div');
         installGuide.id = 'pwa-install-banner';
         installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5; z-index: 9999; position: relative;';
@@ -2406,6 +2408,21 @@ function checkDomainMigration() {
             </span>
         `;
         document.body.prepend(installGuide);
+    };
+
+    // 新ドメインかつPWAとして起動されていない場合
+    if (isNewDomain && !isPWA) {
+        // インストール可能なイベント（未インストール状態）を検知した場合に表示
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // イベントをキャッチできた＝インストールされていない
+            showInstallBanner();
+        });
+
+        // iOSや一部ブラウザでは上記イベントが動かないため、
+        // 判定から1秒後に念のためチェックして表示（補完措置）
+        setTimeout(() => {
+            showInstallBanner();
+        }, 1000);
     }
 }
 initApp();
