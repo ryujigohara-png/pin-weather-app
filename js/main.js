@@ -2262,23 +2262,24 @@ function initPwaInstall() {
 
     // B. iOS (Safari) の場合
     if (isIOS) {
-        // iOSはブラウザイベントが取れないため、最初からガイドボタンとして表示
         installContainer.style.display = 'block';
     }
 
-    // ボタンクリック時の挙動をデバイス別に分岐
+    // ボタンクリック時の挙動
     installBtn.onclick = async () => {
         if (isIOS) {
-            // iOS用のガイドを表示（辞書から取得）
             alert(`${i18n.t('iosInstallTitle')}\n\n${i18n.t('iosInstallGuide')}`);
         } else if (deferredPrompt) {
-            // Android/PC用のインストールダイアログ
             deferredPrompt.prompt();
             const { outcome } = await deferredPrompt.userChoice;
             if (outcome === 'accepted') {
                 installContainer.style.display = 'none';
             }
             deferredPrompt = null;
+        } else {
+            // 【重要】ブラウザがボタンを自動で出さない場合の救済策
+            // 古いアイコンがあっても、ブラウザのメニューから直接インストールは可能です
+            alert("新しいURLでアプリを登録します。\n\nブラウザ右上のメニュー（︙）から「アプリをインストール」または「ホーム画面に追加」を選択してください。");
         }
     };
 }
