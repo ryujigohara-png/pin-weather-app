@@ -2389,15 +2389,13 @@ function checkDomainMigration() {
         }
     }
 
-    // 4. インストールを促すバナーの表示条件判定（ドメイン判定の外側に配置）
+    // 4. インストールを促すバナーの表示条件判定
     const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
     const isNewDomain = currentHost === newDomain || currentHost === `www.${newDomain}`;
     
     // 表示条件：
-    // ①ブラウザ（非PWA）で開いている
-    // ②PWAで開いているが、新ドメインではない（＝旧ドメインのPWAである）
-    // かつ、移行完了アラートの表示中でないこと
-    if ((!isPWA || !isNewDomain) && !sessionStorage.getItem('migration_final_alert')) {
+    // 「新ドメインを表示している」が、「PWAとして起動されていない（ブラウザで見ている、または旧PWAの枠内で新ドメインを見ている）」場合
+    if (isNewDomain && !isPWA && !sessionStorage.getItem('migration_final_alert')) {
         const installGuide = document.createElement('div');
         installGuide.id = 'pwa-install-banner';
         installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5; z-index: 9999; position: relative;';
