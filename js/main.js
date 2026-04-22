@@ -2364,12 +2364,6 @@ function checkDomainMigration() {
                 sessionStorage.removeItem('migration_final_alert');
                 
                 if (typeof showAppDialog === 'function') {
-                    // Android向けにブラウザを強制起動するためのintentリンクを作成
-                    const browserUrl = `https://pin-weather.pro/?mode=browser`;
-                    const intentUrl = `intent://${newDomain}/?mode=browser#Intent;scheme=https;package=com.android.chrome;end`;
-                    const isAndroid = /Android/i.test(navigator.userAgent);
-                    const finalUrl = isAndroid ? intentUrl : browserUrl;
-
                     showAppDialog({
                         title: "データ引継ぎ完了",
                         message: "データの移行に成功しました。\n下記のリンクをタップしてブラウザで開き直し、ホーム画面への再登録をお願いします。",
@@ -2384,7 +2378,7 @@ function checkDomainMigration() {
                                         ・AndroidはChrome等「ホーム画面に追加」<br>
                                         ・iPhoneはSafari「共有」⇒「ホーム画面に追加」<br>
                                         をしてPWAをインストールしてください。<br><br>
-                                        <a href="${finalUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block; background-color:#d32f2f; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold;">新サイトをブラウザで開く</a>
+                                        <a href="https://pin-weather.pro/?mode=browser" target="_blank" rel="noopener noreferrer" style="display:inline-block; background-color:#d32f2f; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold;">新サイトをブラウザで開く</a>
                                     </p>
                                     <p style="margin-top:20px; color:#666;">このPWA（古いサイト）は閉じてください。</p>
                                 </div>`;
@@ -2394,9 +2388,12 @@ function checkDomainMigration() {
             }, 1000);
         }
 
-        // 4. ブラウザ起動時（非PWA）のみ、常に上部にインストールを促すバナーを表示
+        // 4. インストールを促すバナーを表示する条件の変更
+        // 非PWA状態、または「PWA状態であっても新ドメインでない場合」に表示する
         const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-        if (!isPWA && !sessionStorage.getItem('migration_final_alert')) {
+        const isNotNewDomain = currentHost !== newDomain && currentHost !== `www.${newDomain}`;
+        
+        if ((!isPWA || isNotNewDomain) && !sessionStorage.getItem('migration_final_alert')) {
             const installGuide = document.createElement('div');
             installGuide.id = 'pwa-install-banner';
             installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5; z-index: 9999; position: relative;';
