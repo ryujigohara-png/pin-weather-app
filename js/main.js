@@ -2371,14 +2371,14 @@ function checkDomainMigration() {
                             document.body.innerHTML = `
                                 <div style="padding:50px; text-align:center; font-family:sans-serif;">
                                     <h3>移行準備が整いました</h3>
-                                    <p style="margin-top:20px;">
+                                    <p style="margin-top:20px; line-height:1.6;">
                                         以下のリンクをタップして<br>新サイトをブラウザで開き直してください。<br><br>
                                         新サイトをワンクリックで開けるようにするときは、<br>
-                                        ・≡サイドバーメニューから「インストール」するか<br>
+                                        <b>・≡サイドバーメニューから「インストール」</b>するか<br>
                                         ・AndroidはChrome等「ホーム画面に追加」<br>
                                         ・iPhoneはSafari「共有」⇒「ホーム画面に追加」<br>
                                         をしてPWAをインストールしてください。<br><br>
-                                        <a href="https://pin-weather.pro" target="_blank" rel="noopener noreferrer" style="display:inline-block; background-color:#d32f2f; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold;">新サイトをブラウザで開く</a>
+                                        <a href="https://pin-weather.pro/?mode=browser" target="_blank" rel="noopener noreferrer" style="display:inline-block; background-color:#d32f2f; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold;">新サイトをブラウザで開く</a>
                                     </p>
                                     <p style="margin-top:20px; color:#666;">このPWA（古いサイト）は閉じてください。</p>
                                 </div>`;
@@ -2393,11 +2393,11 @@ function checkDomainMigration() {
         if (!isPWA && !sessionStorage.getItem('migration_final_alert')) {
             const installGuide = document.createElement('div');
             installGuide.id = 'pwa-install-banner';
-            installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5;';
+            installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5; z-index: 9999; position: relative;';
             installGuide.innerHTML = `
                 「ホーム画面に追加」すると次からワンクリックで開けます！<br>
                 <span style="font-size: 11px; font-weight: normal;">
-                    Android: Chromeメニューから「ホーム画面に追加」 / iPhone: Safari共有から「ホーム画面に追加」
+                    左上の≡メニュー内「インストール」または、ブラウザの「ホーム画面に追加」から
                 </span>
             `;
             document.body.prepend(installGuide);
