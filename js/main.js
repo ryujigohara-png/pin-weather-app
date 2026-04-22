@@ -2302,27 +2302,22 @@ function checkDomainMigration() {
 
     // 1. 古いドメインにいる場合：データを新ドメインに送る準備
     if (currentHost.includes("onrender.com")) {
-        // 各データを取得
         const spotsData = localStorage.getItem('pin_weather_spots');
         const viewConfigData = localStorage.getItem('pin_weather_view_config');
         const windFilterData = localStorage.getItem('pin_weather_wind_filter');
         
-        // 移動ボタンのクリックイベント
         window.goNewDomain = function() {
             let targetUrl = `https://${newDomain}`;
-            
-            // データを一つのオブジェクトにまとめる
             const migrationPackage = {
                 spots: spotsData,
                 viewConfig: viewConfigData,
                 windFilter: windFilterData
             };
-            
-            // 文字列化してURLパラメータに付与
             const dataString = encodeURIComponent(JSON.stringify(migrationPackage));
             targetUrl += `?migration_all=${dataString}`;
             
-            window.location.href = targetUrl;
+            // 履歴を残さず移動
+            window.location.replace(targetUrl);
         };
 
         const banner = document.createElement('div');
@@ -2357,33 +2352,29 @@ function checkDomainMigration() {
             try {
                 const parsed = JSON.parse(decodeURIComponent(migrationAll));
                 
-                // それぞれのデータが存在する場合のみ個別に保存
-                if (parsed.spots) {
-                    localStorage.setItem('pin_weather_spots', parsed.spots);
-                }
-                if (parsed.viewConfig) {
-                    localStorage.setItem('pin_weather_view_config', parsed.viewConfig);
-                }
-                if (parsed.windFilter) {
-                    localStorage.setItem('pin_weather_wind_filter', parsed.windFilter);
-                }
+                if (parsed.spots) localStorage.setItem('pin_weather_spots', parsed.spots);
+                if (parsed.viewConfig) localStorage.setItem('pin_weather_view_config', parsed.viewConfig);
+                if (parsed.windFilter) localStorage.setItem('pin_weather_wind_filter', parsed.windFilter);
 
-                // リロード後もメッセージを出すためのフラグをセット
+                // 強制リロード前に履歴を現在のURLで完全に上書き（「戻る」の死滅）
+                const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                window.history.replaceState(null, "", cleanUrl);
+                
+                // リロード後にメッセージを出すためのフラグ
                 sessionStorage.setItem('migration_complete_flag', 'true');
 
-                // パラメータを削除したクリーンなURLへ強制リロード（location.replaceにより履歴も上書き）
-                const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-                window.location.replace(cleanUrl);
-                return; // リロードが開始されるため処理を終了
+                // 物理的なリロードを実行してグラフ描画を確実にする
+                window.location.href = cleanUrl;
+                return; 
 
             } catch (e) {
                 console.error("Data migration failed", e);
             }
         }
 
-        // リロード後にフラグがあれば完了案内を表示
+        // 引継ぎ完了後のダイアログ表示
         if (sessionStorage.getItem('migration_complete_flag') === 'true') {
-            sessionStorage.removeItem('migration_complete_flag'); // 表示後に削除
+            sessionStorage.removeItem('migration_complete_flag');
 
             if (typeof showAppDialog === 'function') {
                 showAppDialog({
@@ -2394,8 +2385,6 @@ function checkDomainMigration() {
                         if (installBtn) installBtn.click();
                     }
                 });
-            } else {
-                alert("地点データを引き継ぎました！\n新しいURLで再登録をお願いします。");
             }
         }
     }
