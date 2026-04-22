@@ -2295,137 +2295,37 @@ window.addEventListener('appinstalled', () => {
 window.addEventListener('DOMContentLoaded', initPwaInstall);
 
 /**
- * サブルーチン：新ドメイン移行案内の表示
- * 概要：旧ドメインから新ドメインへのデータ引継ぎを行い、完了後はユーザーにアプリを閉じてブラウザで開き直すよう促す。
- * 新ドメイン起動時は、未インストールのユーザーに対してホーム画面追加（PWA）の手順を表示する。
+ * 診断用：なぜバナーが出ないのかを特定するサブルーチン
  */
 function checkDomainMigration() {
     const currentHost = window.location.hostname;
     const newDomain = "pin-weather.pro"; 
+    
+    // 診断メッセージを溜める変数
+    let debugMsg = "";
 
-    // 1. 旧ドメイン（onrender.com）での処理
-    if (currentHost.includes("onrender.com")) {
-        window.goNewDomain = function() {
-            const spotsData = localStorage.getItem('pin_weather_spots');
-            const viewConfigData = localStorage.getItem('pin_weather_view_config');
-            const windFilterData = localStorage.getItem('pin_weather_wind_filter');
-            
-            let targetUrl = `https://${newDomain}/`;
-            const migrationPackage = {
-                spots: spotsData,
-                viewConfig: viewConfigData,
-                windFilter: windFilterData
-            };
-            const dataString = encodeURIComponent(JSON.stringify(migrationPackage));
-            targetUrl += `?migration_all=${dataString}`;
-            
-            window.location.replace(targetUrl);
-        };
+    // 1. PWA判定の診断
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
+                      || window.navigator.standalone 
+                      || document.referrer.includes('android-app://');
+    debugMsg += `・PWA起動状態: ${isStandalone ? "YES (PWA内)" : "NO (ブラウザ)"}\n`;
 
-        const banner = document.createElement('div');
-        banner.id = 'migration-banner';
-        banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background-color:#d32f2f;color:white;text-align:center;padding:15px 10px;z-index:10000;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,0.3);';
-        banner.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 5px;">【重要】URL移行とデータ引継ぎ</div>
-            <div style="margin-bottom: 10px; font-size: 14px; line-height: 1.4;">
-                専門ドメインに転居しました。登録地点は自動で引き継ぎます。<br>
-                移動後、一度このアプリを閉じてから、ブラウザで開き直してください。
-            </div>
-            <button onclick="goNewDomain()" style="background-color: white; color: #d32f2f; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer;">地点データを保持して移動する</button>
-        `;
-        document.body.prepend(banner);
-        document.body.style.paddingTop = "130px";
-    }
+    // 2. ドメイン判定の診断
+    const isNewDomain = currentHost === newDomain || currentHost === `www.${newDomain}`;
+    debugMsg += `・新ドメイン判定: ${isNewDomain ? "OK" : "NG (旧ドメイン)"}\n`;
 
-    // 2. 新ドメイン（pin-weather.pro）に届いた直後の処理
-    if (currentHost === newDomain || currentHost === `www.${newDomain}`) {
-        const urlParams = new URLSearchParams(window.location.search);
-        const migrationAll = urlParams.get('migration_all');
-        
-        if (migrationAll) {
-            try {
-                const parsed = JSON.parse(decodeURIComponent(migrationAll));
-                if (parsed.spots) localStorage.setItem('pin_weather_spots', parsed.spots);
-                if (parsed.viewConfig) localStorage.setItem('pin_weather_view_config', parsed.viewConfig);
-                if (parsed.windFilter) localStorage.setItem('pin_weather_wind_filter', parsed.windFilter);
+    // 3. インストール済みイベントの診断
+    window.addEventListener('beforeinstallprompt', (e) => {
+        alert("【診断結果】インストール可能です！(beforeinstallprompt検知)");
+    });
 
-                // 保存が完了したら、パラメータのないクリーンなURLへ差し替え
-                sessionStorage.setItem('migration_final_alert', 'true');
-                window.location.replace(window.location.origin + window.location.pathname);
-                return; 
-            } catch (e) {
-                console.error("Migration error", e);
-            }
-        }
-
-        // 3. パラメータが消えた後、ユーザーに案内を表示
-        if (sessionStorage.getItem('migration_final_alert') === 'true') {
-            setTimeout(() => {
-                sessionStorage.removeItem('migration_final_alert');
-                
-                if (typeof showAppDialog === 'function') {
-                    showAppDialog({
-                        title: "データ引継ぎ完了",
-                        message: "データの移行に成功しました。\n下記のリンクをタップしてブラウザで開き直し、ホーム画面への再登録をお願いします。",
-                        onSave: () => {
-                            document.body.innerHTML = `
-                                <div style="padding:50px; text-align:center; font-family:sans-serif;">
-                                    <h3>移行準備が整いました</h3>
-                                    <p style="margin-top:20px; line-height:1.6;">
-                                        以下のリンクをタップして<br>新サイトをブラウザで開き直してください。<br><br>
-                                        新サイトをワンクリックで開けるようにするときは、<br>
-                                        <b>・≡サイドバーメニューから「インストール」</b>するか<br>
-                                        ・AndroidはChrome等「ホーム画面に追加」<br>
-                                        ・iPhoneはSafari「共有」⇒「ホーム画面に追加」<br>
-                                        をしてPWAをインストールしてください。<br><br>
-                                        <a href="https://pin-weather.pro/?mode=browser" target="_blank" rel="noopener noreferrer" style="display:inline-block; background-color:#d32f2f; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold;">新サイトをブラウザで開く</a>
-                                    </p>
-                                    <p style="margin-top:20px; color:#666;">このPWA（古いサイト）は閉じてください。</p>
-                                </div>`;
-                        }
-                    });
-                }
-            }, 1000);
-        }
-    }
-
-    // 4. インストールバナー表示（誤判定防止強化版）
-    const runInstallGuide = () => {
-        // 二重表示防止
-        if (document.getElementById('pwa-install-banner')) return;
-
-        // PWA判定（複数の手法でスタンドアロン状態をチェック）
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
-                          || window.navigator.standalone 
-                          || document.referrer.includes('android-app://');
-
-        const isNewDomain = currentHost === newDomain || currentHost === `www.${newDomain}`;
-        const isMigrationActive = sessionStorage.getItem('migration_final_alert') === 'true';
-
-        // 条件：新ドメインである AND PWAとして起動していない AND 移行アラート中ではない
-        if (isNewDomain && !isStandalone && !isMigrationActive) {
-            const installGuide = document.createElement('div');
-            installGuide.id = 'pwa-install-banner';
-            installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5; z-index: 9999; position: relative;';
-            installGuide.innerHTML = `
-                「ホーム画面に追加」すると次からワンクリックで開けます！<br>
-                <span style="font-size: 11px; font-weight: normal;">
-                    左上の≡メニュー内「インストール」または、ブラウザの「ホーム画面に追加」から
-                </span>
-            `;
-            
-            // bodyの先頭に安全に挿入
-            if (document.body) {
-                document.body.prepend(installGuide);
-            }
-        }
+    // 実行ボタンを画面の端に出して、手動で診断結果を見れるようにする
+    const debugBtn = document.createElement('button');
+    debugBtn.innerText = "診断";
+    debugBtn.style.cssText = "position:fixed; bottom:10px; right:10px; z-index:10001; padding:10px; background:black; color:white; opacity:0.5;";
+    debugBtn.onclick = () => {
+        alert("--- 診断レポート ---\n" + debugMsg + "\n※もしPWA起動がYESなら、ブラウザの仕様でバナーは絶対に出ません。");
     };
-
-    // DOMの読み込み状態に応じて実行タイミングを調整
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', runInstallGuide);
-    } else {
-        runInstallGuide();
-    }
+    document.body.appendChild(debugBtn);
 }
 initApp();
