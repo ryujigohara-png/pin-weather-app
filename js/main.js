@@ -2295,37 +2295,134 @@ window.addEventListener('appinstalled', () => {
 window.addEventListener('DOMContentLoaded', initPwaInstall);
 
 /**
- * 診断用：なぜバナーが出ないのかを特定するサブルーチン
+ * サブルーチン：新ドメイン移行案内の表示（診断ログ機能付き）
+ * 概要：通常の移行処理を行いながら、バナーが表示されない原因を画面に書き出す。
  */
 function checkDomainMigration() {
     const currentHost = window.location.hostname;
     const newDomain = "pin-weather.pro"; 
     
-    // 診断メッセージを溜める変数
-    let debugMsg = "";
-
-    // 1. PWA判定の診断
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
-                      || window.navigator.standalone 
-                      || document.referrer.includes('android-app://');
-    debugMsg += `・PWA起動状態: ${isStandalone ? "YES (PWA内)" : "NO (ブラウザ)"}\n`;
-
-    // 2. ドメイン判定の診断
-    const isNewDomain = currentHost === newDomain || currentHost === `www.${newDomain}`;
-    debugMsg += `・新ドメイン判定: ${isNewDomain ? "OK" : "NG (旧ドメイン)"}\n`;
-
-    // 3. インストール済みイベントの診断
-    window.addEventListener('beforeinstallprompt', (e) => {
-        alert("【診断結果】インストール可能です！(beforeinstallprompt検知)");
-    });
-
-    // 実行ボタンを画面の端に出して、手動で診断結果を見れるようにする
-    const debugBtn = document.createElement('button');
-    debugBtn.innerText = "診断";
-    debugBtn.style.cssText = "position:fixed; bottom:10px; right:10px; z-index:10001; padding:10px; background:black; color:white; opacity:0.5;";
-    debugBtn.onclick = () => {
-        alert("--- 診断レポート ---\n" + debugMsg + "\n※もしPWA起動がYESなら、ブラウザの仕様でバナーは絶対に出ません。");
+    // --- 診断用ログ出力関数 ---
+    const logDebug = (msg) => {
+        console.log("[Migration Debug]: " + msg);
+        let debugDiv = document.getElementById('migration-debug-log');
+        if (!debugDiv) {
+            debugDiv = document.createElement('div');
+            debugDiv.id = 'migration-debug-log';
+            debugDiv.style.cssText = 'position:fixed;bottom:0;left:0;width:100%;background:rgba(0,0,0,0.7);color:lime;font-size:10px;z-index:10002;pointer-events:none;padding:5px;';
+            document.body.appendChild(debugDiv);
+        }
+        debugDiv.innerHTML += msg + "<br>";
     };
-    document.body.appendChild(debugBtn);
+
+    logDebug(`起動ドメイン: ${currentHost}`);
+
+    // 1. 旧ドメインでの処理
+    if (currentHost.includes("onrender.com")) {
+        logDebug("旧ドメイン判定: 一致 (移行バナーを表示すべき状態)");
+        window.goNewDomain = function() {
+            const spotsData = localStorage.getItem('pin_weather_spots');
+            const viewConfigData = localStorage.getItem('pin_weather_view_config');
+            const windFilterData = localStorage.getItem('pin_weather_wind_filter');
+            
+            let targetUrl = `https://${newDomain}/`;
+            const migrationPackage = {
+                spots: spotsData,
+                viewConfig: viewConfigData,
+                windFilter: windFilterData
+            };
+            const dataString = encodeURIComponent(JSON.stringify(migrationPackage));
+            targetUrl += `?migration_all=${dataString}`;
+            
+            window.location.replace(targetUrl);
+        };
+
+        const banner = document.createElement('div');
+        banner.id = 'migration-banner';
+        banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background-color:#d32f2f;color:white;text-align:center;padding:15px 10px;z-index:10000;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,0.3);';
+        banner.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 5px;">【重要】URL移行とデータ引継ぎ</div>
+            <div style="margin-bottom: 10px; font-size: 14px; line-height: 1.4;">
+                専門ドメインに転居しました。登録地点は自動で引き継ぎます。<br>
+                移動後、一度このアプリを閉じてから、ブラウザで開き直してください。
+            </div>
+            <button onclick="goNewDomain()" style="background-color: white; color: #d32f2f; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer;">地点データを保持して移動する</button>
+        `;
+        document.body.prepend(banner);
+        document.body.style.paddingTop = "130px";
+    }
+
+    // 2. 新ドメインに届いた直後の処理
+    if (currentHost === newDomain || currentHost === `www.${newDomain}`) {
+        logDebug("新ドメイン判定: 一致");
+        const urlParams = new URLSearchParams(window.location.search);
+        const migrationAll = urlParams.get('migration_all');
+        
+        if (migrationAll) {
+            logDebug("データ移行パラメータ検知: 処理中...");
+            try {
+                const parsed = JSON.parse(decodeURIComponent(migrationAll));
+                if (parsed.spots) localStorage.setItem('pin_weather_spots', parsed.spots);
+                if (parsed.viewConfig) localStorage.setItem('pin_weather_view_config', parsed.viewConfig);
+                if (parsed.windFilter) localStorage.setItem('pin_weather_wind_filter', parsed.windFilter);
+
+                sessionStorage.setItem('migration_final_alert', 'true');
+                logDebug("保存完了: クリーンアップ実行");
+                window.location.replace(window.location.origin + window.location.pathname);
+                return; 
+            } catch (e) {
+                logDebug("ERR: 移行エラー " + e.message);
+            }
+        }
+
+        // 3. パラメータが消えた後、ユーザーに案内を表示
+        if (sessionStorage.getItem('migration_final_alert') === 'true') {
+            logDebug("移行完了アラート待機中...");
+            setTimeout(() => {
+                sessionStorage.removeItem('migration_final_alert');
+                if (typeof showAppDialog === 'function') {
+                    showAppDialog({
+                        title: "データ引継ぎ完了",
+                        message: "データの移行に成功しました。\n下記のリンクをタップしてブラウザで開き直し、ホーム画面への再登録をお願いします。",
+                        onSave: () => {
+                            document.body.innerHTML = `
+                                <div style="padding:50px; text-align:center; font-family:sans-serif;">
+                                    <h3>移行準備が整いました</h3>
+                                    <p style="margin-top:20px; line-height:1.6;">
+                                        以下のリンクをタップして<br>新サイトをブラウザで開き直してください。<br><br>
+                                        <a href="https://pin-weather.pro/?mode=browser" target="_blank" rel="noopener noreferrer" style="display:inline-block; background-color:#d32f2f; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold;">新サイトをブラウザで開く</a>
+                                    </p>
+                                </div>`;
+                        }
+                    });
+                }
+            }, 1000);
+        }
+    }
+
+    // 4. インストールバナー表示条件の診断
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    const isNewDomain = (currentHost === newDomain || currentHost === `www.${newDomain}`);
+    const isFinalAlert = sessionStorage.getItem('migration_final_alert') === 'true';
+
+    logDebug(`判定ステータス: 新ドメイン=${isNewDomain}, PWA起動=${isPWA}, アラート表示中=${isFinalAlert}`);
+
+    // 条件：新ドメインである AND PWA起動ではない AND アラート表示中ではない
+    if (isNewDomain && !isPWA && !isFinalAlert) {
+        logDebug("バナー表示条件成立: DOM生成中...");
+        const installGuide = document.createElement('div');
+        installGuide.id = 'pwa-install-banner';
+        installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5; z-index: 9999; position: relative;';
+        installGuide.innerHTML = `「ホーム画面に追加」すると次からワンクリックで開けます！`;
+        
+        if (document.body) {
+            document.body.prepend(installGuide);
+            logDebug("バナーをbodyに挿入しました");
+        } else {
+            logDebug("ERR: document.bodyが見つかりません");
+        }
+    } else {
+        logDebug("バナー表示条件不成立のためスキップ");
+    }
 }
 initApp();
