@@ -2292,6 +2292,7 @@ window.addEventListener('appinstalled', () => {
 
 // DOM構築後に実行
 window.addEventListener('DOMContentLoaded', initPwaInstall);
+
 /**
  * サブルーチン：新ドメイン移行案内の表示（データ引継ぎ機能付き）
  */
@@ -2366,22 +2367,33 @@ function checkDomainMigration() {
                 if (parsed.windFilter) {
                     localStorage.setItem('pin_weather_wind_filter', parsed.windFilter);
                 }
+
+                // リロード後にダイアログを出すためのフラグを立てる
+                sessionStorage.setItem('migration_complete_flag', 'true');
+
+                // パラメータなしのURLへ「履歴を置き換えて」リロード
+                // これによりF5を押さずともグラフが表示され、ブラウザの「戻る」で古いドメインに戻らなくなります
+                const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                window.location.replace(cleanUrl);
+                return; 
+
             } catch (e) {
                 console.error("Data migration failed", e);
             }
+        }
 
-            const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-            window.history.replaceState({}, document.title, cleanUrl);
-            
+        // リロード後、または通常のアクセス時にフラグを確認してダイアログを表示
+        if (sessionStorage.getItem('migration_complete_flag') === 'true') {
+            sessionStorage.removeItem('migration_complete_flag'); // 一度表示したら消す
+
             // 既存の showAppDialog や i18n を活用した丁寧な案内
             if (typeof showAppDialog === 'function') {
                 showAppDialog({
                     title: "データ引継ぎ完了",
                     message: "お気に入りの地点を引き継ぎました。\n\n最後に、この新しいURLを「ホーム画面に追加」し、古い方のアイコンは削除してください。",
                     onSave: () => {
-                        // 既存のインストール案内ボタンへスクロール、またはボタンをクリックさせる
                         const installBtn = document.getElementById('btn-pwa-install');
-                        if (installBtn) installBtn.click(); // そのまま既存のインストール処理へ繋ぐ
+                        if (installBtn) installBtn.click();
                     }
                 });
             } else {
@@ -2390,6 +2402,5 @@ function checkDomainMigration() {
         }
     }
 }
-
 
 initApp();
