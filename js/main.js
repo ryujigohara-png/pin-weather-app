@@ -2397,16 +2397,18 @@ function checkDomainMigration() {
         if (isNewDomain && (!isPWA || isExplicitBrowser) && !sessionStorage.getItem('migration_final_alert')) {
             const installGuide = document.createElement('div');
             installGuide.id = 'pwa-install-banner';
-            installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5; z-index: 9999; position: relative;';
+            // z-index を 100 に下げてサイドバーの下に隠れるように修正
+            installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5; z-index: 100; position: relative;';
             installGuide.innerHTML = `
                 「ホーム画面に追加」⇒次からワンクリックで開けます！<br>
                 <span style="font-size: 11px; font-weight: normal;">
                     左上の≡メニュー内「インストール」または、<br>
-                     Chrome ⋮ メニューから / Safari 共有 から<br>「ホーム画面に追加」
+                    Chrome ⋮ メニューから / Safari 共有 から<br>「ホーム画面に追加」
                 </span>
             `;
             document.body.prepend(installGuide);
         }
     }
 }
+
 initApp();
