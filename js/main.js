@@ -2366,10 +2366,19 @@ function checkDomainMigration() {
                 if (typeof showAppDialog === 'function') {
                     showAppDialog({
                         title: "データ引継ぎ完了",
-                        message: "データの移行に成功しました。\n\n現在の「古いアプリ」を一度完全に閉じてください。\nその後、ブラウザ（Chrome等）を起動し、新たに「https://pin-weather.pro」へアクセスして、ホーム画面に再登録をお願いします。",
+                        message: "データの移行に成功しました。\n\n現在の「古いアプリ」を一度完全に閉じてください。\nその後、下記のリンクをタップしてブラウザで開き直し、ホーム画面への再登録をお願いします。",
                         onSave: () => {
                             // ユーザーが了解した後に、視覚的に終了を促す（閉じる機能がないため、白紙にする等の処理）
-                            document.body.innerHTML = '<div style="padding:50px; text-align:center; font-family:sans-serif;"><h3>移行準備が整いました</h3><p>このアプリ（古いアイコン）を閉じてください。<br><br>その後、通常のブラウザで<br><b>https://pin-weather.pro</b><br>を開いてください。</p></div>';
+                            document.body.innerHTML = `
+                                <div style="padding:50px; text-align:center; font-family:sans-serif;">
+                                    <h3>移行準備が整いました</h3>
+                                    <p>このアプリ（古いアイコン）を閉じてください。</p>
+                                    <p style="margin-top:20px;">
+                                        その後、以下のリンクをタップして<br>ブラウザで開き直してください。<br>
+                                        ブラウザで「ホーム画面に追加」をしてインストールしてください。<br><br>
+                                        <a href="https://pin-weather.pro" target="_blank" rel="noopener noreferrer" style="display:inline-block; background-color:#d32f2f; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold;">新サイトをブラウザで開く</a>
+                                    </p>
+                                </div>`;
                         }
                     });
                 }
