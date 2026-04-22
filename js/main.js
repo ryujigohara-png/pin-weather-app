@@ -2295,7 +2295,8 @@ window.addEventListener('appinstalled', () => {
 window.addEventListener('DOMContentLoaded', initPwaInstall);
 
 /**
- * サブルーチン：新ドメイン移行案内の表示（エラー修正・クリーン起動版）
+ * サブルーチン：新ドメイン移行案内の表示
+ * 概要：旧ドメインから新ドメインへのデータ引継ぎを行い、完了後はユーザーにアプリを閉じてブラウザで開き直すよう促す。
  */
 function checkDomainMigration() {
     const currentHost = window.location.hostname;
@@ -2304,27 +2305,38 @@ function checkDomainMigration() {
     // 1. 旧ドメイン（onrender.com）での処理
     if (currentHost.includes("onrender.com")) {
         window.goNewDomain = function() {
+            const spotsData = localStorage.getItem('pin_weather_spots');
+            const viewConfigData = localStorage.getItem('pin_weather_view_config');
+            const windFilterData = localStorage.getItem('pin_weather_wind_filter');
+            
+            let targetUrl = `https://${newDomain}/`;
             const migrationPackage = {
-                spots: localStorage.getItem('pin_weather_spots'),
-                viewConfig: localStorage.getItem('pin_weather_view_config'),
-                windFilter: localStorage.getItem('pin_weather_wind_filter')
+                spots: spotsData,
+                viewConfig: viewConfigData,
+                windFilter: windFilterData
             };
             const dataString = encodeURIComponent(JSON.stringify(migrationPackage));
-            // replaceを使用して履歴を残さず新URLへ
-            window.location.replace(`https://${newDomain}/?migration_all=${dataString}`);
+            targetUrl += `?migration_all=${dataString}`;
+            
+            window.location.replace(targetUrl);
         };
 
         const banner = document.createElement('div');
-        banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background-color:#d32f2f;color:white;text-align:center;padding:15px 10px;z-index:10000;font-size:14px;';
+        banner.id = 'migration-banner';
+        banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background-color:#d32f2f;color:white;text-align:center;padding:15px 10px;z-index:10000;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,0.3);';
         banner.innerHTML = `
-            <div style="font-weight:bold;margin-bottom:5px;">【重要】URL移行とデータ引継ぎ</div>
-            <button onclick="goNewDomain()" style="background-color:white;color:#d32f2f;border:none;padding:8px 15px;border-radius:5px;font-weight:bold;cursor:pointer;">データを保持して移動する</button>
+            <div style="font-weight: bold; margin-bottom: 5px;">【重要】URL移行とデータ引継ぎ</div>
+            <div style="margin-bottom: 10px; font-size: 14px; line-height: 1.4;">
+                専門ドメインへ移動します。登録地点も自動で引き継がれます。<br>
+                移動後、一度このアプリを閉じてから、ブラウザで開き直してください。
+            </div>
+            <button onclick="goNewDomain()" style="background-color: white; color: #d32f2f; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer;">地点データを保持して移動する</button>
         `;
         document.body.prepend(banner);
-        document.body.style.paddingTop = "100px";
+        document.body.style.paddingTop = "130px";
     }
 
-    // 2. 新ドメインにパラメータ付きで届いた場合
+    // 2. 新ドメイン（pin-weather.pro）に届いた直後の処理
     if (currentHost === newDomain || currentHost === `www.${newDomain}`) {
         const urlParams = new URLSearchParams(window.location.search);
         const migrationAll = urlParams.get('migration_all');
@@ -2336,33 +2348,30 @@ function checkDomainMigration() {
                 if (parsed.viewConfig) localStorage.setItem('pin_weather_view_config', parsed.viewConfig);
                 if (parsed.windFilter) localStorage.setItem('pin_weather_wind_filter', parsed.windFilter);
 
-                // 一度セッションに保存し、パラメータを消して完全に開き直す（これが重要）
-                sessionStorage.setItem('migration_complete_flag', 'true');
+                // 保存が完了したら、パラメータのないクリーンなURLへ差し替え
+                sessionStorage.setItem('migration_final_alert', 'true');
                 window.location.replace(window.location.origin + window.location.pathname);
                 return; 
-            } catch (e) { console.error("Migration parse error", e); }
+            } catch (e) {
+                console.error("Migration error", e);
+            }
         }
 
-        // 3. クリーンなURLで開き直された直後の処理
-        if (sessionStorage.getItem('migration_complete_flag') === 'true') {
-            sessionStorage.removeItem('migration_complete_flag');
-            
-            // ログにあるエラー(null参照)を防ぐため、要素の存在を確認してからダイアログを出す
+        // 3. パラメータが消えた後、ユーザーに「終了とブラウザ起動」を命じる
+        if (sessionStorage.getItem('migration_final_alert') === 'true') {
             setTimeout(() => {
-                const message = "データの引継ぎが完了しました。\n\n「URL表示」を消して全画面で利用するために、ブラウザメニューから再度「ホーム画面に追加」を行ってください。\n（完了後、古いアイコンは削除してOKです）";
+                sessionStorage.removeItem('migration_final_alert');
                 
+                // showAppDialogが存在することを確認して呼び出し
                 if (typeof showAppDialog === 'function') {
                     showAppDialog({
-                        title: "設定完了",
-                        message: message,
+                        title: "データ引継ぎ完了",
+                        message: "データの移行に成功しました。\n\n現在の「古いアプリ」を一度完全に閉じてください。\nその後、ブラウザ（Chrome等）を起動し、新たに「https://pin-weather.pro」へアクセスして、ホーム画面に再登録をお願いします。",
                         onSave: () => {
-                            // インストールイベントを蹴る、または手動案内
-                            const installBtn = document.getElementById('btn-pwa-install');
-                            if (installBtn) installBtn.click();
+                            // ユーザーが了解した後に、視覚的に終了を促す（閉じる機能がないため、白紙にする等の処理）
+                            document.body.innerHTML = '<div style="padding:50px; text-align:center; font-family:sans-serif;"><h3>移行準備が整いました</h3><p>このアプリ（古いアイコン）を閉じてください。<br><br>その後、通常のブラウザで<br><b>https://pin-weather.pro</b><br>を開いてください。</p></div>';
                         }
                     });
-                } else {
-                    alert(message);
                 }
             }, 1000);
         }
