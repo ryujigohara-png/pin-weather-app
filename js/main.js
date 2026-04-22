@@ -1871,7 +1871,6 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
     if (isWind) min = 0;
 
     if (valCont) {
-        // 単位に応じてラベルの小数点以下の表示を調整（ms 以外や華氏なら整数表示の方がスッキリする場合があるが、既存のロジックを尊重）
         valCont.innerHTML = `<div class="y-max">${max.toFixed(isWind ? 0 : 1)}</div><div class="y-min">${min.toFixed(isWind ? 0 : 1)}</div>`;
     }
     const range = (max - min) || 1;
@@ -1962,7 +1961,6 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
     datasets.forEach(ds => {
         if (ds.type === 'bar') {
             for(let i = startIdx; i < totalDataCount; i++){
-                // renderSection 内、ds.type === 'bar' のループ内
                 const val = ds.data[i];
                 if (val === null || typeof val === 'undefined') continue;
 
@@ -1971,12 +1969,10 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                 const deg = allData.data.wind_direction_10m[i];
                 const dirText = getWindDirText(deg);
 
-                // --- 修正箇所：viewConfig から閾値を取得 ---
                 const thHigh = viewConfig.windThresholdHigh;
                 const thMid  = viewConfig.windThresholdMid;
                 const thLow  = viewConfig.windThresholdLow;
 
-                // 取得した閾値を使用して色を判定
                 let color = targetWindDirections.includes(dirText) 
                     ? (val >= thHigh ? '#dc143c' : val >= thMid ? '#ffa500' : val >= thLow ? '#87CEEB' : '#ccc') 
                     : (val >= thHigh ? 'rgba(220, 20, 60, 0.4)' : '#ccc');
@@ -2044,9 +2040,8 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
         const wIcon = weatherIcons[allData.data.weather_code[validIdx]] || "❓";
         const getVal = (val, unit, fixed = 1) => (val !== null && typeof val !== 'undefined' && !isNaN(val)) ? val.toFixed(fixed) + unit : "---";
 
-        // 設定に基づいた単位の取得
         const tUnit = viewConfig.temperatureUnit === 'celsius' ? '℃' : '℉';
-        const wUnit = i18n.t('speedunit'); // i18n側の動的定義を使用
+        const wUnit = i18n.t('speedunit'); 
 
         const precipVal = getVal(allData.data.precipitation ? allData.data.precipitation[validIdx] : null, "mm");
         const windVal = getVal(allData.data.wind_speed_10m ? allData.data.wind_speed_10m[validIdx] : null, wUnit);
@@ -2089,15 +2084,18 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
 
         if (isAutoScroll) {
             tooltip.style.left = (100 + hs * 3) + "px";
-            tooltip.style.bottom = "20px"; 
+            // 広告枠を避けるため bottom を 70px に変更
+            tooltip.style.bottom = "70px"; 
             tooltip.style.top = "auto";
         } else {
             const tooltipWidth = tooltip.offsetWidth || 220;
             let tx = (clientX > window.innerWidth / 2) ? clientX - tooltipWidth - 20 : clientX + 20;
             tooltip.style.left = tx + "px";
             let ty = clientY + 20;
-            if (ty + tooltip.offsetHeight > window.innerHeight) {
-                tooltip.style.bottom = "10px";
+            // 画面外（下方向）へのはみ出し判定を広告枠分（+80px）余裕を持たせる
+            if (ty + tooltip.offsetHeight + 70 > window.innerHeight) {
+                // 画面下部に張り付く位置を 70px に変更
+                tooltip.style.bottom = "70px"; 
                 tooltip.style.top = "auto";
             } else {
                 tooltip.style.top = ty + "px";
