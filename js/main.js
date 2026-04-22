@@ -2297,6 +2297,7 @@ window.addEventListener('DOMContentLoaded', initPwaInstall);
 /**
  * サブルーチン：新ドメイン移行案内の表示
  * 概要：旧ドメインから新ドメインへのデータ引継ぎを行い、完了後はユーザーにアプリを閉じてブラウザで開き直すよう促す。
+ * 新ドメイン起動時は、未インストールのユーザーに対してホーム画面追加（PWA）の手順を表示する。
  */
 function checkDomainMigration() {
     const currentHost = window.location.hostname;
@@ -2327,7 +2328,7 @@ function checkDomainMigration() {
         banner.innerHTML = `
             <div style="font-weight: bold; margin-bottom: 5px;">【重要】URL移行とデータ引継ぎ</div>
             <div style="margin-bottom: 10px; font-size: 14px; line-height: 1.4;">
-                専門ドメインへ移動します。登録地点も自動で引き継がれます。<br>
+                専門ドメインに転居しました。登録地点は自動で引き継ぎます。<br>
                 移動後、一度このアプリを閉じてから、ブラウザで開き直してください。
             </div>
             <button onclick="goNewDomain()" style="background-color: white; color: #d32f2f; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer;">地点データを保持して移動する</button>
@@ -2357,36 +2358,49 @@ function checkDomainMigration() {
             }
         }
 
-        // 3. パラメータが消えた後、ユーザーに「終了とブラウザ起動」を命じる
+        // 3. パラメータが消えた後、ユーザーに案内を表示
         if (sessionStorage.getItem('migration_final_alert') === 'true') {
             setTimeout(() => {
                 sessionStorage.removeItem('migration_final_alert');
                 
-                // showAppDialogが存在することを確認して呼び出し
                 if (typeof showAppDialog === 'function') {
                     showAppDialog({
                         title: "データ引継ぎ完了",
                         message: "データの移行に成功しました。\n下記のリンクをタップしてブラウザで開き直し、ホーム画面への再登録をお願いします。",
                         onSave: () => {
-                            // ユーザーが了解した後に、視覚的に終了を促す（閉じる機能がないため、白紙にする等の処理）
                             document.body.innerHTML = `
                                 <div style="padding:50px; text-align:center; font-family:sans-serif;">
                                     <h3>移行準備が整いました</h3>
                                     <p style="margin-top:20px;">
                                         以下のリンクをタップして<br>新サイトをブラウザで開き直してください。<br><br>
-                                        新サイトをワンクリックで開けるようにするために、<br>
-                                        ・三サイドバーメニューから「インストール」<br>
-                                        ・androidは、chrome等の「ホーム画面に追加」<br>
-                                        ・iphoneは、safariの「共有」⇒「ホーム画面に追加」<br>
+                                        新サイトをワンクリックで開けるようにするときは、<br>
+                                        ・≡サイドバーメニューから「インストール」するか<br>
+                                        ・AndroidはChrome等「ホーム画面に追加」<br>
+                                        ・iPhoneはSafari「共有」⇒「ホーム画面に追加」<br>
                                         をしてPWAをインストールしてください。<br><br>
                                         <a href="https://pin-weather.pro" target="_blank" rel="noopener noreferrer" style="display:inline-block; background-color:#d32f2f; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold;">新サイトをブラウザで開く</a>
                                     </p>
-                                    <p>このPWA（古いサイト）は閉じてください。</p>
+                                    <p style="margin-top:20px; color:#666;">このPWA（古いサイト）は閉じてください。</p>
                                 </div>`;
                         }
                     });
                 }
             }, 1000);
+        }
+
+        // 4. ブラウザ起動時（非PWA）のみ、常に上部にインストールを促すバナーを表示
+        const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+        if (!isPWA && !sessionStorage.getItem('migration_final_alert')) {
+            const installGuide = document.createElement('div');
+            installGuide.id = 'pwa-install-banner';
+            installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5;';
+            installGuide.innerHTML = `
+                「ホーム画面に追加」すると次からワンクリックで開けます！<br>
+                <span style="font-size: 11px; font-weight: normal;">
+                    Android: Chromeメニューから「ホーム画面に追加」 / iPhone: Safari共有から「ホーム画面に追加」
+                </span>
+            `;
+            document.body.prepend(installGuide);
         }
     }
 }
