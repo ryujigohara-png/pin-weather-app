@@ -2368,25 +2368,23 @@ function checkDomainMigration() {
                     localStorage.setItem('pin_weather_wind_filter', parsed.windFilter);
                 }
 
-                // リロード後にダイアログを出すためのフラグを立てる
+                // リロード後もメッセージを出すためのフラグをセット
                 sessionStorage.setItem('migration_complete_flag', 'true');
 
-                // パラメータなしのURLへ「履歴を置き換えて」リロード
-                // これによりF5を押さずともグラフが表示され、ブラウザの「戻る」で古いドメインに戻らなくなります
+                // パラメータを削除したクリーンなURLへ強制リロード（location.replaceにより履歴も上書き）
                 const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
                 window.location.replace(cleanUrl);
-                return; 
+                return; // リロードが開始されるため処理を終了
 
             } catch (e) {
                 console.error("Data migration failed", e);
             }
         }
 
-        // リロード後、または通常のアクセス時にフラグを確認してダイアログを表示
+        // リロード後にフラグがあれば完了案内を表示
         if (sessionStorage.getItem('migration_complete_flag') === 'true') {
-            sessionStorage.removeItem('migration_complete_flag'); // 一度表示したら消す
+            sessionStorage.removeItem('migration_complete_flag'); // 表示後に削除
 
-            // 既存の showAppDialog や i18n を活用した丁寧な案内
             if (typeof showAppDialog === 'function') {
                 showAppDialog({
                     title: "データ引継ぎ完了",
