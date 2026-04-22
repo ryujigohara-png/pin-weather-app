@@ -2387,24 +2387,27 @@ function checkDomainMigration() {
                 }
             }, 1000);
         }
+    }
 
-        // 4. インストールを促すバナーを表示する条件の変更
-        // 非PWA状態、または「PWA状態であっても新ドメインでない場合」に表示する
-        const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-        const isNotNewDomain = currentHost !== newDomain && currentHost !== `www.${newDomain}`;
-        
-        if ((!isPWA || isNotNewDomain) && !sessionStorage.getItem('migration_final_alert')) {
-            const installGuide = document.createElement('div');
-            installGuide.id = 'pwa-install-banner';
-            installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5; z-index: 9999; position: relative;';
-            installGuide.innerHTML = `
-                「ホーム画面に追加」すると次からワンクリックで開けます！<br>
-                <span style="font-size: 11px; font-weight: normal;">
-                    左上の≡メニュー内「インストール」または、ブラウザの「ホーム画面に追加」から
-                </span>
-            `;
-            document.body.prepend(installGuide);
-        }
+    // 4. インストールを促すバナーの表示条件判定（ドメイン判定の外側に配置）
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    const isNewDomain = currentHost === newDomain || currentHost === `www.${newDomain}`;
+    
+    // 表示条件：
+    // ①ブラウザ（非PWA）で開いている
+    // ②PWAで開いているが、新ドメインではない（＝旧ドメインのPWAである）
+    // かつ、移行完了アラートの表示中でないこと
+    if ((!isPWA || !isNewDomain) && !sessionStorage.getItem('migration_final_alert')) {
+        const installGuide = document.createElement('div');
+        installGuide.id = 'pwa-install-banner';
+        installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5; z-index: 9999; position: relative;';
+        installGuide.innerHTML = `
+            「ホーム画面に追加」すると次からワンクリックで開けます！<br>
+            <span style="font-size: 11px; font-weight: normal;">
+                左上の≡メニュー内「インストール」または、ブラウザの「ホーム画面に追加」から
+            </span>
+        `;
+        document.body.prepend(installGuide);
     }
 }
 initApp();
