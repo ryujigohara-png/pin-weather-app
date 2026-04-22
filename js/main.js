@@ -2366,18 +2366,23 @@ function checkDomainMigration() {
                 if (typeof showAppDialog === 'function') {
                     showAppDialog({
                         title: "データ引継ぎ完了",
-                        message: "データの移行に成功しました。\n\n現在の「古いアプリ」を一度完全に閉じてください。\nその後、下記のリンクをタップしてブラウザで開き直し、ホーム画面への再登録をお願いします。",
+                        message: "データの移行に成功しました。\n下記のリンクをタップしてブラウザで開き直し、ホーム画面への再登録をお願いします。",
                         onSave: () => {
                             // ユーザーが了解した後に、視覚的に終了を促す（閉じる機能がないため、白紙にする等の処理）
                             document.body.innerHTML = `
                                 <div style="padding:50px; text-align:center; font-family:sans-serif;">
                                     <h3>移行準備が整いました</h3>
-                                    <p>このアプリ（古いアイコン）を閉じてください。</p>
                                     <p style="margin-top:20px;">
-                                        その後、以下のリンクをタップして<br>ブラウザで開き直してください。<br>
-                                        ブラウザで「ホーム画面に追加」をしてインストールしてください。<br><br>
+                                        以下のリンクをタップして<br>新サイトをブラウザで開き直してください。<br>
+                                        新サイトをワンクリックで開けるようにするためには、<br>
+                                        新サイトでサイドバーメニューからインストールするか<br>
+                                        ブラウザのメニューから<br>
+                                        ・androidは、ブラウザ(chrome等)の「ホーム画面に追加」<br>
+                                        ・iphoneは、safariの「共有」から「ホーム画面に追加」<br>
+                                        をしてPWAをインストールしてください。<br><br>
                                         <a href="https://pin-weather.pro" target="_blank" rel="noopener noreferrer" style="display:inline-block; background-color:#d32f2f; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold;">新サイトをブラウザで開く</a>
                                     </p>
+                                    <p>このPWA（古いサイト）は閉じてください。</p>
                                 </div>`;
                         }
                     });
