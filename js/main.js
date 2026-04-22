@@ -2399,9 +2399,9 @@ function checkDomainMigration() {
             installGuide.id = 'pwa-install-banner';
             installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5; z-index: 9999; position: relative;';
             installGuide.innerHTML = `
-                「ホーム画面に追加」すると次からワンクリックで開けます！<br>
+                「ホーム画面に追加」⇒次からワンクリックで開けます！<br>
                 <span style="font-size: 11px; font-weight: normal;">
-                    左上の≡メニュー内「インストール」または、ブラウザの「ホーム画面に追加」から
+                    左上の≡メニュー内「インストール」または、android: Chromeメニューから「ホーム画面に追加」/iPhone: Safari共有から「ホーム画面に追加
                 </span>
             `;
             document.body.prepend(installGuide);
