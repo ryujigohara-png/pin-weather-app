@@ -2364,6 +2364,12 @@ function checkDomainMigration() {
                 sessionStorage.removeItem('migration_final_alert');
                 
                 if (typeof showAppDialog === 'function') {
+                    // Android向けにブラウザを強制起動するためのintentリンクを作成
+                    const browserUrl = `https://pin-weather.pro/?mode=browser`;
+                    const intentUrl = `intent://${newDomain}/?mode=browser#Intent;scheme=https;package=com.android.chrome;end`;
+                    const isAndroid = /Android/i.test(navigator.userAgent);
+                    const finalUrl = isAndroid ? intentUrl : browserUrl;
+
                     showAppDialog({
                         title: "データ引継ぎ完了",
                         message: "データの移行に成功しました。\n下記のリンクをタップしてブラウザで開き直し、ホーム画面への再登録をお願いします。",
@@ -2378,7 +2384,7 @@ function checkDomainMigration() {
                                         ・AndroidはChrome等「ホーム画面に追加」<br>
                                         ・iPhoneはSafari「共有」⇒「ホーム画面に追加」<br>
                                         をしてPWAをインストールしてください。<br><br>
-                                        <a href="https://pin-weather.pro/?mode=browser" target="_blank" rel="noopener noreferrer" style="display:inline-block; background-color:#d32f2f; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold;">新サイトをブラウザで開く</a>
+                                        <a href="${finalUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block; background-color:#d32f2f; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold;">新サイトをブラウザで開く</a>
                                     </p>
                                     <p style="margin-top:20px; color:#666;">このPWA（古いサイト）は閉じてください。</p>
                                 </div>`;
@@ -2404,5 +2410,4 @@ function checkDomainMigration() {
         }
     }
 }
-
 initApp();
