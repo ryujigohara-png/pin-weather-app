@@ -2381,7 +2381,7 @@ function checkDomainMigration() {
                                         をしてPWAをインストールしてください。<br><br>
                                         <a href="https://pin-weather.pro/?mode=browser" style="display:inline-block; background-color:#d32f2f; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold;">新サイトをブラウザで開く</a>
                                     </p>
-                                    <p style="margin-top:20px; color:#666;">このPWA（古いサイト）は閉じてください。</p>
+                                    <p style="margin-top:20px; color:#666;">ホーム画面の古いアイコンは紛らわしいので、必ず削除してください。</p>
                                 </div>`;
                         }
                     });
