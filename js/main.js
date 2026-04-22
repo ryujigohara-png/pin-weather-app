@@ -2294,7 +2294,7 @@ window.addEventListener('appinstalled', () => {
 window.addEventListener('DOMContentLoaded', initPwaInstall);
 
 /**
- * サブルーチン：新ドメイン移行案内の表示（エラー回避・自動リロード版）
+ * サブルーチン：新ドメイン移行案内の表示（履歴遮断・完全移行版）
  */
 function checkDomainMigration() {
     const currentHost = window.location.hostname;
@@ -2316,12 +2316,11 @@ function checkDomainMigration() {
             const dataString = encodeURIComponent(JSON.stringify(migrationPackage));
             targetUrl += `?migration_all=${dataString}`;
             
-            // 履歴を残さず新ドメインへ。PWAの「×」で戻るのを防ぐ
+            // 古いドメインの履歴を新しいURLで上書き
             window.location.replace(targetUrl);
         };
 
         const banner = document.createElement('div');
-        banner.id = 'migration-banner';
         banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background-color:#d32f2f;color:white;text-align:center;padding:15px 10px;z-index:10000;font-size:14px;';
         banner.innerHTML = `
             <div style="font-weight:bold;margin-bottom:5px;">【重要】URL移行とデータ引継ぎ</div>
@@ -2339,40 +2338,43 @@ function checkDomainMigration() {
         if (migrationAll) {
             try {
                 const parsed = JSON.parse(decodeURIComponent(migrationAll));
-                
-                // データを保存
                 if (parsed.spots) localStorage.setItem('pin_weather_spots', parsed.spots);
                 if (parsed.viewConfig) localStorage.setItem('pin_weather_view_config', parsed.viewConfig);
                 if (parsed.windFilter) localStorage.setItem('pin_weather_wind_filter', parsed.windFilter);
 
-                // 次回起動時にダイアログを出すためのフラグ
                 sessionStorage.setItem('migration_success', 'true');
 
-                // 重要：クリーンなURLへ差し替え。これにより「戻る」履歴を抹消し、アプリを正常初期化させる
+                // パラメータを消したURLに差し替え
                 const cleanUrl = window.location.origin + window.location.pathname;
                 window.location.replace(cleanUrl);
                 return; 
-
             } catch (e) {
-                console.error("Migration parse error", e);
+                console.error("Migration error", e);
             }
         }
 
-        // リロード後、DOMが完全に整ってからダイアログを表示（setTimeoutで安全策）
+        // 移行成功フラグがある場合、履歴をクリーンにする
         if (sessionStorage.getItem('migration_success') === 'true') {
+            // 【追加】戻る操作を封じ込める：現在の履歴状態を自分自身で上書き
+            window.history.pushState(null, null, window.location.href);
+            window.addEventListener('popstate', function() {
+                // 戻るボタンが押されても現在のURLを維持し続ける
+                window.history.pushState(null, null, window.location.href);
+            });
+
             setTimeout(() => {
                 sessionStorage.removeItem('migration_success');
                 if (typeof showAppDialog === 'function') {
                     showAppDialog({
                         title: "データ引継ぎ完了",
-                        message: "地点データを引き継ぎました。\nこの新しいURLをホーム画面に追加してください。",
+                        message: "地点データを引き継ぎました。\nこの新しいURLをホーム画面に追加してください。\n（古いアイコンは削除して問題ありません）",
                         onSave: () => {
                             const installBtn = document.getElementById('btn-pwa-install');
                             if (installBtn) installBtn.click();
                         }
                     });
                 }
-            }, 1000); // 1秒待機して確実に描画を優先させる
+            }, 1000);
         }
     }
 }
