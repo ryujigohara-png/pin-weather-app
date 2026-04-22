@@ -2303,8 +2303,8 @@ function checkDomainMigration() {
     const currentHost = window.location.hostname;
     const newDomain = "pin-weather.pro"; 
 
-    // 1. 旧ドメイン（onrender.com）での処理
-    if (currentHost.includes("onrender.com")) {
+    // 1. 旧ドメイン（app.onrender.com）での処理
+    if (currentHost.includes("app.onrender.com")) {
         window.goNewDomain = function() {
             const spotsData = localStorage.getItem('pin_weather_spots');
             const viewConfigData = localStorage.getItem('pin_weather_view_config');
