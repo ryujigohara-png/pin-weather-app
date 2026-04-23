@@ -2437,8 +2437,9 @@ function checkDomainMigration() {
 
 /**
  * サブルーチン：AdMobバナー広告の初期化（既存フッター対応版）
+ * 2026-04-23：ストア未公開のため、AdSense移行を検討し一旦全停止。
  */
-function initAdMob() {
+/* function initAdMob() {
     // 1. Google 広告ライブラリの動的読み込み
     const script = document.createElement('script');
     script.async = true;
@@ -2447,7 +2448,6 @@ function initAdMob() {
     document.head.appendChild(script);
 
     // 2. 広告を表示するコンテナを作成
-    // 既存の padding-bottom: 70px の範囲内に収まるように配置します
     const adContainer = document.createElement('div');
     adContainer.id = "ad-banner-bottom";
     adContainer.style.cssText = `
@@ -2457,7 +2457,7 @@ function initAdMob() {
         width: 100%;
         text-align: center;
         z-index: 9999;
-        background: #ffffff; /* フッター背景と合わせる */
+        background: #ffffff;
         height: 60px;
         display: flex;
         justify-content: center;
@@ -2465,7 +2465,7 @@ function initAdMob() {
         border-top: 1px solid #eaeaea;
     `;
 
-    // 3. 広告ユニットの挿入（ユニットID: 5919866110）
+    // 3. 広告ユニットの挿入
     adContainer.innerHTML = `
         <ins class="adsbygoogle"
              style="display:inline-block;width:320px;height:50px"
@@ -2475,7 +2475,7 @@ function initAdMob() {
 
     document.body.appendChild(adContainer);
 
-    // 4. 実行（ライブラリ読み込み完了後にプッシュ）
+    // 4. 実行
     script.onload = () => {
         try {
             (adsbygoogle = window.adsbygoogle || []).push({});
@@ -2484,9 +2484,9 @@ function initAdMob() {
         }
     };
 }
+*/
 
-// アプリ起動時に実行
-window.addEventListener('DOMContentLoaded', initAdMob);
-
+// アプリ起動時の実行もコメントアウト
+// window.addEventListener('DOMContentLoaded', initAdMob);
 
 initApp();
