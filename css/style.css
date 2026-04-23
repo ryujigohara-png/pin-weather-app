@@ -224,7 +224,7 @@ svg { width: 100%; display: block; overflow: visible; }
 .date-container { position: absolute; height: 30px; bottom: -30px; left: 0; width: 100%; pointer-events: none; z-index: 10; }
 .sticky-date {
     position: absolute; bottom: 0; font-size: 22px; font-weight: bold;
-    background: rgba(255,255,255,0.8); padding: 0 10px; border-radius: 4px;
+    background: rgba(255,255,255,0.0); padding: 0 10px; border-radius: 4px;
     color: #000; white-space: nowrap;
 }
 

@@ -2133,6 +2133,8 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
 
 /**
  * サブルーチン：スクロールイベントの初期化
+ * 概要：1番目は最初から左端(-100px)に固定。
+ * 以降は「Y軸(sl)」にタッチしたラベルが次の「Y軸タッチ」まで左端にとどまる制御。
  */
 function initScrollEvent(hScale, startIdx) {
     const scrollRoot = document.getElementById('scroll-root');
@@ -2142,12 +2144,32 @@ function initScrollEvent(hScale, startIdx) {
             const hs = Number(hScale);
             const sIdx = Number(startIdx);
             
-            document.querySelectorAll('.sticky-date').forEach(el => {
+            const labels = document.querySelectorAll('.sticky-date');
+            
+            labels.forEach((el, index) => {
                 const x = parseFloat(el.dataset.x);
-                const nextX = x + (24 * hs);
-                if (sl >= x && sl < nextX - 100) {
-                    el.style.left = (sl - 100) + "px";
-                } else {
+                const nextEl = labels[index + 1];
+                const nextX = nextEl ? parseFloat(nextEl.dataset.x) : Infinity;
+
+                // --- 1. 消去判定 ---
+                // 次の日付(nextX)が Y軸(sl) にタッチした瞬間に、自分を消す
+                if (sl >= nextX) {
+                    el.style.display = "none";
+                    el.style.visibility = "hidden";
+                } 
+                // --- 2. 滞在・追従（Sticky）判定 ---
+                // 条件A: 1番目の日付（index===0）は、次の日が来るまで常に左端に固定
+                // 条件B: 2番目以降は、自分が「Y軸(sl)」にタッチしてから「次が来る」まで左端に固定
+                else if (index === 0 || sl >= x) {
+                    el.style.display = "block";
+                    el.style.visibility = "visible";
+                    el.style.left = (sl - 100) + "px"; // 常に画面左端(-100px)の位置
+                } 
+                // --- 3. 待機状態 ---
+                // まだY軸に到達していない未来の日付は、本来の座標x（Y軸より右側）に表示
+                else {
+                    el.style.display = "block";
+                    el.style.visibility = "visible";
                     el.style.left = x + "px";
                 }
             });
@@ -2159,6 +2181,7 @@ function initScrollEvent(hScale, startIdx) {
                 window.updateTooltipFromScroll(hourIdx, 0, 0, true, sl);
             }
         };
+        // 初期状態（sl=0）を即座に反映
         scrollRoot.dispatchEvent(new Event('scroll'));
     }
 }
