@@ -118,6 +118,8 @@ const i18n = {
             disclaimer: "【免責事項】海上気象データは予測モデルに基づく「最寄りの海上地点」の数値であり、実際の局地的な地形や潮流による影響を反映しきれない場合があります。",
             
             // --- メッセージ類 ---
+            pwa_install_msg: "「ホーム画面に追加」⇒次からワンクリックで開けます！",
+            pwa_install_sub: "左上の≡メニュー内「インストール」または、<br>Chrome ⋮ メニューから / Safari 共有 から<br>「ホーム画面に追加」",
             welcomeGuide: "表示したい地点を登録してください。現在地を取得するか、地図から場所を選択できます。登録は画面上部の地名タブを長押しまたは右クリックしてください。",
             confirmDelete: (name) => `「${name}」を削除しますか？`,
             confirmInit: "初期化しますか？",
@@ -206,6 +208,8 @@ const i18n = {
             speedunit: viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph',            disclaimer: "[Disclaimer] Marine weather data is based on forecast models for the 'nearest sea point' and may not reflect local terrain or tidal effects.",
 
             // --- Messages ---
+            pwa_install_msg: "Add to Home Screen for instant access!",
+            pwa_install_sub: "Select \"Install\" from the ≡ menu,<br>or use the browser menu (Chrome ⋮ / Safari Share)<br>and tap \"Add to Home Screen\"",
             welcomeGuide: "Please register the locations you want to display. You can get your current location or select a place from the map. To register, long-press or right-click on the location tab at the top of the screen.",
             confirmDelete: (name) => `Delete "${name}"?`,
             confirmInit: "Initialize all spots?",
@@ -2398,10 +2402,9 @@ function checkDomainMigration() {
             // z-index を 100 に下げてサイドバーの下に隠れるように修正
             installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5; z-index: 100; position: relative;';
             installGuide.innerHTML = `
-                「ホーム画面に追加」⇒次からワンクリックで開けます！<br>
+                ${i18n.t('pwa_install_msg')}<br>
                 <span style="font-size: 11px; font-weight: normal;">
-                    左上の≡メニュー内「インストール」または、<br>
-                    Chrome ⋮ メニューから / Safari 共有 から<br>「ホーム画面に追加」
+                    ${i18n.t('pwa_install_sub')}
                 </span>
             `;
             document.body.prepend(installGuide);
