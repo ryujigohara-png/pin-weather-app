@@ -25,6 +25,14 @@ const defaultViewConfig = {
 const savedConfig = JSON.parse(localStorage.getItem('pin_weather_view_config')) || {};
 let viewConfig = { ...defaultViewConfig, ...savedConfig };
 
+// 初回訪問時（localStorageに保存がない場合）の言語判定
+if (!savedConfig.language) {
+    const browserLang = navigator.language || navigator.userLanguage;
+    if (!browserLang.startsWith('ja')) {
+        viewConfig.language = 'en';
+    }
+}
+
 // ★重要：ここで先に i18n を定義する！！
 const i18n = {
     _currentLang: viewConfig.language || 'ja',
