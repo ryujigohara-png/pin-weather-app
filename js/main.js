@@ -125,6 +125,21 @@ const i18n = {
             speedunit: viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph',
             disclaimer: "【免責事項】海上気象データは予測モデルに基づく「最寄りの海上地点」の数値であり、実際の局地的な地形や潮流による影響を反映しきれない場合があります。",
             
+            guideMainTitle: "Pin_Weather Pro 活用ガイド",
+            guideLabel1: "16日間気象予報・8日間海洋気象予報",
+            guideBody1: "風速・風向・気温などの気象データは<strong>最大16日間</strong>、波高・潮位・海水温などの海洋データは<strong>最大8日間</strong>表示。長期の遠征計画から直近の出艇判断までサポートします。",
+            guideLabel2: "MySpots 10箇所登録",
+            guideBody2: `お気に入りのゲレンデやマリーナを最大10箇所まで保存可能。登録した地点はタブで簡単に切り替え可能。各地点の天気をすぐに確認できます。<br><br>
+                        <strong>登録方法：</strong><br>
+                        ・GPSボタンで現在地を取得、またはマップ上の任意の地点をタップして📌を立てることで、好きな場所を登録できます。<br>
+                        ・マップ内の検索ボックスから施設名や地名で検索して登録することも可能です。<br><br>
+                        <strong>管理・修正：</strong><br>
+                        ・画面上の地点タブを長押しすると、登録地点の修正や削除が簡単に行えます。<br>
+                        ・現在表示中のグラフ地点をマップで即座に確認し、再調整することも可能です。`,
+            guideLabel3: "自分専用表示カスタマイズ",
+            guideBody3: `<strong>風向色付設定</strong>ボタンから色付けする風向を指定可能。<br>
+                        <strong>表示詳細設定</strong>ボタンから風速の色付けしきい値を変更可能。自分の道具やレベルに合わせた「ベストコンディション」がグラフ上で一目で判別できるようになります。`,
+
             // --- メッセージ類 ---
             pwa_install_msg: "「ホーム画面に追加」⇒次からワンクリックで開けます！",
             pwa_install_sub: "左上の≡メニュー内「インストール」または、<br>Chrome ⋮ メニューから / Safari 共有 から<br>「ホーム画面に追加」",
@@ -213,7 +228,23 @@ const i18n = {
             yAxisTemp: `Temp(${viewConfig.temperatureUnit === 'celsius' ? '°C' : '°F'})<br>Sea(${viewConfig.temperatureUnit === 'celsius' ? '°C' : '°F'})`,
             yAxisMarine: "Wave(m)<br>Tide(m)",
             legendWindTitle: "Wind Color:",
-            speedunit: viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph',            disclaimer: "[Disclaimer] Marine weather data is based on forecast models for the 'nearest sea point' and may not reflect local terrain or tidal effects.",
+            speedunit: viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph',
+            disclaimer: "[Disclaimer] Marine weather data is based on forecast models for the 'nearest sea point' and may not reflect local terrain or tidal effects.",
+
+            guideMainTitle: "Pin_Weather Pro User Guide",
+            guideLabel1: "16-day Weather & 8-day Marine Forecast",
+            guideBody1: "Weather data (wind, temp) is available for up to <strong>16 days</strong>, and marine data (waves, tides) for up to <strong>8 days</strong>.",
+            guideLabel2: "Register 10 MySpots",
+            guideBody2: `Save up to 10 favorite spots. Switch easily via tabs.<br><br>
+                        <strong>Registration:</strong><br>
+                        ・Use GPS or tap the map to drop a 📌.<br>
+                        ・Search by name or facility.<br><br>
+                        <strong>Management:</strong><br>
+                        ・Long-press tabs to edit or delete.<br>
+                        ・Verify and adjust current locations on the map instantly.`,
+            guideLabel3: "Custom Display Settings",
+            guideBody3: `Specify which wind directions to highlight from the <strong>Wind Color Settings</strong> button.<br>
+                        Adjust <strong>Wind Speed Thresholds</strong> from the <strong>Display Settings</strong> button to match your gear and skill level.`,
 
             // --- Messages ---
             pwa_install_msg: "Add to Home Screen for instant access!",
@@ -224,7 +255,6 @@ const i18n = {
             confirmReset: "Reset all view settings to default?",
             gpsFetching: "Locating...",
             gpsError: "Failed to get location.",
-            gpsDefaultLabel: "GPS Location",
             noLocationError: "No location information available.",
             editSpotGuide: "Edit or delete the spot name",
             btnDelete: "Delete",
