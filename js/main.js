@@ -127,7 +127,7 @@ const i18n = {
             
             guideMainTitle: "Pin_Weather Pro 活用ガイド",
             guideLabel1: "16日間気象予報・8日間海洋気象予報",
-            guideBody1: "風速・風向・気温などの気象データは<strong>最大16日間</strong>、波高・潮位・海水温などの海洋データは<strong>最大8日間</strong>表示。長期の遠征計画から直近の出艇判断までサポートします。",
+            guideBody1: "風速・風向・気温などの気象データは<strong>最大16日間</strong>表示。<br>波高・潮位・海水温などの海洋データは<strong>最大8日間</strong>表示。<br>長期の遠征計画から直近の出艇判断までサポートします。",
             guideLabel2: "MySpots 10箇所登録",
             guideBody2: `お気に入りのゲレンデやマリーナを最大10箇所まで保存可能。登録した地点はタブで簡単に切り替え可能。各地点の天気をすぐに確認できます。<br><br>
                         <strong>登録方法：</strong><br>
