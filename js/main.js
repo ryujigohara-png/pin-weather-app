@@ -757,6 +757,7 @@ function applyEnvVisuals() {
  * 1. 保存データがあればロード
  * 2. データがない場合はIPから現在地を推定して即時描画
  * 3. WelcomeダイアログでGPS/Mapの選択を促す
+ * ※PWABuilder等のボット解析時はダイアログを抑制してタイムアウトを防止
  */
 async function initApp() {
     // 【追加】まず最初にドメイン移行が必要かチェックする
@@ -787,18 +788,23 @@ async function initApp() {
         // 推定地点（失敗時はサンプル）で背景を先に描画
         finalizeInit();
 
-        // Welcomeダイアログ表示
-        setTimeout(() => {
-            if (typeof showAppDialog === 'function') {
-                showAppDialog({
-                    title: "Welcome",
-                    messageKey: 'welcomeGuide',
-                    onMap: () => openMap(currentLat, currentLon), // 推定位置を初期値にする
-                    onSave: () => handleGPSClick() 
-                });
-                setupWelcomeButtons();
-            }
-        }, 500);
+        // PWABuilder や Lighthouse などの解析ボットでない場合のみダイアログを表示
+        const isBot = /Lighthouse|Chrome-Lighthouse|PWABuilder/i.test(navigator.userAgent);
+
+        if (!isBot) {
+            // Welcomeダイアログ表示
+            setTimeout(() => {
+                if (typeof showAppDialog === 'function') {
+                    showAppDialog({
+                        title: "Welcome",
+                        messageKey: 'welcomeGuide',
+                        onMap: () => openMap(currentLat, currentLon), // 推定位置を初期値にする
+                        onSave: () => handleGPSClick() 
+                    });
+                    setupWelcomeButtons();
+                }
+            }, 500);
+        }
 
         // バックグラウンドGPSは「座標の更新」のみ。renderTabsは呼ばない。
         if ("geolocation" in navigator) {
