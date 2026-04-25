@@ -4,7 +4,7 @@
   "short_name": "Pin_Weather",
   "description": "【最大16日間の長期予報】好きな地点を登録し、風・波・潮汐を一気見。風速・気温は16日間、波高・潮汐は8日間の詳細予報を提供。 / Pinpoint 16-day wind and 8-day marine forecast for your favorite spots.",  "id": "/index.html",
   "categories": ["weather", "sports", "navigation", "travel", "productivity", "utilities", "lifestyle"],
-  "start_url": "../index.html",
+  "start_url": "/index.html",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone"],
   "orientation": "any",
@@ -13,25 +13,25 @@
   "scope": "/",
   "icons": [
     {
-      "src": "icons/icon-192.png",
+      "src": "/static/icons/icon-192.png",
       "type": "image/png",
       "sizes": "192x192",
       "purpose": "any"
     },
     {
-      "src": "icons/icon-192.png",
+      "src": "/static/icons/icon-192.png",
       "type": "image/png",
       "sizes": "192x192",
       "purpose": "maskable"
     },
     {
-      "src": "icons/icon-512.png",
+      "src": "/static/icons/icon-512.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any"
     },
     {
-      "src": "icons/icon-512.png",
+      "src": "/static/icons/icon-512.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "maskable"
@@ -39,21 +39,21 @@
   ],
   "screenshots": [
     {
-      "src": "icons/screenshot-mobile1.png",
+      "src": "/static/icons/screenshot-mobile1.png",
       "sizes": "1080x2400",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "アプリの予報画面"
     },
     {
-      "src": "icons/screenshot-mobile2.png",
+      "src": "/static/icons/screenshot-mobile2.png",
       "sizes": "1080x2400",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "ツールチップ（詳細情報）表示画面"
     },
     {
-      "src": "icons/screenshot-desktop.png",
+      "src": "/static/icons/screenshot-desktop.png",
       "sizes": "1920x1080",
       "type": "image/png",
       "form_factor": "wide",
