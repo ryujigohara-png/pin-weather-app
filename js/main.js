@@ -1941,23 +1941,19 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
             let dayColor = (dayIdx === 0) ? "#FF0000" : (dayIdx === 6 ? "#0000FF" : "#000000");
             
             const localizedDateStr = getLocalizedDate(d);
+            // スパン内のインラインスタイルも最小限に
             const labelContent = `<span style="color:${dayColor}; font-size:${labelFS * 1.5}px;" class="notranslate">${localizedDateStr}</span>`;
 
-            // 下部用日付要素
+            // 下部用日付要素（クラス名付与のみ）
             const dateDiv = document.createElement('div');
             dateDiv.className = 'sticky-date-bottom';
-            dateDiv.style.position = 'absolute'; // 水平配置を保証
-            dateDiv.style.fontWeight = 'bold'; // 太字を明示
             dateDiv.style.left = `${x}px`;
             dateDiv.dataset.x = x;
 
             if (isFirst && dateTop) {
-                // 上部用日付要素
+                // 上部用日付要素（クラス名付与のみ）
                 const topDiv = document.createElement('div');
                 topDiv.className = 'sticky-date-top';
-                topDiv.style.position = 'absolute'; // 水平配置を保証
-                topDiv.style.whiteSpace = 'nowrap'; // 改行を防ぐ
-                topDiv.style.fontWeight = 'bold'; // 太字を明示
                 topDiv.style.left = `${x}px`;
                 topDiv.dataset.x = x;
                 topDiv.innerHTML = labelContent;
@@ -2199,18 +2195,15 @@ function initScrollEvent(hScale, startIdx) {
                     const nextEl = labels[index + 1];
                     const nextX = nextEl ? parseFloat(nextEl.dataset.x) : Infinity;
 
-                    // 1. 次の要素が左端(sl)に来たら、現在の要素を非表示
                     if (sl >= nextX) {
                         el.style.display = "none";
                         el.style.visibility = "hidden";
                     } 
-                    // 2. 現在の要素が左端(sl)に来ている、または最初の要素である場合
                     else if (index === 0 || sl >= x) {
                         el.style.display = "block";
                         el.style.visibility = "visible";
                         el.style.left = (sl - 100) + "px"; 
                     } 
-                    // 3. まだ左端に到達していない未来の要素
                     else {
                         el.style.display = "block";
                         el.style.visibility = "visible";
@@ -2219,7 +2212,7 @@ function initScrollEvent(hScale, startIdx) {
                 });
             };
 
-            // 上部と下部のグループを個別に更新（NodeListの混在を防止）
+            // 上部と下部を分離して計算（NodeListの混線を防止）
             updateStickyGroup('.sticky-date-top');
             updateStickyGroup('.sticky-date-bottom');
 
