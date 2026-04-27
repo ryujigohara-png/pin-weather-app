@@ -1902,13 +1902,13 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
     const svg = document.getElementById(svgId);
     const dateCont = document.getElementById(dateContId);
     const dateTop = document.getElementById('date-top');
-    const timeTop = document.getElementById('time-top'); // 新設コンテナの取得
+    const timeTop = document.getElementById('time-top');
     const valCont = document.getElementById(`val-${svgId}`);
 
     if (!svg || !dateCont) return;
     dateCont.innerHTML = "";
     if (isFirst && dateTop) dateTop.innerHTML = "";
-    if (isFirst && timeTop) timeTop.innerHTML = ""; // 初期化
+    if (isFirst && timeTop) timeTop.innerHTML = ""; 
     
     const allVals = datasets.flatMap(ds => ds.data ? ds.data.slice(startIdx) : [])
                             .filter(v => typeof v === 'number' && !isNaN(v));
@@ -1943,20 +1943,26 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
             const localizedDateStr = getLocalizedDate(d);
             const labelContent = `<span style="color:${dayColor}; font-size:${labelFS * 1.5}px;" class="notranslate">${localizedDateStr}</span>`;
 
+            // 下部用日付要素
             const dateDiv = document.createElement('div');
-            dateDiv.className = 'sticky-date';
+            dateDiv.className = 'sticky-date-bottom';
+            dateDiv.style.position = 'absolute'; // 水平配置を保証
+            dateDiv.style.fontWeight = 'bold'; // 太字を明示
             dateDiv.style.left = `${x}px`;
             dateDiv.dataset.x = x;
 
             if (isFirst && dateTop) {
+                // 上部用日付要素
                 const topDiv = document.createElement('div');
-                topDiv.className = 'sticky-date';
+                topDiv.className = 'sticky-date-top';
+                topDiv.style.position = 'absolute'; // 水平配置を保証
+                topDiv.style.whiteSpace = 'nowrap'; // 改行を防ぐ
+                topDiv.style.fontWeight = 'bold'; // 太字を明示
                 topDiv.style.left = `${x}px`;
                 topDiv.dataset.x = x;
                 topDiv.innerHTML = labelContent;
                 dateTop.appendChild(topDiv);
 
-                // 時刻コンテナ(time-top)に「時」を追加
                 const topTimeDiv = document.createElement('div');
                 topTimeDiv.style.position = 'absolute';
                 topTimeDiv.style.left = `${x}px`;
@@ -2177,8 +2183,6 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS) {
 
 /**
  * サブルーチン：スクロールイベントの初期化
- * 概要：1番目は最初から左端(-100px)に固定。
- * 以降は「Y軸(sl)」にタッチしたラベルが次の「Y軸タッチ」まで左端にとどまる制御。
  */
 function initScrollEvent(hScale, startIdx) {
     const scrollRoot = document.getElementById('scroll-root');
@@ -2188,35 +2192,36 @@ function initScrollEvent(hScale, startIdx) {
             const hs = Number(hScale);
             const sIdx = Number(startIdx);
             
-            const labels = document.querySelectorAll('.sticky-date');
-            
-            labels.forEach((el, index) => {
-                const x = parseFloat(el.dataset.x);
-                const nextEl = labels[index + 1];
-                const nextX = nextEl ? parseFloat(nextEl.dataset.x) : Infinity;
+            const updateStickyGroup = (selector) => {
+                const labels = document.querySelectorAll(selector);
+                labels.forEach((el, index) => {
+                    const x = parseFloat(el.dataset.x);
+                    const nextEl = labels[index + 1];
+                    const nextX = nextEl ? parseFloat(nextEl.dataset.x) : Infinity;
 
-                // --- 1. 消去判定 ---
-                // 次の日付(nextX)が Y軸(sl) にタッチした瞬間に、自分を消す
-                if (sl >= nextX) {
-                    el.style.display = "none";
-                    el.style.visibility = "hidden";
-                } 
-                // --- 2. 滞在・追従（Sticky）判定 ---
-                // 条件A: 1番目の日付（index===0）は、次の日が来るまで常に左端に固定
-                // 条件B: 2番目以降は、自分が「Y軸(sl)」にタッチしてから「次が来る」まで左端に固定
-                else if (index === 0 || sl >= x) {
-                    el.style.display = "block";
-                    el.style.visibility = "visible";
-                    el.style.left = (sl - 100) + "px"; // 常に画面左端(-100px)の位置
-                } 
-                // --- 3. 待機状態 ---
-                // まだY軸に到達していない未来の日付は、本来の座標x（Y軸より右側）に表示
-                else {
-                    el.style.display = "block";
-                    el.style.visibility = "visible";
-                    el.style.left = x + "px";
-                }
-            });
+                    // 1. 次の要素が左端(sl)に来たら、現在の要素を非表示
+                    if (sl >= nextX) {
+                        el.style.display = "none";
+                        el.style.visibility = "hidden";
+                    } 
+                    // 2. 現在の要素が左端(sl)に来ている、または最初の要素である場合
+                    else if (index === 0 || sl >= x) {
+                        el.style.display = "block";
+                        el.style.visibility = "visible";
+                        el.style.left = (sl - 100) + "px"; 
+                    } 
+                    // 3. まだ左端に到達していない未来の要素
+                    else {
+                        el.style.display = "block";
+                        el.style.visibility = "visible";
+                        el.style.left = x + "px";
+                    }
+                });
+            };
+
+            // 上部と下部のグループを個別に更新（NodeListの混在を防止）
+            updateStickyGroup('.sticky-date-top');
+            updateStickyGroup('.sticky-date-bottom');
 
             if (typeof window.updateTooltipFromScroll === 'function' && !isNaN(hs) && !isNaN(sIdx)) {
                 const visualOffset = hs * 2; 
@@ -2225,7 +2230,6 @@ function initScrollEvent(hScale, startIdx) {
                 window.updateTooltipFromScroll(hourIdx, 0, 0, true, sl);
             }
         };
-        // 初期状態（sl=0）を即座に反映
         scrollRoot.dispatchEvent(new Event('scroll'));
     }
 }
