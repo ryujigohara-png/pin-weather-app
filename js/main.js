@@ -77,6 +77,10 @@ const i18n = {
             btnCopyUrl: "🔗 URLをコピー",
             copySuccess: "✅ コピー完了！",
             copyError: "コピーに失敗しました。",
+            btnWidget: "🧩 ホームページに埋め込む",
+            widgetTitle: "ホームページに埋め込む",
+            widgetDesc: "ご自身のブログやサイトに、現在のグラフを埋め込むことができます。",
+            widgetCopy: "コードをコピーする",
 
             // --- 地図・地点登録モーダル ---
             mapClickGuide: "地点をクリックしてください",
@@ -182,6 +186,10 @@ const i18n = {
             btnCopyUrl: "🔗 Copy URL",
             copySuccess: "✅ Copied!",
             copyError: "Failed to copy.",
+            btnWidget: "🧩 Embed in Website",
+            widgetTitle: "Embed in Website",
+            widgetDesc: "You can embed the current graph into your own blog or website.",
+            widgetCopy: "Copy Code",
 
             // --- Map & Spot Modal ---
             mapClickGuide: "Click on the map",
@@ -695,6 +703,107 @@ function initCopyUrlEvent() {
         }, 2000);
     };
 }
+
+/**
+ * サブルーチン：ウィジェットプレビューモーダルを開く
+ * 凡例の後に続く footer-info を強制的に表示させます。
+ */
+function openWidgetPreview() {
+    console.log("DEBUG: openWidgetPreview [START]");
+
+    const t = (key) => (typeof i18next !== 'undefined' ? i18next.t(key) : key);
+
+    // 要素取得
+    const titleArea = document.getElementById('common-modal-title');
+    const msgArea = document.getElementById('common-modal-message');
+    const widgetArea = document.getElementById('widget-preview-area');
+    const iframe = document.getElementById('widget-preview-iframe');
+    const codeArea = document.getElementById('widget-code-area');
+    const copyBtnText = document.getElementById('widget-copy-btn-text');
+
+    // URL生成
+    const currentUrl = window.location.origin + window.location.pathname;
+    const params = new URLSearchParams();
+    params.set('mode', 'widget');
+    
+    if (typeof currentLat !== 'undefined' && currentLat !== null) params.set('lat', currentLat);
+    if (typeof currentLon !== 'undefined' && currentLon !== null) params.set('lon', currentLon);
+    
+    const widgetUrl = `${currentUrl}?${params.toString()}`;
+    // 埋め込みコード上の高さは、ボタンやガイドが収まるよう 650px 程度を推奨
+    const embedCode = `<iframe src="${widgetUrl}" width="100%" height="650" frameborder="0" style="border:1px solid #eee; border-radius:8px;"></iframe>`;
+
+    // モーダル内のテキストセット
+    if (titleArea) titleArea.innerText = t('widgetTitle');
+    if (msgArea) msgArea.innerText = t('widgetDesc');
+    if (widgetArea) widgetArea.style.display = 'block';
+    if (codeArea) codeArea.value = embedCode;
+    if (copyBtnText) copyBtnText.innerText = t('widgetCopy');
+
+    // モーダル表示
+    if (typeof openModal === 'function') {
+        openModal('app-common-modal');
+    } else {
+        const modal = document.getElementById('app-common-modal');
+        if (modal) modal.style.display = 'block';
+    }
+
+    // iframeの読み込みと表示強制
+    if (iframe) {
+        iframe.src = widgetUrl;
+        
+        iframe.onload = function() {
+            // ウィジェットモードのJSが要素を隠す処理を追い越すため、少し遅延させて実行
+            setTimeout(() => {
+                try {
+                    const doc = iframe.contentDocument || iframe.contentWindow.document;
+                    
+                    // 凡例のコンテナを取得
+                    const legend = doc.querySelector('.legend-wind-container');
+                    // フッターのコンテナを取得
+                    const footer = doc.querySelector('.footer-info');
+                    
+                    if (footer) {
+                        // ウィジェットモードで消されていても強制的に表示
+                        footer.style.setProperty('display', 'block', 'important');
+                        footer.style.setProperty('visibility', 'visible', 'important');
+                        footer.style.setProperty('opacity', '1', 'important');
+                        footer.style.setProperty('padding-bottom', '20px', 'important'); // プレビュー用余白
+                    }
+                    
+                    // 凡例が見えていてフッターが見えない場合、凡例の直後にフッターを移動（確実な表示）
+                    if (legend && footer && legend.nextElementSibling !== footer) {
+                        legend.parentNode.insertBefore(footer, legend.nextSibling);
+                    }
+                    
+                    console.log("DEBUG: Footer visibility forced.");
+                } catch (e) {
+                    console.warn("DEBUG: iframe DOM access failed (expected if local file check).", e);
+                }
+            }, 500); 
+        };
+    }
+
+    console.log("DEBUG: openWidgetPreview [END] URL:", widgetUrl);
+}
+
+/**
+ * サブルーチン：コードをクリップボードにコピー
+ */
+function copyWidgetCode() {
+    const area = document.getElementById("widget-code-area");
+    if (area) {
+        area.select();
+        try {
+            document.execCommand("copy");
+            const msg = (typeof i18next !== 'undefined') ? i18next.t('copySuccess') : "Copied!";
+            alert(msg);
+        } catch (err) {
+            console.error("Copy failed:", err);
+        }
+    }
+}
+
 /**
  * サブルーチン：環境判定とUIへの反映
  * index.htmlの構造に合わせてセレクタを修正
@@ -954,6 +1063,15 @@ function setupGeneralEvents() {
             const privacyUrl = "./privacy.html";
             window.open(privacyUrl, '_blank');
         };
+    }
+
+    // 9. ウィジェット埋め込みボタン
+    const widgetBtn = document.getElementById('open-widget-modal-btn');
+    if (widgetBtn) {
+        widgetBtn.onclick = openWidgetPreview;
+        console.log("DEBUG: widgetBtn event attached");
+    } else {
+        console.warn("DEBUG: widgetBtn element not found in setupGeneralEvents");
     }
 }
 
@@ -1455,6 +1573,7 @@ window.history.replaceState({ page: 'home' }, "");
 
 /**
  * 監視役：ブラウザの「戻る」が押されたら実行（一本化）
+ * 背景固定の解除処理を追加しました。
  */
 window.onpopstate = function(event) {
     console.log("DEBUG: Back Button Pressed!", event.state);
@@ -1468,6 +1587,9 @@ window.onpopstate = function(event) {
         }
     });
     
+    // 背景固定を解除し、スクロールを有効にする
+    document.body.style.overflow = '';
+
     // 地図の仮マーカー消去
     if (typeof tempMarker !== 'undefined' && tempMarker && map) {
         map.removeLayer(tempMarker);
@@ -1495,11 +1617,16 @@ function openModal(id) {
 
 /**
  * 共通サブルーチン：モーダルを閉じる
+ * 背景固定の解除処理を追加しました。
  */
 function closeModal(id) {
     const modal = document.getElementById(id);
     if (modal && modal.style.display === 'block') {
         modal.style.display = 'none';
+        
+        // 背景固定を解除してスクロール可能にする
+        document.body.style.overflow = '';
+        console.log("DEBUG: Modal closed, body scroll restored.");
         
         if (window.history.state && window.history.state.page === 'modal') {
             window.history.back();
@@ -1768,6 +1895,10 @@ async function draw() {
             return;
         }
 
+        // --- ウィジェットモード判定 ---
+        const params = new URLSearchParams(window.location.search);
+        const isWidget = params.get('mode') === 'widget';
+        
         allData = await fetchWithCache(currentLat, currentLon);
         const svgW = document.getElementById('svg-weather');
         if (!svgW || !allData || !allData.data) return;
@@ -1780,6 +1911,21 @@ async function draw() {
 
         const fullIdx = allData.data.time.findIndex(t => new Date(t) > drawReferenceTime) - 1;
         const startIdx = Math.max(0, fullIdx - 4);
+        
+        // 横幅・表示件数は通常ロジックを維持
+        const hScale = viewConfig.hourWidth; 
+        const displayCount = totalDataCount - startIdx;
+
+        // 1. 【修正点】グラフの高さ設定（ウィジェット時はすべて80px）
+        let windH = viewConfig.windHeight;
+        let subH = viewConfig.subHeight;
+        if (isWidget) {
+            windH = 80;
+            subH = 80;
+            // 2. 【修正点】タブ（ナビゲーション等）を非表示にする
+            const nav = document.querySelector('.nav-container') || document.querySelector('nav');
+            if (nav) nav.style.display = 'none';
+        }
         
         const waveData = allData.data.wave_height ? allData.data.wave_height.slice(startIdx) : [];
         const tideData = allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl.slice(startIdx) : [];
@@ -1794,8 +1940,6 @@ async function draw() {
             titles[3].innerHTML = marineTitle;
         }
 
-        const displayCount = totalDataCount - startIdx;
-        const hScale = viewConfig.hourWidth; 
         const labelFS = viewConfig.fontSize;
         const iScale = viewConfig.iconScale;
         const gMargin = viewConfig.graphMargin;
@@ -1807,9 +1951,9 @@ async function draw() {
         const sections = [document.querySelector('.section-weather'), secWind, secTemp, secMarine];
         sections.forEach(sec => { if(sec) sec.style.width = totalW + "px"; });
 
-        if (secWind) { secWind.style.height = viewConfig.windHeight + "px"; secWind.style.marginBottom = gMargin + "px"; }
-        if (secTemp) { secTemp.style.height = viewConfig.subHeight + "px"; secTemp.style.marginBottom = gMargin + "px"; }
-        if (secMarine) { secMarine.style.height = viewConfig.subHeight + "px"; }
+        if (secWind) { secWind.style.height = windH + "px"; secWind.style.marginBottom = gMargin + "px"; }
+        if (secTemp) { secTemp.style.height = subH + "px"; secTemp.style.marginBottom = gMargin + "px"; }
+        if (secMarine) { secMarine.style.height = subH + "px"; }
         
         let wHtml = "";
         const pData = allData.data.precipitation ? allData.data.precipitation.slice(startIdx) : [];
@@ -1836,12 +1980,11 @@ async function draw() {
         }
         svgW.innerHTML = wHtml;
 
-        // renderSection に drawReferenceTime を渡す（内部で現在時刻線を描画するため）
-        renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], viewConfig.windHeight, 5.0, true, false, true, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime);
-        renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, !hasMarineData, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime);
+        renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], windH, 5.0, true, false, true, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime);
+        renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], subH, 5.0, false, !hasMarineData, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime);
         
         if (hasMarineData) {
-            renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], viewConfig.subHeight, 0.5, false, true, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime);
+            renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], subH, 0.5, false, true, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime);
         } else {
             const svgM = document.getElementById("svg-marine");
             if (svgM) svgM.innerHTML = "";
@@ -1854,7 +1997,8 @@ async function draw() {
         updateWindLegend();
         resetGraphScroll();
         initScrollEvent(hScale, startIdx);
-        // 【重要】ツールチップ初期化にも基準時刻を渡す
+
+        // 3. 【修正点】ツールチップ初期化：縦位置が graphH/windH に連動するよう基準時刻を渡す
         initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime);
         
     } catch (e) { 
@@ -2089,13 +2233,17 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
         tooltip.style.transform = "none";
 
         if (isAutoScroll) {
+            // 【スクロール時：グラフの下端に張り付く】
+            const rect = stage.getBoundingClientRect();
             tooltip.style.left = (100 + hs * 3) + "px";
-            tooltip.style.bottom = "70px"; 
-            tooltip.style.top = "auto";
+            tooltip.style.top = (rect.bottom - tooltip.offsetHeight) + "px";
+            tooltip.style.bottom = "auto";
         } else {
+            // 【マウス移動・クリック時：従前のとおり高さに合わせる】
             const tooltipWidth = tooltip.offsetWidth || 220;
             let tx = (clientX > window.innerWidth / 2) ? clientX - tooltipWidth - 20 : clientX + 20;
             tooltip.style.left = tx + "px";
+            
             let ty = clientY + 20;
             if (ty + tooltip.offsetHeight + 70 > window.innerHeight) {
                 tooltip.style.bottom = "70px"; 
@@ -2173,6 +2321,7 @@ function initScrollEvent(hScale, startIdx) {
                 const visualOffset = hs * 2; 
                 const targetX = sl + visualOffset; 
                 const hourIdx = (targetX / hs) + sIdx;
+                // isAutoScroll を true として呼び出し
                 window.updateTooltipFromScroll(hourIdx, 0, 0, true, sl);
             }
         };

@@ -425,3 +425,56 @@ svg { width: 100%; display: block; overflow: visible; }
     color: #666;
     margin-top: 5px;
 }
+
+/* ============================================================
+   ウィジェットモード専用スタイル (既存のスタイルを壊さないアドオン)
+   ============================================================ */
+
+/* 1. ウィジェットモード時は、メイン画面のヘッダーやメニューを完全に消す */
+body.widget-mode {
+    padding-top: 0 !important;
+    background: #ffffff !important;
+}
+
+body.widget-mode .control-wrapper,
+body.widget-mode .sidebar,
+body.widget-mode .sidebar-overlay,
+body.widget-mode .footer-info,
+body.widget-mode .modal-overlay {
+    display: none !important;
+}
+
+/* 2. ウィジェット時のカード余白調整（影を消してフラットに） */
+body.widget-mode .main-card {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+}
+
+/* 3. ウィジェット専用ヘッダー（後ほどJSで追加する要素用） */
+.widget-only-header {
+    display: none; /* 通常モードでは隠す */
+    padding: 10px 15px;
+    background: #fff;
+    border-bottom: 1px solid #eee;
+    font-family: sans-serif;
+}
+
+body.widget-mode .widget-only-header {
+    display: flex; /* ウィジェットモード時のみ表示 */
+    justify-content: space-between;
+    align-items: center;
+}
+
+#widget-spot-name {
+    font-weight: bold;
+    font-size: 16px;
+    color: #333;
+}
+
+#widget-coords {
+    font-size: 11px;
+    color: #888;
+    margin-left: 8px;
+}
