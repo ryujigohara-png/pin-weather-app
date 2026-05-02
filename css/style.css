@@ -439,7 +439,6 @@ body.widget-mode {
 body.widget-mode .control-wrapper,
 body.widget-mode .sidebar,
 body.widget-mode .sidebar-overlay,
-body.widget-mode .footer-info,
 body.widget-mode .modal-overlay {
     display: none !important;
 }
@@ -477,4 +476,43 @@ body.widget-mode .widget-only-header {
     font-size: 11px;
     color: #888;
     margin-left: 8px;
+}
+
+/* 共通モーダルのレスポンシブ・安定化レイアウト */
+#app-common-modal .modal-content {
+    display: flex !important;
+    flex-direction: column !important;
+    max-height: 90vh !important; /* 画面高の90%に収める */
+    overflow: hidden !important; /* 全体のスクロールを禁止 */
+    padding: 0 !important;      /* 内部のpaddingで制御 */
+}
+
+/* ヘッダー部分を物理的に固定し、消失を防ぐ */
+#common-modal-header {
+    display: block !important; /* flexアイテムとして確実に表示 */
+    flex-shrink: 0 !important; /* 他の要素に押しつぶされるのを禁止 */
+    min-height: 50px;          /* 最低限の表示領域を確保 */
+    visibility: visible !important;
+}
+
+/* タイトル自体の文字を確実に表示 */
+#common-modal-title {
+    display: block !important;
+    color: #333 !important;
+    font-size: 1.25rem;
+    font-weight: bold;
+}
+
+/* ボディセクション：ここだけをスクロール可能にする */
+.view-settings-body {
+    flex-grow: 1;               /* 残りのスペースをすべて使う */
+    overflow-y: auto;           /* 溢れたらスクロール */
+    padding: 10px 20px 20px 20px;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* フッター：ボタンエリアを固定 */
+#common-modal-footer {
+    flex-shrink: 0;
+    border-top: 1px solid #eee;
 }

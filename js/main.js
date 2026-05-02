@@ -78,9 +78,10 @@ const i18n = {
             copySuccess: "✅ コピー完了！",
             copyError: "コピーに失敗しました。",
             btnWidget: "🧩 ホームページに埋め込む",
-            widgetTitle: "ホームページに埋め込む",
-            widgetDesc: "ご自身のブログやサイトに、現在のグラフを埋め込むことができます。",
-            widgetCopy: "コードをコピーする",
+            widgetTitle: "ウィジェット埋め込み設定",
+            widgetDesc: "あなたのサイトやブログに、この地点の気象グラフを埋め込むことができます。",
+            widgetCopy: "コードをコピー",
+            copySuccess: "コピーしました！",
 
             // --- 地図・地点登録モーダル ---
             mapClickGuide: "地点をクリックしてください",
@@ -187,9 +188,10 @@ const i18n = {
             copySuccess: "✅ Copied!",
             copyError: "Failed to copy.",
             btnWidget: "🧩 Embed in Website",
-            widgetTitle: "Embed in Website",
-            widgetDesc: "You can embed the current graph into your own blog or website.",
+            widgetTitle: "Widget Embedding Settings",
+            widgetDesc: "You can embed this weather graph into your website or blog.",
             widgetCopy: "Copy Code",
+            copySuccess: "Copied to clipboard!",
 
             // --- Map & Spot Modal ---
             mapClickGuide: "Click on the map",
@@ -706,89 +708,81 @@ function initCopyUrlEvent() {
 
 /**
  * サブルーチン：ウィジェットプレビューモーダルを開く
- * 凡例の後に続く footer-info を強制的に表示させます。
+ * パラメータの受け渡しを強化し、タイミング問題による表示消えを防止します。
  */
 function openWidgetPreview() {
     console.log("DEBUG: openWidgetPreview [START]");
 
-    const t = (key) => (typeof i18next !== 'undefined' ? i18next.t(key) : key);
-
-    // 要素取得
     const titleArea = document.getElementById('common-modal-title');
     const msgArea = document.getElementById('common-modal-message');
     const widgetArea = document.getElementById('widget-preview-area');
     const iframe = document.getElementById('widget-preview-iframe');
     const codeArea = document.getElementById('widget-code-area');
     const copyBtnText = document.getElementById('widget-copy-btn-text');
+    const modal = document.getElementById('app-common-modal');
 
-    // URL生成
+    if (!modal) return;
+
+    // 1. テキスト（タイトル）の確実な表示
+    const displayLang = (typeof i18next !== 'undefined') ? i18next.language : 'ja';
+    if (titleArea) {
+        titleArea.innerText = (typeof i18next !== 'undefined' && i18next.exists('widgetTitle')) 
+                              ? i18next.t('widgetTitle', { lng: displayLang }) 
+                              : "Widget Settings";
+        titleArea.style.display = 'block';
+    }
+
+    // 2. パラメータの構成
     const currentUrl = window.location.origin + window.location.pathname;
     const params = new URLSearchParams();
     params.set('mode', 'widget');
+    params.set('lang', displayLang);
     
+    // localStorage由来の値を確実にセット
+    const placeValue = (typeof currentLabel !== 'undefined') ? currentLabel : '';
+    if (placeValue) params.set('place', placeValue);
     if (typeof currentLat !== 'undefined' && currentLat !== null) params.set('lat', currentLat);
     if (typeof currentLon !== 'undefined' && currentLon !== null) params.set('lon', currentLon);
     
     const widgetUrl = `${currentUrl}?${params.toString()}`;
-    // 埋め込みコード上の高さは、ボタンやガイドが収まるよう 650px 程度を推奨
     const embedCode = `<iframe src="${widgetUrl}" width="100%" height="650" frameborder="0" style="border:1px solid #eee; border-radius:8px;"></iframe>`;
 
-    // モーダル内のテキストセット
-    if (titleArea) titleArea.innerText = t('widgetTitle');
-    if (msgArea) msgArea.innerText = t('widgetDesc');
-    if (widgetArea) widgetArea.style.display = 'block';
     if (codeArea) codeArea.value = embedCode;
-    if (copyBtnText) copyBtnText.innerText = t('widgetCopy');
+    if (widgetArea) widgetArea.style.display = 'block';
 
-    // モーダル表示
-    if (typeof openModal === 'function') {
-        openModal('app-common-modal');
-    } else {
-        const modal = document.getElementById('app-common-modal');
-        if (modal) modal.style.display = 'block';
-    }
+    // 3. 表示
+    modal.style.display = 'block';
+    window.history.pushState({ page: 'modal', id: 'app-common-modal' }, "");
 
-    // iframeの読み込みと表示強制
+    // 4. iframeへの反映（注入ではなくURL更新のみで完結させる）
     if (iframe) {
         iframe.src = widgetUrl;
         
+        // 【重要】親からのDOM操作を最小限にし、URLパラメータ経由での表示を待つ
+        // ウィジェット側のコードが URLSearchParams で 'place' を見ていれば、これで確実に表示されます。
         iframe.onload = function() {
-            // ウィジェットモードのJSが要素を隠す処理を追い越すため、少し遅延させて実行
             setTimeout(() => {
                 try {
                     const doc = iframe.contentDocument || iframe.contentWindow.document;
+                    if (!doc) return;
+                    // 地名エリアの再補完（予備的措置）
+                    const spotEl = doc.getElementById('widget-spot-name') || doc.querySelector('.widget-only-header span:first-child');
+                    if (spotEl && placeValue) spotEl.innerText = placeValue;
                     
-                    // 凡例のコンテナを取得
-                    const legend = doc.querySelector('.legend-wind-container');
-                    // フッターのコンテナを取得
-                    const footer = doc.querySelector('.footer-info');
-                    
-                    if (footer) {
-                        // ウィジェットモードで消されていても強制的に表示
-                        footer.style.setProperty('display', 'block', 'important');
-                        footer.style.setProperty('visibility', 'visible', 'important');
-                        footer.style.setProperty('opacity', '1', 'important');
-                        footer.style.setProperty('padding-bottom', '20px', 'important'); // プレビュー用余白
+                    const coordEl = doc.getElementById('widget-coords') || doc.querySelector('.widget-only-header span:last-child');
+                    if (coordEl && typeof currentLat !== 'undefined') {
+                        coordEl.innerText = `${Number(currentLat).toFixed(3)}, ${Number(currentLon).toFixed(3)}`;
                     }
-                    
-                    // 凡例が見えていてフッターが見えない場合、凡例の直後にフッターを移動（確実な表示）
-                    if (legend && footer && legend.nextElementSibling !== footer) {
-                        legend.parentNode.insertBefore(footer, legend.nextSibling);
-                    }
-                    
-                    console.log("DEBUG: Footer visibility forced.");
-                } catch (e) {
-                    console.warn("DEBUG: iframe DOM access failed (expected if local file check).", e);
-                }
-            }, 500); 
+                } catch (e) { console.warn("DEBUG: iframe sync delayed or restricted."); }
+            }, 500);
         };
     }
-
-    console.log("DEBUG: openWidgetPreview [END] URL:", widgetUrl);
+    
+    console.log("DEBUG: openWidgetPreview [END]");
 }
 
 /**
- * サブルーチン：コードをクリップボードにコピー
+ * サブルーチン：ウィジェットコードをコピー
  */
 function copyWidgetCode() {
     const area = document.getElementById("widget-code-area");
@@ -1111,6 +1105,7 @@ function toggleSidebar() {
 /**
  * サイドバー内のボタンからモーダルを呼び出す専用関数
  * 戻るボタンの競合（一瞬で消える現象）を防ぐための完全版
+ * 修正内容：ウィジェット設定時は翻訳データを反映する処理を追加
  */
 function openModalFromSidebar(modalId) {
     const sb = document.getElementById('sidebar');
@@ -1123,6 +1118,22 @@ function openModalFromSidebar(modalId) {
     sb.classList.remove('open');
     sb.style.display = 'none';
     if (overlay) overlay.style.display = 'none';
+
+    // 【追加】ウィジェット用モーダルの場合、表示テキストを辞書から取得してセット
+    if (modalId === 'app-common-modal') {
+        const titleArea = document.getElementById('common-modal-title');
+        const msgArea = document.getElementById('common-modal-message');
+        
+        // i18next が利用可能な場合に翻訳を実行
+        if (typeof i18next !== 'undefined') {
+            if (titleArea) titleArea.innerText = i18next.t('widgetTitle');
+            if (msgArea) msgArea.innerText = i18next.t('widgetDesc');
+        } else {
+            // 万が一のフォールバック
+            if (titleArea) titleArea.innerText = "ウィジェット埋め込み設定";
+            if (msgArea) msgArea.innerText = "あなたのサイトやブログに、この地点の気象グラフを埋め込むことができます。";
+        }
+    }
 
     // 2. サイドバー用に積んでいた履歴を「モーダル用」として再利用（上書き）
     // これにより popstate が発火せず、一瞬で消える現象を回避する
