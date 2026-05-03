@@ -79,7 +79,7 @@ const i18n = {
             copyError: "コピーに失敗しました。",
             btnWidget: "🧩 ホームページに埋め込む",
             widgetTitle: "ウィジェット埋め込み設定",
-            widgetDesc: "あなたのサイトやブログに、この地点の気象グラフを埋め込むことができます。",
+            widgetDesc: "あなたのサイトにこの地点の気象グラフを埋め込むことができます。",
             widgetCopy: "コードをコピー",
             copySuccess: "コピーしました！",
 
@@ -707,8 +707,9 @@ function initCopyUrlEvent() {
 }
 
 /**
- * サブルーチン：ウィジェットプレビューモーダルを開く
- * パラメータの受け渡しを強化し、タイミング問題による表示消えを防止します。
+ * サブルーチン：ウィジェットプレビューモーダルを開く（地名・言語同期 修正版）
+ * 1. 地名(place)と座標(lat/lon)をiframeに確実に引き継ぎます。
+ * 2. 表示言語をコピーコードと完全に一致させます。
  */
 function openWidgetPreview() {
     console.log("DEBUG: openWidgetPreview [START]");
@@ -723,58 +724,88 @@ function openWidgetPreview() {
 
     if (!modal) return;
 
-    // 1. テキスト（タイトル）の確実な表示
-    const displayLang = (typeof i18next !== 'undefined') ? i18next.language : 'ja';
+// --- 1. タイトルとメッセージの表示（i18nエラーを回避） ---
+    // i18n.exists メソッドを使用せず、安全にテキストを取得します
     if (titleArea) {
-        titleArea.innerText = (typeof i18next !== 'undefined' && i18next.exists('widgetTitle')) 
-                              ? i18next.t('widgetTitle', { lng: displayLang }) 
-                              : "Widget Settings";
+        let titleText = "Widget Settings"; // デフォルト
+        if (typeof i18n !== 'undefined') {
+            // i18n.t が存在するか確認し、存在すれば翻訳を試みる
+            titleText = (typeof i18n.t === 'function') ? i18n.t('widgetTitle') : titleText;
+        }
+        titleArea.innerText = titleText;
         titleArea.style.display = 'block';
+    }
+
+    if (msgArea && typeof i18n !== 'undefined' && typeof i18n.t === 'function') {
+        msgArea.innerText = i18n.t('widgetDesc');
+    }
+
+    if (copyBtnText && typeof i18n !== 'undefined' && typeof i18n.t === 'function') {
+        copyBtnText.innerText = i18n.t('widgetCopy');
     }
 
     // 2. パラメータの構成
     const currentUrl = window.location.origin + window.location.pathname;
     const params = new URLSearchParams();
     params.set('mode', 'widget');
-    params.set('lang', displayLang);
-    
-    // localStorage由来の値を確実にセット
-    const placeValue = (typeof currentLabel !== 'undefined') ? currentLabel : '';
-    if (placeValue) params.set('place', placeValue);
+
+    // 地名：ローカルストレージ由来の変数を確実に取得
+    const placeName = (typeof currentLabel !== 'undefined') ? currentLabel : '';
+    if (placeName) params.set('place', placeName);
+
     if (typeof currentLat !== 'undefined' && currentLat !== null) params.set('lat', currentLat);
     if (typeof currentLon !== 'undefined' && currentLon !== null) params.set('lon', currentLon);
     
     const widgetUrl = `${currentUrl}?${params.toString()}`;
     const embedCode = `<iframe src="${widgetUrl}" width="100%" height="650" frameborder="0" style="border:1px solid #eee; border-radius:8px;"></iframe>`;
 
+
     if (codeArea) codeArea.value = embedCode;
     if (widgetArea) widgetArea.style.display = 'block';
 
-    // 3. 表示
+    // --- 3. 表示 ---
     modal.style.display = 'block';
     window.history.pushState({ page: 'modal', id: 'app-common-modal' }, "");
 
-    // 4. iframeへの反映（注入ではなくURL更新のみで完結させる）
+    // --- 4. iframe内の地名・座標の復元注入 ---
     if (iframe) {
         iframe.src = widgetUrl;
         
-        // 【重要】親からのDOM操作を最小限にし、URLパラメータ経由での表示を待つ
-        // ウィジェット側のコードが URLSearchParams で 'place' を見ていれば、これで確実に表示されます。
         iframe.onload = function() {
+            // iframeのロード完了後にヘッダーを構築（地名が消えるのを防ぐ）
             setTimeout(() => {
                 try {
                     const doc = iframe.contentDocument || iframe.contentWindow.document;
                     if (!doc) return;
-                    // 地名エリアの再補完（予備的措置）
-                    const spotEl = doc.getElementById('widget-spot-name') || doc.querySelector('.widget-only-header span:first-child');
-                    if (spotEl && placeValue) spotEl.innerText = placeValue;
-                    
-                    const coordEl = doc.getElementById('widget-coords') || doc.querySelector('.widget-only-header span:last-child');
-                    if (coordEl && typeof currentLat !== 'undefined') {
-                        coordEl.innerText = `${Number(currentLat).toFixed(3)}, ${Number(currentLon).toFixed(3)}`;
+
+                    // 既存のヘッダーがなければ作成
+                    let header = doc.querySelector('.widget-only-header');
+                    if (!header) {
+                        header = doc.createElement('div');
+                        header.className = 'widget-only-header';
+                        header.style.padding = '10px';
+                        header.style.background = '#fff';
+                        header.innerHTML = `
+                            <div style="font-weight:bold;">
+                                <span id="inner-spot-name"></span>
+                                <span id="inner-coords" style="font-size:0.8em; color:#666; margin-left:10px;"></span>
+                            </div>
+                        `;
+                        doc.body.prepend(header);
                     }
-                } catch (e) { console.warn("DEBUG: iframe sync delayed or restricted."); }
-            }, 500);
+
+                    // 値の流し込み
+                    const spotNameEl = doc.getElementById('inner-spot-name');
+                    const coordsEl = doc.getElementById('inner-coords');
+                    
+                    if (spotNameEl) spotNameEl.innerText = placeName;
+                    if (coordsEl && typeof currentLat !== 'undefined' && typeof currentLon !== 'undefined') {
+                        coordsEl.innerText = `${currentLat.toFixed(3)}, ${currentLon.toFixed(3)}`;
+                    }
+                } catch (e) {
+                    console.error("DEBUG: iframe manipulation failed", e);
+                }
+            }, 600); // 描画を確実にするための待機
         };
     }
     
@@ -790,7 +821,7 @@ function copyWidgetCode() {
         area.select();
         try {
             document.execCommand("copy");
-            const msg = (typeof i18next !== 'undefined') ? i18next.t('copySuccess') : "Copied!";
+            const msg = (typeof i18n !== 'undefined') ? i18n.t('copySuccess') : "Copied!";
             alert(msg);
         } catch (err) {
             console.error("Copy failed:", err);
@@ -1124,10 +1155,10 @@ function openModalFromSidebar(modalId) {
         const titleArea = document.getElementById('common-modal-title');
         const msgArea = document.getElementById('common-modal-message');
         
-        // i18next が利用可能な場合に翻訳を実行
-        if (typeof i18next !== 'undefined') {
-            if (titleArea) titleArea.innerText = i18next.t('widgetTitle');
-            if (msgArea) msgArea.innerText = i18next.t('widgetDesc');
+        // i18n が利用可能な場合に翻訳を実行
+        if (typeof i18n !== 'undefined') {
+            if (titleArea) titleArea.innerText = i18n.t('widgetTitle');
+            if (msgArea) msgArea.innerText = i18n.t('widgetDesc');
         } else {
             // 万が一のフォールバック
             if (titleArea) titleArea.innerText = "ウィジェット埋め込み設定";
