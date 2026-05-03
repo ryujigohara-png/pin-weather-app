@@ -757,7 +757,7 @@ function openWidgetPreview() {
     if (typeof currentLon !== 'undefined' && currentLon !== null) params.set('lon', currentLon);
     
     const widgetUrl = `${currentUrl}?${params.toString()}`;
-    const embedCode = `<iframe src="${widgetUrl}" width="100%" height="650" frameborder="0" style="border:1px solid #eee; border-radius:8px;"></iframe>`;
+    const embedCode = `<iframe src="${widgetUrl}" width="100%" height="660" frameborder="0" style="border:1px solid #eee; border-radius:8px;"></iframe>`;
 
 
     if (codeArea) codeArea.value = embedCode;
@@ -1241,7 +1241,7 @@ function initCompassUI() {
 }
 
 /**
- * サブルーチン：環境色を反映した汎用ダイアログを表示（多言語・サイズ調整版）
+ * サブルーチン：環境色を反映した汎用ダイアログを表示（多言語・サイズ調整・安全版）
  */
 function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onSave = null, onDelete = null }) {
     const modal = document.getElementById('app-common-modal');
@@ -1252,7 +1252,13 @@ function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onS
     const input = document.getElementById('common-modal-input');
     const footer = document.getElementById('common-modal-footer');
 
-    // 1. 環境色の厳密な一致（applyEnvVisualsのロジックを流用）
+    // 必須要素の存在確認（クラッシュ防止）
+    if (!modal || !header || !titleEl || !msgEl || !footer) {
+        console.error("Critical Error: Required modal elements not found.");
+        return;
+    }
+
+    // 1. 環境色の反映（ホスト名による判定）
     const hostname = window.location.hostname;
     let bgColor = "#007bff"; // Main (Blue)
     let textColor = "#ffffff";
@@ -1265,22 +1271,25 @@ function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onS
         textColor = "#333333";
     }
 
+    // スタイル適用
     header.style.backgroundColor = bgColor;
     titleEl.style.color = textColor;
 
-    // 2. コンテンツのセット（多言語化対応）
+    // 2. コンテンツのセット
     titleEl.innerText = title;
-    // メッセージキーがあれば翻訳、なければ空
     msgEl.innerText = messageKey ? i18n.t(messageKey) : "";
     
-    if (inputValue !== null) {
-        inputArea.style.display = 'block';
-        input.value = inputValue;
-    } else {
-        inputArea.style.display = 'none';
+    // 入力エリアの表示制御
+    if (inputArea && input) {
+        if (inputValue !== null) {
+            inputArea.style.display = 'block';
+            input.value = inputValue;
+        } else {
+            inputArea.style.display = 'none';
+        }
     }
 
-    // 3. ボタンの生成
+    // 3. ボタンの生成（初期化してから追加）
     footer.innerHTML = "";
     
     // 削除ボタン
@@ -1288,7 +1297,6 @@ function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onS
         const btnDelete = document.createElement('button');
         btnDelete.className = "btn btn-danger-outline";
         btnDelete.innerText = i18n.t('btnDelete'); 
-        
         btnDelete.onclick = () => {
             onDelete();
             modal.style.display = 'none';
@@ -1296,10 +1304,10 @@ function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onS
         footer.appendChild(btnDelete);
     }
 
-    // 地図ボタン（新規追加）
+    // 地図ボタン
     if (onMap) {
         const btnMap = document.createElement('button');
-        btnMap.className = "btn btn-map-view"; // 既存の地図ボタン用クラスを流用
+        btnMap.className = "btn btn-map-view";
         btnMap.innerText = "Map"; 
         btnMap.onclick = () => {
             onMap();
@@ -1312,21 +1320,25 @@ function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onS
     const btnCancel = document.createElement('button');
     btnCancel.className = "btn btn-secondary";
     btnCancel.innerText = i18n.t('btnClose');
-    btnCancel.onclick = () => modal.style.display = 'none';
+    btnCancel.onclick = () => {
+        modal.style.display = 'none';
+    };
     footer.appendChild(btnCancel);
 
-    // 保存ボタン
+    // 保存・適用ボタン
     if (onSave) {
         const btnSave = document.createElement('button');
         btnSave.className = "btn btn-save";
         btnSave.innerText = i18n.t('btnApply') || i18n.t('btnSaveSettings');
         btnSave.onclick = () => {
-            onSave(input.value);
+            const value = input ? input.value : null;
+            onSave(value);
             modal.style.display = 'none';
         };
         footer.appendChild(btnSave);
     }
 
+    // 表示（flexで中央揃えを維持）
     modal.style.display = 'flex';
 }
 
@@ -1723,56 +1735,75 @@ async function executeMapSearch() {
     } catch (err) { console.error(err); }
 }
 
-async function onMapClick(e) {
+function onMapClick(e) {
     const { lat, lng } = e.latlng;
-    if (tempMarker) map.removeLayer(tempMarker);
-    tempMarker = L.marker([lat, lng]).addTo(map);
-    await fetchAddressInfo(lat, lng);
+    
+    // 【DEBUG】クリックされた瞬間の座標を記録
+    console.log(`[DEBUG] Map Clicked: lat=${lat}, lon=${lng}`);
+
+    currentLat = lat;
+    currentLon = lng;
+
+    if (tempMarker) {
+        tempMarker.setLatLng(e.latlng);
+    } else {
+        tempMarker = L.marker(e.latlng).addTo(map);
+    }
+
+    // 住所取得。この後に currentLabel がどう変わるかが重要
+    if (typeof fetchAddressInfo === 'function') {
+        fetchAddressInfo(currentLat, currentLon);
+    }
 }
 
-/**
- * サブルーチン：地図モーダル内での住所情報取得とボタン設定
- */
 async function fetchAddressInfo(lat, lng) {
+    // 【DEBUG】関数開始時の座標を確認
+    console.log(`[DEBUG] fetchAddressInfo started: lat=${lat}, lon=${lng}`);
+
     const statusEl = document.getElementById('map-status');
     if (statusEl) statusEl.innerText = i18n.t('mapStatusFetching');
     
     try {
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=${i18n._currentLang}`);
         const data = await res.json();
+        
+        // 【DEBUG】APIから返ってきた住所データを確認
+        console.log(`[DEBUG] Address Data:`, data.address);
+
         const addr = data.address;
         const city = addr.city || addr.town || addr.village || "";
         const district = addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district || "";
         const defaultName = (city + district) || i18n.t('mapNewSpot');
 
-        const tempViewBtn = document.getElementById('temp-view-btn');
-        if (tempViewBtn) {
-            tempViewBtn.onclick = () => {
-                const suffix = i18n._currentLang === 'ja' ? "(未登録)" : "(Temp)";
-                updateLocation(lat, lng, defaultName + suffix);
-                closeModal('map-modal');
-            };
-            tempViewBtn.disabled = false;
-        }
-
         const saveSpotBtn = document.getElementById('save-spot-btn');
         if (saveSpotBtn) {
             saveSpotBtn.onclick = () => {
+                // 【DEBUG】ボタンが押された瞬間の lat, lng を確認
+                console.log(`[DEBUG] Save button clicked for: ${defaultName} (lat:${lat}, lon:${lng})`);
+
                 showAppDialog({
                     title: defaultName,
                     messageKey: 'mapSavePrompt',
                     inputValue: defaultName,
-                    // fetchAddressInfo 内の地図からの保存処理
                     onSave: (spotName) => {
+                        // 【DEBUG】ダイアログで保存が押された後の最終確認
+                        console.log(`[DEBUG] Dialog onSave triggered: name=${spotName}, lat=${lat}, lon=${lng}`);
+
                         if (!spotName) return;
 
-                        // サブルーチンでチェック
-                        if (!checkSpotLimit(spotName)) return;
+                        if (!checkSpotLimit(spotName)) {
+                            console.warn(`[DEBUG] checkSpotLimit returned false for: ${spotName}`);
+                            return;
+                        }
 
                         const filtered = mySpots.filter(s => s.label !== spotName);
                         mySpots = [{ lat, lon: lng, label: spotName }, ...filtered];
                         
                         localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                        
+                        // 【DEBUG】ストレージ保存完了の確認
+                        console.log("[DEBUG] Storage update success. Current mySpots length:", mySpots.length);
+
                         updateLocation(lat, lng, spotName);
                         renderTabs(spotName);
                         closeModal('map-modal');
@@ -1784,6 +1815,7 @@ async function fetchAddressInfo(lat, lng) {
         
         if (statusEl) statusEl.innerText = "📍：" + defaultName;
     } catch (err) {
+        console.error("[DEBUG] fetchAddressInfo Error:", err);
         if (statusEl) statusEl.innerText = i18n.t('mapStatusFail');
     }
 }
