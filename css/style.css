@@ -469,74 +469,70 @@ svg { width: 100%; display: block; overflow: visible; }
 }
 
 /* ============================================================
-   2. ウィジェットモード（widget-mode）専用スタイル
+   widget-mode専用：余白除去・高さ自動調整版
    ============================================================ */
-
-/* 全体：ブラウザのスクロールバーのみを許可 */
 body.widget-mode {
     padding-top: 0 !important;
     background: #ffffff !important;
-    overflow-y: visible !important; 
-    height: auto !important;
+    overflow: hidden !important; /* bodyのスクロールを禁止 */
+    height: auto !important;     /* 100vhからautoに変更し、中身に合わせる */
+    min-height: 0 !important;
 }
 
-/* 不要要素の非表示 */
-body.widget-mode .control-wrapper,
-body.widget-mode .sidebar,
-body.widget-mode .sidebar-overlay,
-body.widget-mode .modal-overlay,
-body.widget-mode #user-guide-container {
-    display: none !important;
-}
-
-/* カード外枠：内部バーの発生源を断つ */
-body.widget-mode .main-card {
+/* 親コンテナ：高さを固定せず、コンテンツに追随させる */
+body.widget-mode .main-card,
+body.widget-mode .scroll-container {
     box-shadow: none !important;
     border-radius: 0 !important;
     margin: 0 !important;
     max-width: none !important;
-    overflow: visible !important; /* 縦バーを強制的に出さない */
-    height: auto !important;
-}
-
-/* 【最重要】ご提示いただいた構造への対策 */
-/* 短いバーの直接的な原因であるコンテナのスクロールを解除 */
-body.widget-mode .scroll-container {
-    overflow-y: visible !important; /* 縦方向は全て表示（バーを消す） */
-    height: auto !important;
-    /* 横スクロールが必要な場合のみ overflow-x を調整（通常は不要） */
-    overflow-x: visible !important; 
-}
-
-/* チャート描画ステージの高さ制限も解除 */
-body.widget-mode .chart-stage {
-    height: auto !important;
-    overflow: visible !important;
+    overflow: hidden !important; 
+    height: auto !important;    /* 100%からautoに変更 */
     display: block !important;
 }
 
-/* ウィジェット専用ヘッダー */
-.widget-only-header {
-    display: none; 
-    padding: 10px 15px;
-    background: #fff;
-    border-bottom: 1px solid #eee;
+/* グラフ描画エリア：横スクロールのみ許可し、高さは中身に合わせる */
+body.widget-mode .chart-stage {
+    height: auto !important;    /* 100%からautoに変更 */
+    display: block !important;
+    overflow-x: auto !important; 
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    margin-left: -100px !important;
 }
 
-body.widget-mode .widget-only-header {
-    display: flex; 
-    justify-content: space-between;
-    align-items: center;
+body.widget-mode .sticky-label {
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 10 !important;
+    background: #ffffff !important;
 }
 
-#widget-spot-name {
-    font-weight: bold;
-    font-size: 16px;
-    color: #333;
+/* 不要なUIをすべて消去 */
+body.widget-mode .control-wrapper,
+body.widget-mode .sidebar,
+body.widget-mode .sidebar-overlay,
+body.widget-mode .modal-overlay,
+body.widget-mode #user-guide-container,
+body.widget-mode footer,
+body.widget-mode .nav-container {
+    display: none !important;
 }
 
-#widget-coords {
-    font-size: 11px;
-    color: #888;
-    margin-left: 8px;
+/* グラフ間の余白を物理的にゼロにする */
+body.widget-mode .section-weather,
+body.widget-mode .section-wind,
+body.widget-mode .section-temp,
+body.widget-mode .section-marine {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+/* 埋め込み時のスクロールバー設定 */
+body.widget-mode .chart-stage::-webkit-scrollbar {
+    height: 4px;
+}
+body.widget-mode .chart-stage::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 2px;
 }

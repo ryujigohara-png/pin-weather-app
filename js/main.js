@@ -2002,12 +2002,16 @@ async function draw() {
         const hScale = viewConfig.hourWidth; 
         const displayCount = totalDataCount - startIdx;
 
-        // 1. 【修正点】グラフの高さ設定（ウィジェット時はすべて80px）
+        // 1. 【修正点】グラフの高さ・余白設定
         let windH = viewConfig.windHeight;
         let subH = viewConfig.subHeight;
+        let gMargin = viewConfig.graphMargin; // 通常時のマージン
+
         if (isWidget) {
             windH = 80;
             subH = 80;
+            gMargin = 0; // 【重要】ウィジェット時はセクション間の余白をゼロにして空白を詰める
+            
             // 2. 【修正点】タブ（ナビゲーション等）を非表示にする
             const nav = document.querySelector('.nav-container') || document.querySelector('nav');
             if (nav) nav.style.display = 'none';
@@ -2028,7 +2032,6 @@ async function draw() {
 
         const labelFS = viewConfig.fontSize;
         const iScale = viewConfig.iconScale;
-        const gMargin = viewConfig.graphMargin;
         const totalW = hScale * (displayCount - 1);
 
         const secWind = document.querySelector('.section-wind');
@@ -2039,7 +2042,10 @@ async function draw() {
 
         if (secWind) { secWind.style.height = windH + "px"; secWind.style.marginBottom = gMargin + "px"; }
         if (secTemp) { secTemp.style.height = subH + "px"; secTemp.style.marginBottom = gMargin + "px"; }
-        if (secMarine) { secMarine.style.height = subH + "px"; }
+        if (secMarine) { 
+            secMarine.style.height = subH + "px"; 
+            secMarine.style.marginBottom = "0px"; // 【重要】最下部セクションの余白は常にゼロ
+        }
         
         let wHtml = "";
         const pData = allData.data.precipitation ? allData.data.precipitation.slice(startIdx) : [];
@@ -2084,8 +2090,18 @@ async function draw() {
         resetGraphScroll();
         initScrollEvent(hScale, startIdx);
 
-        // 3. 【修正点】ツールチップ初期化：縦位置が graphH/windH に連動するよう基準時刻を渡す
+        // 3. 【修正点】ツールチップ初期化
         initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime);
+
+        // 4. 【修正点】親コンテナの高さ制限を解除し、グラフの高さに合わせる
+        if (isWidget) {
+            const stage = document.getElementById('stage');
+            const scrollRoot = document.getElementById('scroll-root');
+            if (stage && scrollRoot) {
+                scrollRoot.style.height = "auto";
+                document.body.style.height = "auto";
+            }
+        }
         
     } catch (e) { 
         console.error("Critical Draw Error:", e);
