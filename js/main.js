@@ -710,6 +710,7 @@ function initCopyUrlEvent() {
  * サブルーチン：ウィジェットプレビューモーダルを開く（地名・言語同期 修正版）
  * 1. 地名(place)と座標(lat/lon)をiframeに確実に引き継ぎます。
  * 2. 表示言語をコピーコードと完全に一致させます。
+ * 3. プレビュー枠の高さを660pxに固定します。
  */
 function openWidgetPreview() {
     console.log("DEBUG: openWidgetPreview [START]");
@@ -724,7 +725,7 @@ function openWidgetPreview() {
 
     if (!modal) return;
 
-// --- 1. タイトルとメッセージの表示（i18nエラーを回避） ---
+    // --- 1. タイトルとメッセージの表示（i18nエラーを回避） ---
     // i18n.exists メソッドを使用せず、安全にテキストを取得します
     if (titleArea) {
         let titleText = "Widget Settings"; // デフォルト
@@ -759,9 +760,13 @@ function openWidgetPreview() {
     const widgetUrl = `${currentUrl}?${params.toString()}`;
     const embedCode = `<iframe src="${widgetUrl}" width="100%" height="660" frameborder="0" style="border:1px solid #eee; border-radius:8px;"></iframe>`;
 
-
     if (codeArea) codeArea.value = embedCode;
-    if (widgetArea) widgetArea.style.display = 'block';
+    if (widgetArea) {
+        widgetArea.style.display = 'block';
+        // プレビューエリア全体の高さを660pxに固定（余白を持たせる）
+        widgetArea.style.height = "660px";
+        widgetArea.style.overflow = "hidden";
+    }
 
     // --- 3. 表示 ---
     modal.style.display = 'block';
@@ -770,6 +775,8 @@ function openWidgetPreview() {
     // --- 4. iframe内の地名・座標の復元注入 ---
     if (iframe) {
         iframe.src = widgetUrl;
+        // iframe自体の高さも660pxに確実に固定
+        iframe.style.height = "660px";
     }
     
     console.log("DEBUG: openWidgetPreview [END]");
