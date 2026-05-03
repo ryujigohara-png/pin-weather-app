@@ -436,10 +436,12 @@ body.widget-mode {
     background: #ffffff !important;
 }
 
+/* ★修正点：ウィジェットモード時は活用ガイド、コントロール、サイドバー等も非表示にする */
 body.widget-mode .control-wrapper,
 body.widget-mode .sidebar,
 body.widget-mode .sidebar-overlay,
-body.widget-mode .modal-overlay {
+body.widget-mode .modal-overlay,
+body.widget-mode #user-guide-container {
     display: none !important;
 }
 
@@ -451,7 +453,7 @@ body.widget-mode .main-card {
     max-width: none !important;
 }
 
-/* 3. ウィジェット専用ヘッダー（後ほどJSで追加する要素用） */
+/* 3. ウィジェット専用ヘッダー */
 .widget-only-header {
     display: none; /* 通常モードでは隠す */
     padding: 10px 15px;
@@ -482,20 +484,18 @@ body.widget-mode .widget-only-header {
 #app-common-modal .modal-content {
     display: flex !important;
     flex-direction: column !important;
-    max-height: 90vh !important; /* 画面高の90%に収める */
-    overflow: hidden !important; /* 全体のスクロールを禁止 */
-    padding: 0 !important;      /* 内部のpaddingで制御 */
+    max-height: 90vh !important;
+    overflow: hidden !important;
+    padding: 0 !important;
 }
 
-/* ヘッダー部分を物理的に固定し、消失を防ぐ */
 #common-modal-header {
-    display: block !important; /* flexアイテムとして確実に表示 */
-    flex-shrink: 0 !important; /* 他の要素に押しつぶされるのを禁止 */
-    min-height: 50px;          /* 最低限の表示領域を確保 */
+    display: block !important;
+    flex-shrink: 0 !important;
+    min-height: 50px;
     visibility: visible !important;
 }
 
-/* タイトル自体の文字を確実に表示 */
 #common-modal-title {
     display: block !important;
     color: #333 !important;
@@ -503,15 +503,13 @@ body.widget-mode .widget-only-header {
     font-weight: bold;
 }
 
-/* ボディセクション：ここだけをスクロール可能にする */
 .view-settings-body {
-    flex-grow: 1;               /* 残りのスペースをすべて使う */
-    overflow-y: auto;           /* 溢れたらスクロール */
+    flex-grow: 1;
+    overflow-y: auto;
     padding: 10px 20px 20px 20px;
     -webkit-overflow-scrolling: touch;
 }
 
-/* フッター：ボタンエリアを固定 */
 #common-modal-footer {
     flex-shrink: 0;
     border-top: 1px solid #eee;

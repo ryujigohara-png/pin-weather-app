@@ -770,43 +770,6 @@ function openWidgetPreview() {
     // --- 4. iframe内の地名・座標の復元注入 ---
     if (iframe) {
         iframe.src = widgetUrl;
-        
-        iframe.onload = function() {
-            // iframeのロード完了後にヘッダーを構築（地名が消えるのを防ぐ）
-            setTimeout(() => {
-                try {
-                    const doc = iframe.contentDocument || iframe.contentWindow.document;
-                    if (!doc) return;
-
-                    // 既存のヘッダーがなければ作成
-                    let header = doc.querySelector('.widget-only-header');
-                    if (!header) {
-                        header = doc.createElement('div');
-                        header.className = 'widget-only-header';
-                        header.style.padding = '10px';
-                        header.style.background = '#fff';
-                        header.innerHTML = `
-                            <div style="font-weight:bold;">
-                                <span id="inner-spot-name"></span>
-                                <span id="inner-coords" style="font-size:0.8em; color:#666; margin-left:10px;"></span>
-                            </div>
-                        `;
-                        doc.body.prepend(header);
-                    }
-
-                    // 値の流し込み
-                    const spotNameEl = doc.getElementById('inner-spot-name');
-                    const coordsEl = doc.getElementById('inner-coords');
-                    
-                    if (spotNameEl) spotNameEl.innerText = placeName;
-                    if (coordsEl && typeof currentLat !== 'undefined' && typeof currentLon !== 'undefined') {
-                        coordsEl.innerText = `${currentLat.toFixed(3)}, ${currentLon.toFixed(3)}`;
-                    }
-                } catch (e) {
-                    console.error("DEBUG: iframe manipulation failed", e);
-                }
-            }, 600); // 描画を確実にするための待機
-        };
     }
     
     console.log("DEBUG: openWidgetPreview [END]");
@@ -830,10 +793,63 @@ function copyWidgetCode() {
 }
 
 /**
+ * サブルーチン：ウィジェット専用ヘッダーの自律生成（確定版）
+ * グローバル変数ではなく、URLパラメータから直接値を抽出して表示します。
+ */
+function setupWidgetHeader() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('mode') !== 'widget') return;
+
+    // --- 修正ポイント：変数からではなく、URLから直接取得する ---
+    const pPlace = urlParams.get('place');
+    const pLat = urlParams.get('lat');
+    const pLon = urlParams.get('lon');
+
+    // 表示用の値を確定（デコード処理を含む）
+    const displayLabel = pPlace ? decodeURIComponent(pPlace) : "";
+    const latNum = pLat ? parseFloat(pLat).toFixed(3) : "";
+    const lonNum = pLon ? parseFloat(pLon).toFixed(3) : "";
+
+    // 二重表示防止
+    const oldHeader = document.querySelector('.widget-only-header');
+    if (oldHeader) oldHeader.remove();
+
+    const header = document.createElement('div');
+    header.className = 'widget-only-header';
+    header.style.cssText = "padding: 10px 15px; background: #fff; border-bottom: 1px solid #eee; font-family: sans-serif; display: block; position: relative; z-index: 9999;";
+
+    // HTMLの構築
+    const coordsHtml = (latNum && lonNum) 
+        ? `<span style="font-size:0.85em; color:#666; margin-left:10px; font-weight:normal;">${latNum}, ${lonNum}</span>` 
+        : '';
+
+    header.innerHTML = `<div style="font-weight:bold; color:#333; font-size:16px;"><span>${displayLabel}</span>${coordsHtml}</div>`;
+    
+    document.body.prepend(header);
+}
+
+/**
  * サブルーチン：環境判定とUIへの反映
  * index.htmlの構造に合わせてセレクタを修正
+ * ウィジェットモードの判定と活用ガイド非表示制御を追加
  */
 function applyEnvVisuals() {
+    // --- 追加：ウィジェットモードの判定とクラス付与 ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const isWidget = urlParams.get('mode') === 'widget';
+
+    if (isWidget) {
+        // bodyにクラスを付与することで、CSS側の非表示ルールを一括適用
+        document.body.classList.add('widget-mode');
+        
+        // ウィジェット時のフッター余白調整
+        const footer = document.querySelector('.footer-info');
+        if (footer) {
+            footer.style.paddingBottom = '20px';
+        }
+    }
+    // ----------------------------------------------
+
     const hostname = window.location.hostname;
     let config = {};
 
@@ -888,17 +904,33 @@ function applyEnvVisuals() {
 
 /**
  * サブルーチン：アプリ起動時の初期化
- * 1. 保存データがあればロード
- * 2. データがない場合はIPから現在地を推定して即時描画
- * 3. WelcomeダイアログでGPS/Mapの選択を促す
- * ※PWABuilder等のボット解析時はダイアログを抑制してタイムアウトを防止
+ * 1. 【最優先】URLパラメータがあれば地点を上書き
+ * 2. 保存データがあればロード
+ * 3. データがない場合はIPから現在地を推定して即時描画（Welcomeダイアログは表示しない）
  */
 async function initApp() {
-    // 【追加】まず最初にドメイン移行が必要かチェックする
-    checkDomainMigration();
+    // ドメイン移行チェックは削除済みのため呼び出しをカット
 
     window.history.replaceState({ page: 'home' }, "");
 
+    // --- 【重要】URLパラメータの解析 ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const pMode = urlParams.get('mode');
+    const pPlace = urlParams.get('place');
+    const pLat = urlParams.get('lat');
+    const pLon = urlParams.get('lon');
+
+    // ウィジェットモードかつ座標パラメータがある場合、ストレージより優先して適用
+    let isParamLoaded = false;
+    if (pMode === 'widget' && pLat && pLon) {
+        currentLat = parseFloat(pLat);
+        currentLon = parseFloat(pLon);
+        currentLabel = pPlace ? decodeURIComponent(pPlace) : "Selected Location";
+        isParamLoaded = true;
+        console.log("DEBUG: Location loaded from URL parameters.");
+    }
+
+    // --- ストレージの確認 ---
     const savedData = localStorage.getItem('pin_weather_spots');
     let parsedData = null;
     try {
@@ -907,7 +939,12 @@ async function initApp() {
         parsedData = null;
     }
 
-    if (parsedData && parsedData.length > 0) {
+    // --- 地点確定ロジック ---
+    if (isParamLoaded) {
+        // URLパラメータでロード済みの場合はそのまま初期化
+        finalizeInit(); 
+    } else if (parsedData && parsedData.length > 0) {
+        // ストレージにデータがある場合
         mySpots = parsedData;
         const lastSpot = mySpots[0];
         currentLat = lastSpot.lat;
@@ -915,37 +952,28 @@ async function initApp() {
         currentLabel = lastSpot.label;
         finalizeInit(); 
     } else {
+        // どちらもない場合はIP推定
         mySpots = [];
-        // IP推定（おおよその位置）が完了するまで待機（真っ白回避）
+        // 推定地点の取得（非同期）
         await setApproximateLocation(); 
         
-        // 推定地点（失敗時はサンプル）で背景を先に描画
+        // 【修正点】Welcomeダイアログ関連の呼び出しを削除し、即座にメイン画面を初期化
         finalizeInit();
 
-        // PWABuilder や Lighthouse などの解析ボットでない場合のみダイアログを表示
-        const isBot = /Lighthouse|Chrome-Lighthouse|PWABuilder/i.test(navigator.userAgent);
-
-        if (!isBot) {
-            // Welcomeダイアログ表示
-            setTimeout(() => {
-                if (typeof showAppDialog === 'function') {
-                    showAppDialog({
-                        title: "Welcome",
-                        messageKey: 'welcomeGuide',
-                        onMap: () => openMap(currentLat, currentLon), // 推定位置を初期値にする
-                        onSave: () => handleGPSClick() 
-                    });
-                    setupWelcomeButtons();
-                }
-            }, 500);
-        }
-
-        // バックグラウンドGPSは「座標の更新」のみ。renderTabsは呼ばない。
+        // バックグラウンドGPS更新
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
-                    currentLat = pos.coords.latitude;
-                    currentLon = pos.coords.longitude;
+                    // 【修正】currentLat/Lon を直接書き換えない
+                    // もし「現在地」として保存したい場合は別の変数に入れるか、
+                    // ここでは何もしないのが設計上安全です。
+                    console.log("GPS accuracy position acquired, but not overwriting current view.");
+                    
+                    /* 
+                    // もし現在地を常に把握しておきたいなら、別名の変数に保持する
+                    this.latestGpsLat = pos.coords.latitude;
+                    this.latestGpsLon = pos.coords.longitude;
+                    */
                 },
                 null,
                 { timeout: 8000 }
@@ -983,29 +1011,13 @@ async function setApproximateLocation() {
     }
 }
 
-/**
- * サブルーチン：Welcomeダイアログのボタン外観調整
- */
-function setupWelcomeButtons() {
-    const footer = document.getElementById('common-modal-footer');
-    if (!footer) return;
-    const buttons = footer.getElementsByTagName('button');
-    for (let btn of buttons) {
-        // 「適用/保存」ボタンのクラス（btn-save）を探してGPSに書き換え
-        if (btn.classList.contains('btn-save')) {
-            btn.innerText = "GPS";
-        }
-        // 「閉じる/キャンセル」ボタン（btn-secondary）を非表示にする
-        if (btn.classList.contains('btn-secondary')) {
-            btn.style.display = 'none';
-        }
-    }
-}
 
 /**
  * サブルーチン：共通の初期化プロセス
  */
 function finalizeInit() {
+// 【追加】ウィジェットモードならヘッダーを表示
+    setupWidgetHeader();
     initViewSettings();
     initCopyUrlEvent();
     applyEnvVisuals(); 
@@ -2504,121 +2516,6 @@ window.addEventListener('appinstalled', () => {
 // DOM構築後に実行
 window.addEventListener('DOMContentLoaded', initPwaInstall);
 
-/**
- * サブルーチン：新ドメイン移行案内の表示
- * 概要：旧ドメインから新ドメインへのデータ引継ぎを行い、完了後はユーザーにアプリを閉じてブラウザで開き直すよう促す。
- * 新ドメイン起動時は、未インストールのユーザーに対してホーム画面追加（PWA）の手順を表示する。
- */
-function checkDomainMigration() {
-    const currentHost = window.location.hostname;
-    const newDomain = "pin-weather.pro"; 
-
-    // 1. 旧ドメイン（app.onrender.com）での処理
-    if (currentHost.includes("app.onrender.com")) {
-        window.goNewDomain = function() {
-            const spotsData = localStorage.getItem('pin_weather_spots');
-            const viewConfigData = localStorage.getItem('pin_weather_view_config');
-            const windFilterData = localStorage.getItem('pin_weather_wind_filter');
-            
-            let targetUrl = `https://${newDomain}/`;
-            const migrationPackage = {
-                spots: spotsData,
-                viewConfig: viewConfigData,
-                windFilter: windFilterData
-            };
-            const dataString = encodeURIComponent(JSON.stringify(migrationPackage));
-            targetUrl += `?migration_all=${dataString}`;
-            
-            window.location.replace(targetUrl);
-        };
-
-        const banner = document.createElement('div');
-        banner.id = 'migration-banner';
-        banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background-color:#d32f2f;color:white;text-align:center;padding:15px 10px;z-index:10000;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,0.3);';
-        banner.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 5px;">【重要】新URLへの移動とデータ引継ぎ</div>
-            <div style="margin-bottom: 10px; font-size: 14px; line-height: 1.4;">
-                新サイトpin-weather.proに転居しました。<br>登録地点は自動で引き継ぎます。<br>
-                新サイトに移動してください。
-            </div>
-            <button onclick="goNewDomain()" style="background-color: white; color: #d32f2f; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer;">地点データを保持して移動する</button>
-        `;
-        document.body.prepend(banner);
-        document.body.style.paddingTop = "130px";
-    }
-
-    // 2. 新ドメイン（pin-weather.pro）に届いた直後の処理
-    if (currentHost === newDomain || currentHost === `www.${newDomain}`) {
-        const urlParams = new URLSearchParams(window.location.search);
-        const migrationAll = urlParams.get('migration_all');
-        const isExplicitBrowser = urlParams.get('mode') === 'browser'; // ブラウザ表示モードの判定
-        
-        if (migrationAll) {
-            try {
-                const parsed = JSON.parse(decodeURIComponent(migrationAll));
-                if (parsed.spots) localStorage.setItem('pin_weather_spots', parsed.spots);
-                if (parsed.viewConfig) localStorage.setItem('pin_weather_view_config', parsed.viewConfig);
-                if (parsed.windFilter) localStorage.setItem('pin_weather_wind_filter', parsed.windFilter);
-
-                // 保存が完了したら、パラメータのないクリーンなURLへ差し替え
-                sessionStorage.setItem('migration_final_alert', 'true');
-                window.location.replace(window.location.origin + window.location.pathname);
-                return; 
-            } catch (e) {
-                console.error("Migration error", e);
-            }
-        }
-
-        // 3. パラメータが消えた後、ユーザーに案内を表示
-        if (sessionStorage.getItem('migration_final_alert') === 'true') {
-            setTimeout(() => {
-                sessionStorage.removeItem('migration_final_alert');
-                
-                if (typeof showAppDialog === 'function') {
-                    showAppDialog({
-                        title: "データ引継ぎ完了",
-                        message: "データの移行に成功しました。\n下記のリンクをタップしてブラウザで開き直し、ホーム画面への再登録をお願いします。",
-                        onSave: () => {
-                            document.body.innerHTML = `
-                                <div style="padding:50px; text-align:center; font-family:sans-serif;">
-                                    <h3>移行準備が整いました</h3>
-                                    <p style="margin-top:20px; line-height:1.6;">
-                                        以下のリンクをタップして<br>新サイトをブラウザで開き直してください。<br><br>
-                                        新サイトをワンクリックで開けるようにするときは、<br>
-                                        <b>・≡サイドバーメニューから「インストール」</b>するか<br>
-                                        ・AndroidはChrome等「ホーム画面に追加」<br>
-                                        ・iPhoneはSafari「共有」⇒「ホーム画面に追加」<br>
-                                        をしてPWAをインストールしてください。<br><br>
-                                        <a href="https://pin-weather.pro/?mode=browser" style="display:inline-block; background-color:#d32f2f; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold;">新サイトをブラウザで開く</a>
-                                    </p>
-                                    <p style="margin-top:20px; color:#666;">ホーム画面の古いアイコンは紛らわしいので、必ず削除してください。</p>
-                                </div>`;
-                        }
-                    });
-                }
-            }, 1000);
-        }
-
-        // 4. インストールを促すバナーの表示条件判定
-        const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-        const isNewDomain = currentHost === newDomain || currentHost === `www.${newDomain}`;
-        
-        // 【修正】PWA起動中であっても、URLに mode=browser が含まれている場合は強制表示する
-        if (isNewDomain && (!isPWA || isExplicitBrowser) && !sessionStorage.getItem('migration_final_alert')) {
-            const installGuide = document.createElement('div');
-            installGuide.id = 'pwa-install-banner';
-            // z-index を 100 に下げてサイドバーの下に隠れるように修正
-            installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5; z-index: 100; position: relative;';
-            installGuide.innerHTML = `
-                ${i18n.t('pwa_install_msg')}<br>
-                <span style="font-size: 11px; font-weight: normal;">
-                    ${i18n.t('pwa_install_sub')}
-                </span>
-            `;
-            document.body.prepend(installGuide);
-        }
-    }
-}
 
 /**
  * サブルーチン：AdMobバナー広告の初期化（既存フッター対応版）
