@@ -707,7 +707,7 @@ function initCopyUrlEvent() {
 }
 
 /**
- * サブルーチン：ウィジェットプレビューモーダルを開く（修正版）
+ * サブルーチン：ウィジェットプレビューモーダルを開く
  * 1. 地名(place)と座標(lat/lon)をiframeに確実に引き継ぎます。
  * 2. 表示言語をコピーコードと完全に一致させます。
  * 3. プレビュー枠の高さを維持しつつ、ボタンが隠れないよう調整します。
@@ -725,9 +725,8 @@ function openWidgetPreview() {
 
     if (!modal) return;
 
-    // 他のモーダル利用時に影響が出ないよう、一旦初期化（念のため）
-    // ※通常はモーダルを閉じる処理で行いますが、ここで明示的に制御します
-    const allModalContents = modal.querySelectorAll('.modal-content-unit'); // 汎用パーツ
+    // 他のモーダル利用時に影響が出ないよう、一旦初期化
+    const allModalContents = modal.querySelectorAll('.modal-content-unit'); 
     allModalContents.forEach(el => el.style.display = 'none');
 
     // --- 1. タイトルとメッセージの表示 ---
@@ -768,19 +767,16 @@ function openWidgetPreview() {
     // --- 3. プレビューエリアの表示制御 ---
     if (widgetArea) {
         widgetArea.style.display = 'block';
-        // 内部のiframeを包む枠自体の高さは、ボタンを押し出さない程度（例: 400px〜）にするか、
-        // あるいはiframe側の指定に任せます。ここでは660pxの枠を確保しつつ溢れを許容します。
         widgetArea.style.height = "auto"; 
     }
 
     if (iframe) {
         iframe.src = widgetUrl;
         iframe.style.display = 'block';
-        iframe.style.height = "480px"; // モーダル内プレビューとして適切な高さに調整
+        iframe.style.height = "660px"; // モーダル内プレビューとして適切な高さ
     }
 
-    // コピーボタン等のエリアがあれば表示
-    const actionArea = document.getElementById('widget-action-area'); // IDは実際の構造に合わせてください
+    const actionArea = document.getElementById('widget-action-area');
     if (actionArea) actionArea.style.display = 'block';
 
     // --- 4. モーダル本体の表示 ---
@@ -845,26 +841,8 @@ function setupWidgetHeader() {
 
 /**
  * サブルーチン：環境判定とUIへの反映
- * index.htmlの構造に合わせてセレクタを修正
- * ウィジェットモードの判定と活用ガイド非表示制御を追加
  */
 function applyEnvVisuals() {
-    // --- 追加：ウィジェットモードの判定とクラス付与 ---
-    const urlParams = new URLSearchParams(window.location.search);
-    const isWidget = urlParams.get('mode') === 'widget';
-
-    if (isWidget) {
-        // bodyにクラスを付与することで、CSS側の非表示ルールを一括適用
-        document.body.classList.add('widget-mode');
-        
-        // ウィジェット時のフッター余白調整
-        const footer = document.querySelector('.footer-info');
-        if (footer) {
-            footer.style.paddingBottom = '20px';
-        }
-    }
-    // ----------------------------------------------
-
     const hostname = window.location.hostname;
     let config = {};
 
@@ -888,14 +866,12 @@ function applyEnvVisuals() {
         };
     }
 
-    // 2. ヘッダー（control-wrapper）背景色の反映
     const headerEl = document.querySelector('.control-wrapper');
     if (headerEl) {
         headerEl.style.backgroundColor = config.headerColor;
         headerEl.style.transition = "background-color 0.3s ease";
     }
 
-    // 3. フッター（footer-info）の下に環境名を表示
     const footerDisclaimer = document.querySelector('.footer-info');
     if (footerDisclaimer) {
         const oldBadge = document.getElementById('footer-env-badge');
@@ -1997,6 +1973,9 @@ function resetGraphScroll() {
 // ツールチップ消去用タイマー変数
 let tooltipTimer = null;
 
+/**
+ * メインサブルーチン：描画処理
+ */
 async function draw() {
     try {
         if (typeof currentLat === 'undefined' || currentLat === null || typeof currentLon === 'undefined' || currentLon === null) {
@@ -2005,7 +1984,6 @@ async function draw() {
             return;
         }
 
-        // --- ウィジェットモード判定 ---
         const params = new URLSearchParams(window.location.search);
         const isWidget = params.get('mode') === 'widget';
         
@@ -2013,30 +1991,23 @@ async function draw() {
         const svgW = document.getElementById('svg-weather');
         if (!svgW || !allData || !allData.data) return;
 
-        // 【重要】この描画セッションにおける「現在時刻」をここで固定する
         const drawReferenceTime = new Date();
-
         const totalDataCount = allData.data.time.length;
         const baseWindIcon = `<svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle; margin-right:2px; display:inline-block;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(-90)"/></svg>`;
 
         const fullIdx = allData.data.time.findIndex(t => new Date(t) > drawReferenceTime) - 1;
         const startIdx = Math.max(0, fullIdx - 4);
         
-        // 横幅・表示件数は通常ロジックを維持
         const hScale = viewConfig.hourWidth; 
         const displayCount = totalDataCount - startIdx;
 
-        // 1. 【修正点】グラフの高さ・余白設定
-        let windH = viewConfig.windHeight;
-        let subH = viewConfig.subHeight;
-        let gMargin = viewConfig.graphMargin; // 通常時のマージン
+        // --- ウィジェット時の高さ切り替え ---
+        // 通常画面の構成を維持し、高さだけを80にする
+        let windH = isWidget ? 80 : viewConfig.windHeight;
+        let subH = isWidget ? 80 : viewConfig.subHeight;
+        let gMargin = viewConfig.graphMargin || 0;
 
         if (isWidget) {
-            windH = 80;
-            subH = 80;
-            gMargin = 0; // 【重要】ウィジェット時はセクション間の余白をゼロにして空白を詰める
-            
-            // 2. 【修正点】タブ（ナビゲーション等）を非表示にする
             const nav = document.querySelector('.nav-container') || document.querySelector('nav');
             if (nav) nav.style.display = 'none';
         }
@@ -2062,13 +2033,14 @@ async function draw() {
         const secTemp = document.querySelector('.section-temp');
         const secMarine = document.querySelector('.section-marine');
         const sections = [document.querySelector('.section-weather'), secWind, secTemp, secMarine];
+        
         sections.forEach(sec => { if(sec) sec.style.width = totalW + "px"; });
 
         if (secWind) { secWind.style.height = windH + "px"; secWind.style.marginBottom = gMargin + "px"; }
         if (secTemp) { secTemp.style.height = subH + "px"; secTemp.style.marginBottom = gMargin + "px"; }
         if (secMarine) { 
             secMarine.style.height = subH + "px"; 
-            secMarine.style.marginBottom = "0px"; // 【重要】最下部セクションの余白は常にゼロ
+            secMarine.style.marginBottom = "0px"; 
         }
         
         let wHtml = "";
@@ -2113,26 +2085,17 @@ async function draw() {
         updateWindLegend();
         resetGraphScroll();
         initScrollEvent(hScale, startIdx);
-
-        // 3. 【修正点】ツールチップ初期化
         initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime);
 
-        // 4. 【修正点】親コンテナの高さ制限を解除し、グラフの高さに合わせる
-        if (isWidget) {
-            const stage = document.getElementById('stage');
-            const scrollRoot = document.getElementById('scroll-root');
-            if (stage && scrollRoot) {
-                scrollRoot.style.height = "auto";
-                document.body.style.height = "auto";
-            }
-        }
-        
     } catch (e) { 
         console.error("Critical Draw Error:", e);
         if (typeof initApp === 'function') { initApp(); }
     }
 }
 
+/**
+ * サブルーチン：セクション（グラフエリア）のレンダリング
+ */
 function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLast, isFirst, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime) {
     const svg = document.getElementById(svgId);
     const dateCont = document.getElementById(dateContId);
@@ -2220,20 +2183,11 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
     }
 
     const startTime = new Date(allData.data.time[startIdx]).getTime();
-    // 【修正】引数で受け取った固定時刻 drawReferenceTime を使用する
     const nowTime = drawReferenceTime.getTime();
     const diffHoursNow = (nowTime - startTime) / (1000 * 60 * 60); 
     if (diffHoursNow >= 0 && diffHoursNow < (totalDataCount - startIdx)) {
         const nowX = diffHoursNow * hScale;
         html += `<line x1="${nowX}" y1="0" x2="${nowX}" y2="${plotHeight}" stroke="#0000FF" stroke-width="2.5" stroke-dasharray="4 3" />`;
-    }
-    if (allData.timestamp) {
-        const fetchedTime = new Date(allData.timestamp).getTime();
-        const diffHoursFetch = (fetchedTime - startTime) / (1000 * 60 * 60); 
-        if (diffHoursFetch >= 0 && diffHoursFetch < (totalDataCount - startIdx)) {
-            const fetchX = diffHoursFetch * hScale;
-            html += `<line x1="${fetchX}" y1="0" x2="${fetchX}" y2="${plotHeight}" stroke="#228b22" stroke-width="2.5" stroke-dasharray="3 2" />`;
-        }
     }
 
     datasets.forEach(ds => {
