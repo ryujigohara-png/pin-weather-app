@@ -136,7 +136,7 @@ const i18n = {
             speedunit: viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph',
             disclaimer: "【免責事項】海上気象データは予測モデルに基づく「最寄りの海上地点」の数値であり、実際の局地的な地形や潮流による影響を反映しきれない場合があります。",
             
-            guideMainTitle: "Pin_Weather Pro 活用ガイド",
+            guideMainTitle: "Pin-Weather.Pro 活用ガイド",
             guideLabel1: "16日間気象予報・8日間海洋気象予報",
             guideBody1: "風速・風向・気温などの気象データは<strong>最大16日間</strong>表示。<br>波高・潮位・海水温などの海洋データは<strong>最大8日間</strong>表示。<br>長期の遠征計画から直近の出艇判断までサポートします。",
             guideLabel2: "MySpots 10箇所登録",
@@ -253,7 +253,7 @@ const i18n = {
             speedunit: viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph',
             disclaimer: "[Disclaimer] Marine weather data is based on forecast models for the 'nearest sea point' and may not reflect local terrain or tidal effects.",
 
-            guideMainTitle: "Pin_Weather Pro User Guide",
+            guideMainTitle: "Pin-Weather.Pro User Guide",
             guideLabel1: "16-day Weather & 8-day Marine Forecast",
             guideBody1: "Weather data (wind, temp) is available for up to <strong>16 days</strong>, and marine data (waves, tides) for up to <strong>8 days</strong>.",
             guideLabel2: "Register 10 MySpots",
