@@ -722,7 +722,7 @@ function initCopyUrlEvent() {
  * サブルーチン：ウィジェットプレビューモーダルを開く
  * 1. 地名(place)と座標(lat/lon)に加え、現在の色付け風向(wind)をパラメータに追加。
  * 2. 表示言語をコピーコードと完全に一致させます。
- * 3. プレビュー枠の高さを維持しつつ、ボタンが隠れないよう調整します。
+ * 3. プレビュー枠の高さを維持しつつ、ボタンが隠れないよう調整しました。
  */
 function openWidgetPreview() {
     console.log("DEBUG: openWidgetPreview [START]");
