@@ -770,11 +770,9 @@ function openWidgetPreview() {
         widgetArea.style.height = "auto"; 
     }
 
-    /**if (iframe) {
+    if (iframe) {
         iframe.src = widgetUrl;
-        iframe.style.display = 'block';
-        iframe.style.height = "660px"; // モーダル内プレビューとして適切な高さ
-    }**/
+    }
 
     const actionArea = document.getElementById('widget-action-area');
     if (actionArea) actionArea.style.display = 'block';
