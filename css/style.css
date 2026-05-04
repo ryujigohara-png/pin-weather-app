@@ -204,8 +204,8 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     width: 100%; 
 }
 .section-weather { height: 80px; border: none; margin-bottom: 0px; }
-.section-wind { height: 280px; margin-bottom: 0px; }
-.section-temp, .section-marine { height: 160px; margin-bottom: 0px; }
+.section-wind { height: 180px; margin-bottom: 0px; }
+.section-temp, .section-marine { height: 100px; margin-bottom: 0px; }
 
 .sticky-label {
     position: sticky; left: 0; top: 0; width: var(--label-box-width);
@@ -476,7 +476,7 @@ svg { width: 100%; display: block; overflow: visible; }
 body.widget-mode {
     padding-top: 0 !important;
     background: #ffffff !important;
-    overflow: hidden !important; /* はみ出しても隠さずスクロール可能にする */
+    overflow: hidden !important;
     height: auto !important;
 }
 

@@ -770,11 +770,11 @@ function openWidgetPreview() {
         widgetArea.style.height = "auto"; 
     }
 
-    if (iframe) {
+    /**if (iframe) {
         iframe.src = widgetUrl;
         iframe.style.display = 'block';
         iframe.style.height = "660px"; // モーダル内プレビューとして適切な高さ
-    }
+    }**/
 
     const actionArea = document.getElementById('widget-action-area');
     if (actionArea) actionArea.style.display = 'block';
@@ -2066,12 +2066,22 @@ async function draw() {
                 wHtml += `<text x="${x}" y="${pBaseY - barH - 2}" font-size="${labelFS - 2}" font-weight="bold" fill="#0000FF" text-anchor="middle">${p.toFixed(1)}</text>`;
             }
         }
-        svgW.innerHTML = wHtml;
 
+        svgW.innerHTML = wHtml;
+        // 天気SVG自体の高さも制御が必要な場合はここに追加
+        // svgW.style.height = `${windH}px`; 
+
+        const svgWind = document.getElementById("svg-wind");
+        if (svgWind) svgWind.style.height = `${windH}px`; // 高さ固定
         renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], windH, 5.0, true, false, true, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime);
+        
+        const svgTemps = document.getElementById("svg-temps");
+        if (svgTemps) svgTemps.style.height = `${subH}px`; // 高さ固定
         renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], subH, 5.0, false, !hasMarineData, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime);
         
         if (hasMarineData) {
+            const svgMarine = document.getElementById("svg-marine");
+            if (svgMarine) svgMarine.style.height = `${subH}px`; // ★ここで150pxをsubH(80px)に上書き
             renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], subH, 0.5, false, true, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime);
         } else {
             const svgM = document.getElementById("svg-marine");
@@ -2189,6 +2199,17 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
         const nowX = diffHoursNow * hScale;
         html += `<line x1="${nowX}" y1="0" x2="${nowX}" y2="${plotHeight}" stroke="#0000FF" stroke-width="2.5" stroke-dasharray="4 3" />`;
     }
+
+    if (allData.timestamp) {
+        const fetchedTime = new Date(allData.timestamp).getTime();
+        const diffHoursFetch = (fetchedTime - startTime) / (1000 * 60 * 60); 
+        if (diffHoursFetch >= 0 && diffHoursFetch < (totalDataCount - startIdx)) {
+            const fetchX = diffHoursFetch * hScale;
+            html += `<line x1="${fetchX}" y1="0" x2="${fetchX}" y2="${plotHeight}" stroke="#228b22" stroke-width="2.5" stroke-dasharray="3 2" />`;
+        }
+    }
+
+
 
     datasets.forEach(ds => {
         if (ds.type === 'bar') {
