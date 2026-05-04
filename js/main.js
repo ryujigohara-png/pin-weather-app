@@ -884,13 +884,13 @@ function applyEnvVisuals() {
         config = {
             titleSuffix: " (B)",
             headerColor: "#f5dc1b", 
-            envName: "Beta版"
+            envName: "Beta"
         };
     } else {
         config = {
             titleSuffix: "",
             headerColor: "#00c8ff", 
-            envName: "Main版"
+            envName: "Main"
         };
     }
 
