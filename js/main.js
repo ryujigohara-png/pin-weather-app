@@ -120,6 +120,12 @@ const i18n = {
             saveGuideText: "※保存するとページが再読み込みされ、設定が反映されます。",
             btnSaveSettings: "設定を保存",
             btnRestoreDefault: "デフォルトに戻す",
+            btnLoadDefault: "デフォルトを読込",
+            btnSaveDefault: "デフォルトに保存",
+            msgLoadComplete: "読込完了",
+            msgLoadDesc: "デフォルト設定を読み込みました。",
+            msgSaveComplete: "保存完了",
+            msgSaveDesc: "現在の設定をデフォルトとして保存しました。",
 
             // --- グラフ軸・凡例・その他（動的対応版） ---
             yAxisWeather: "天気<br>降水(mm)",
@@ -231,6 +237,12 @@ const i18n = {
             saveGuideText: "*Saving will reload the page to apply settings.",
             btnSaveSettings: "Save Settings",
             btnRestoreDefault: "Restore Default",
+            btnLoadDefault: "Load Default",
+            btnSaveDefault: "Set Default",
+            msgLoadComplete: "Loaded",
+            msgLoadDesc: "Default settings loaded.",
+            msgSaveComplete: "Saved",
+            msgSaveDesc: "Current settings saved as default.",
 
             // --- Axes, Legends, etc.（動的対応版） ---
             yAxisWeather: "Weather<br>Precip(mm)",
@@ -708,7 +720,7 @@ function initCopyUrlEvent() {
 
 /**
  * サブルーチン：ウィジェットプレビューモーダルを開く
- * 1. 地名(place)と座標(lat/lon)をiframeに確実に引き継ぎます。
+ * 1. 地名(place)と座標(lat/lon)に加え、現在の色付け風向(wind)をパラメータに追加。
  * 2. 表示言語をコピーコードと完全に一致させます。
  * 3. プレビュー枠の高さを維持しつつ、ボタンが隠れないよう調整します。
  */
@@ -758,6 +770,11 @@ function openWidgetPreview() {
 
     if (typeof currentLat !== 'undefined' && currentLat !== null) params.set('lat', currentLat);
     if (typeof currentLon !== 'undefined' && currentLon !== null) params.set('lon', currentLon);
+
+    // --- 【追加】現在の色付け風向(targetWindDirections)をパラメータに追加 ---
+    if (typeof targetWindDirections !== 'undefined' && targetWindDirections.length > 0) {
+        params.set('wind', targetWindDirections.join(','));
+    }
     
     const widgetUrl = `${currentUrl}?${params.toString()}`;
     const embedCode = `<iframe src="${widgetUrl}" width="100%" height="660" frameborder="0" style="border:1px solid #eee; border-radius:8px;"></iframe>`;
@@ -786,6 +803,7 @@ function openWidgetPreview() {
 
 /**
  * サブルーチン：ウィジェットコードをコピー
+ * ブラウザの標準alertを、汎用モーダル showAppDialog に置き換えています。
  */
 function copyWidgetCode() {
     const area = document.getElementById("widget-code-area");
@@ -793,8 +811,20 @@ function copyWidgetCode() {
         area.select();
         try {
             document.execCommand("copy");
-            const msg = (typeof i18n !== 'undefined') ? i18n.t('copySuccess') : "Copied!";
-            alert(msg);
+            const msgTitle = (typeof i18n !== 'undefined') ? i18n.t('msgSaveComplete') : "Complete";
+            const msgBody = (typeof i18n !== 'undefined') ? i18n.t('copySuccess') : "Copied!";
+            
+            // ブラウザ標準 alert(msgBody) から 汎用モーダルへ変更
+            if (typeof showAppDialog === 'function') {
+                showAppDialog({
+                    title: msgTitle,
+                    message: msgBody,
+                    onSave: () => {} // 通知のみのため空関数
+                });
+            } else {
+                alert(msgBody); // 万が一 showAppDialog が未定義の場合のフォールバック
+            }
+            
         } catch (err) {
             console.error("Copy failed:", err);
         }
@@ -893,13 +923,12 @@ function applyEnvVisuals() {
 
 /**
  * サブルーチン：アプリ起動時の初期化
- * 1. 【最優先】URLパラメータがあれば地点を上書き
+ * 1. 【最優先】URLパラメータがあれば地点および「色付け風向(wind)」を上書き
  * 2. 保存データがあればロード
- * 3. データがない場合はIPから現在地を推定して即時描画（Welcomeダイアログは表示しない）
+ * 3. データがない場合はIPから現在地を推定して即時描画
  */
 async function initApp() {
-    // ドメイン移行チェックは削除済みのため呼び出しをカット
-
+    console.log("DEBUG: App Init - Setting Home State");
     window.history.replaceState({ page: 'home' }, "");
 
     // --- 【重要】URLパラメータの解析 ---
@@ -908,6 +937,7 @@ async function initApp() {
     const pPlace = urlParams.get('place');
     const pLat = urlParams.get('lat');
     const pLon = urlParams.get('lon');
+    const pWind = urlParams.get('wind');
 
     // ウィジェットモードかつ座標パラメータがある場合、ストレージより優先して適用
     let isParamLoaded = false;
@@ -915,8 +945,33 @@ async function initApp() {
         currentLat = parseFloat(pLat);
         currentLon = parseFloat(pLon);
         currentLabel = pPlace ? decodeURIComponent(pPlace) : "Selected Location";
+        
+        // --- URLから色付け風向を復元 ---
+        if (pWind) {
+            const rawWindDirs = pWind.split(',');
+            // map内で言語変換を行い、直接 targetWindDirections を確定させる
+            targetWindDirections = rawWindDirs.map(val => {
+                if (typeof i18n !== 'undefined' && i18n._currentLang === 'en') {
+                    if (typeof jaDirs !== 'undefined' && typeof enDirs !== 'undefined') {
+                        const idx = jaDirs.indexOf(val);
+                        return idx !== -1 ? enDirs[idx] : val;
+                    }
+                } else if (typeof i18n !== 'undefined') {
+                    if (typeof jaDirs !== 'undefined' && typeof enDirs !== 'undefined') {
+                        const idx = enDirs.indexOf(val);
+                        return idx !== -1 ? jaDirs[idx] : val;
+                    }
+                }
+                return val;
+            });
+            console.log("DEBUG: targetWindDirections restored from URL:", targetWindDirections);
+        } else {
+            // パラメータにwindがない場合は空配列にして、全方位化を明示的に防ぐ
+            targetWindDirections = [];
+        }
+
         isParamLoaded = true;
-        console.log("DEBUG: Location loaded from URL parameters.");
+        console.log("DEBUG: Location and Wind Filters loaded from URL parameters.");
     }
 
     // --- ストレージの確認 ---
@@ -928,9 +983,10 @@ async function initApp() {
         parsedData = null;
     }
 
-    // --- 地点確定ロジック ---
+    // --- 地点確定ロジック（上書きガード付き） ---
     if (isParamLoaded) {
-        // URLパラメータでロード済みの場合はそのまま初期化
+        // 【最重要】パラメータロード済みの場合は、finalizeInit内で上書きされないよう
+        // ここで確定させ、他の代入処理をバイパスする
         finalizeInit(); 
     } else if (parsedData && parsedData.length > 0) {
         // ストレージにデータがある場合
@@ -939,30 +995,34 @@ async function initApp() {
         currentLat = lastSpot.lat;
         currentLon = lastSpot.lon;
         currentLabel = lastSpot.label;
+
+        // 地点個別の風向設定があれば反映
+        if (lastSpot.windFilters) {
+            targetWindDirections = [...lastSpot.windFilters];
+        } else {
+            // 設定がない場合のみ全方位（デフォルト）
+            if (typeof jaDirs !== 'undefined') {
+                targetWindDirections = [...jaDirs];
+            }
+        }
+
         finalizeInit(); 
     } else {
-        // どちらもない場合はIP推定
+        // どちらもない場合（新規訪問）
         mySpots = [];
-        // 推定地点の取得（非同期）
         await setApproximateLocation(); 
         
-        // 【修正点】Welcomeダイアログ関連の呼び出しを削除し、即座にメイン画面を初期化
+        // 新規訪問時のみ全方位をデフォルトセット
+        if (typeof jaDirs !== 'undefined') {
+            targetWindDirections = [...jaDirs];
+        }
+        
         finalizeInit();
 
-        // バックグラウンドGPS更新
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
-                    // 【修正】currentLat/Lon を直接書き換えない
-                    // もし「現在地」として保存したい場合は別の変数に入れるか、
-                    // ここでは何もしないのが設計上安全です。
                     console.log("GPS accuracy position acquired, but not overwriting current view.");
-                    
-                    /* 
-                    // もし現在地を常に把握しておきたいなら、別名の変数に保持する
-                    this.latestGpsLat = pos.coords.latitude;
-                    this.latestGpsLon = pos.coords.longitude;
-                    */
                 },
                 null,
                 { timeout: 8000 }
@@ -1019,10 +1079,11 @@ function finalizeInit() {
 
 /**
  * サブルーチン：UIイベントの登録
- * 画面上の各ボタンや入力欄に、クリック等の動作（イベント）を紐付ける。
+ * 既存のユーザーデータ「pin_weather_spots」および「pin_weather_wind_filter」を厳守。
+ * 「変更して登録」ボタンのクリックイベントが消失する問題を解決した修正版。
  */
 function setupGeneralEvents() {
-    // 1. 地図検索入力欄（Enterキーで検索実行）
+    // 1. 地図検索入力欄
     const searchInput = document.getElementById('map-search-input');
     if (searchInput) {
         searchInput.onkeypress = (e) => {
@@ -1034,29 +1095,103 @@ function setupGeneralEvents() {
     const searchBtn = document.getElementById('map-search-btn');
     if (searchBtn) searchBtn.onclick = executeMapSearch;
     
-    // 3. 風向色付設定ボタン（サイドバー内）
-    // 競合回避のため、toggleSidebar を介さず openModalFromSidebar を使用
+    // 3. 風向設定ボタン（サイドバー）
     const windCfgBtn = document.getElementById('wind-cfg-btn');
     if (windCfgBtn) {
         windCfgBtn.onclick = () => {
             if (typeof openModalFromSidebar === 'function') {
                 openModalFromSidebar('wind-modal');
             } else {
-                // 万が一関数がない場合のフォールバック（動作安定のため）
                 toggleSidebar();
                 openModal('wind-modal');
             }
         };
     }
     
-    // 4. 風向設定の適用ボタン（モーダル内）
+    // 4. 風向設定モーダル内のボタン群
     const applyWindBtn = document.getElementById('apply-wind-btn');
     if (applyWindBtn) {
-        applyWindBtn.onclick = () => {
-            localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
+        // 保存・適用処理（既存キー pin_weather_spots を厳守）
+        const executeApply = () => {
+            const currentSpot = mySpots.find(s => 
+                Math.abs(s.lat - currentLat) < 0.0001 && 
+                Math.abs(s.lon - currentLon) < 0.0001
+            );
+
+            if (currentSpot) {
+                // 地点固有の設定を保存
+                currentSpot.windFilters = [...targetWindDirections];
+                // 【重要】既存のキー名 pin_weather_spots をそのまま使用
+                localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+            } else {
+                // デフォルト設定用キー
+                localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
+            }
+
             closeModal('wind-modal');
-            draw(); // グラフを再描画
+            draw(); // グラフ再描画
         };
+
+        const footer = applyWindBtn.parentElement;
+        if (footer && !document.getElementById('wind-helper-group')) {
+            const helperGroup = document.createElement('div');
+            helperGroup.id = 'wind-helper-group';
+            helperGroup.style.display = 'flex';
+            helperGroup.style.width = '100%';
+            helperGroup.style.gap = '6px';
+            helperGroup.style.marginTop = '4px';
+
+            const baseBtnStyle = "padding: 8px 4px; border-radius: 6px; font-size: 11px; font-weight: 500; border: none; cursor: pointer; transition: opacity 0.2s; flex: 1; white-space: nowrap;";
+
+            // ボタン1: デフォルトを読込
+            const btnLoadDef = document.createElement('button');
+            btnLoadDef.style.cssText = baseBtnStyle + "background: #f1f3f5; color: #495057;";
+            btnLoadDef.innerText = i18n.t('btnLoadDefault');
+            btnLoadDef.onclick = () => {
+                const savedDef = localStorage.getItem('pin_weather_wind_filter');
+                if (savedDef) {
+                    let raw = JSON.parse(savedDef);
+                    targetWindDirections = raw.map(val => {
+                        if (i18n._currentLang === 'en') {
+                            const idx = jaDirs.indexOf(val); return idx !== -1 ? enDirs[idx] : val;
+                        } else {
+                            const idx = enDirs.indexOf(val); return idx !== -1 ? jaDirs[idx] : val;
+                        }
+                    });
+                    if (typeof initCompassUI === 'function') initCompassUI();
+                    showAppDialog({ title: i18n.t('msgLoadComplete'), message: i18n.t('msgLoadDesc'), onSave: () => {} });
+                }
+            };
+
+            // ボタン2: デフォルトに保存
+            const btnSaveDef = document.createElement('button');
+            btnSaveDef.style.cssText = baseBtnStyle + "background: #f1f3f5; color: #495057;";
+            btnSaveDef.innerText = i18n.t('btnSaveDefault');
+            btnSaveDef.onclick = () => {
+                localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
+                showAppDialog({ title: i18n.t('msgSaveComplete'), message: i18n.t('msgSaveDesc'), onSave: () => {} });
+            };
+
+            // ボタン3: キャンセル
+            const cancelBtn = document.createElement('button');
+            cancelBtn.id = "btnCancel"; 
+            cancelBtn.style.cssText = baseBtnStyle + "background: #6c757d; color: white;";
+            cancelBtn.innerText = i18n.t('btnCancel') || "Cancel";
+            cancelBtn.onclick = () => closeModal('wind-modal');
+
+            // ボタン4: 適用（変更して登録）
+            const finalApplyBtn = document.createElement('button');
+            finalApplyBtn.style.cssText = baseBtnStyle + "background: #007bff; color: white; flex: 1.2;";
+            finalApplyBtn.innerText = i18n.t('btnApplyChanges') || "Apply Changes";
+            finalApplyBtn.onclick = executeApply; // ここでイベントを再登録
+
+            // フッター再構築
+            footer.innerHTML = ''; 
+            footer.appendChild(btnLoadDef);
+            footer.appendChild(btnSaveDef);
+            footer.appendChild(cancelBtn);
+            footer.appendChild(finalApplyBtn);
+        }
     }
 
     // 5. GPSボタン
@@ -1072,32 +1207,27 @@ function setupGeneralEvents() {
         };
     }
 
-    // 7. 【追加】ご意見・ご要望ボタン（サイドバー内）
+    // 7. ご意見・ご要望ボタン
     const feedbackBtn = document.getElementById('feedback-btn');
     if (feedbackBtn) {
         feedbackBtn.onclick = () => {
-            const formUrl = "https://forms.gle/zdbaJNdodCMzcftK6";
-            window.open(formUrl, '_blank');
+            window.open("https://forms.gle/zdbaJNdodCMzcftK6", '_blank');
         };
     }
 
-    // 8. プライバシーポリシーのリンク
+    // 8. プライバシーポリシー
     const privacyLink = document.getElementById('privacy-link');
     if (privacyLink) {
         privacyLink.onclick = (e) => {
-            e.preventDefault(); // 画面遷移を防ぐ
-            const privacyUrl = "./privacy.html";
-            window.open(privacyUrl, '_blank');
+            e.preventDefault();
+            window.open("./privacy.html", '_blank');
         };
     }
 
-    // 9. ウィジェット埋め込みボタン
+    // 9. ウィジェットボタン
     const widgetBtn = document.getElementById('open-widget-modal-btn');
     if (widgetBtn) {
         widgetBtn.onclick = openWidgetPreview;
-        console.log("DEBUG: widgetBtn event attached");
-    } else {
-        console.warn("DEBUG: widgetBtn element not found in setupGeneralEvents");
     }
 }
 
@@ -1180,27 +1310,41 @@ function openModalFromSidebar(modalId) {
     }
 }
 
+/**
+ * サブルーチン：コンパスUIの初期化
+ * 言語互換ロジックに基づき、現在の言語(targetWindDirections)と同期して描画する。
+ */
 function initCompassUI() {
     const container = document.getElementById('compass-ui');
     if (!container) return;
+
+    // 最新の地点・デフォルト設定を読み込み（同期）
+    syncWindFilterWithCurrentSpot();
+
     const radius = 130; 
     const centerX = 160; 
     const centerY = 160;
 
-    // 中央のテキストを辞書から取得するように変更
+    // 中央ボタン（言語切り替え対応）
     const centerText = i18n._currentLang === 'ja' ? "全選択<br>解除" : "ALL";
     container.innerHTML = `<div class="compass-center">${centerText}</div>`;
 
+    // windDirs は初期化時に現在の言語(jaDirs または enDirs)がセットされている
     windDirs.forEach((dir, i) => {
         const angle = (i * 22.5 - 90) * (Math.PI / 180);
         const x = centerX + radius * Math.cos(angle) - 30;
         const y = centerY + radius * Math.sin(angle) - 15;
 
         const el = document.createElement('div');
-        el.className = 'compass-label' + (targetWindDirections.includes(dir) ? ' active' : '');
+        
+        // targetWindDirections に含まれているか判定
+        // 言語互換ロジックにより targetWindDirections も現在の言語に変換されているため一致する
+        const isActive = targetWindDirections.includes(dir);
+        
+        el.className = 'compass-label' + (isActive ? ' active' : '');
         el.style.left = `${x}px`;
         el.style.top = `${y}px`;
-        el.innerText = dir;
+        el.innerText = dir; // 現在の言語の文字列を表示
         
         el.onclick = () => {
             if (targetWindDirections.includes(dir)) {
@@ -1210,6 +1354,7 @@ function initCompassUI() {
                 targetWindDirections.push(dir);
                 el.classList.add('active');
             }
+            console.log("DEBUG: Current wind selection:", targetWindDirections);
         };
         container.appendChild(el);
     });
@@ -1968,6 +2113,58 @@ function resetGraphScroll() {
     }
 }
 
+/**
+ * 現在の地点またはデフォルトから風向設定を同期する。
+ * 保存されているデータ形式を現在の言語に合わせて変換する。
+ * ただし、ウィジェットモードでURLから設定済みの場合は上書きしない。
+ */
+function syncWindFilterWithCurrentSpot() {
+    // 【重要】URLパラメータから既に設定されている（isWidgetMode等のフラグ、
+    //  またはtargetWindDirectionsに値がある）場合は、同期処理をスキップして終了する。
+    if (typeof isWidgetMode !== 'undefined' && isWidgetMode && targetWindDirections.length > 0) {
+        console.log("DEBUG: Skip syncWindFilter (Widget mode with URL params)");
+        return;
+    }
+
+    const currentSpot = mySpots.find(s => 
+        Math.abs(s.lat - currentLat) < 0.0001 && 
+        Math.abs(s.lon - currentLon) < 0.0001
+    );
+
+    let baseData = [];
+
+    if (currentSpot && currentSpot.windFilters && currentSpot.windFilters.length > 0) {
+        baseData = [...currentSpot.windFilters];
+    } else {
+        const savedDef = localStorage.getItem('pin_weather_wind_filter');
+        if (savedDef) {
+            baseData = JSON.parse(savedDef);
+        } else {
+            // 設定がない場合は現在の言語の全方位をセット
+            // windDirs が未定義の場合のエラーを避けるため、jaDirs等を参照
+            if (typeof windDirs !== 'undefined') {
+                targetWindDirections = [...windDirs];
+            } else if (typeof jaDirs !== 'undefined') {
+                targetWindDirections = [...jaDirs];
+            }
+            return;
+        }
+    }
+
+    // 言語互換ロジックを適用して変換
+    targetWindDirections = baseData.map(val => {
+        if (typeof i18n !== 'undefined' && i18n._currentLang === 'en') {
+            const idx = jaDirs.indexOf(val);
+            return idx !== -1 ? enDirs[idx] : val;
+        } else {
+            const idx = enDirs.indexOf(val);
+            return idx !== -1 ? jaDirs[idx] : val;
+        }
+    });
+    
+    console.log("DEBUG: Synced targetWindDirections", targetWindDirections);
+}
+
 // ツールチップ消去用タイマー変数
 let tooltipTimer = null;
 
@@ -1975,6 +2172,9 @@ let tooltipTimer = null;
  * メインサブルーチン：描画処理
  */
 async function draw() {
+    // 描画の直前に、現在の地点に合わせた風向設定を読み込む
+    syncWindFilterWithCurrentSpot();
+
     try {
         if (typeof currentLat === 'undefined' || currentLat === null || typeof currentLon === 'undefined' || currentLon === null) {
             console.warn("Location coordinates are undefined. Redirecting to initApp...");
@@ -1989,6 +2189,16 @@ async function draw() {
         const svgW = document.getElementById('svg-weather');
         if (!svgW || !allData || !allData.data) return;
 
+        // 【追加】地点切り替え時の風向設定を特定
+        const currentSpot = mySpots.find(s => 
+            Math.abs(s.lat - currentLat) < 0.0001 && 
+            Math.abs(s.lon - currentLon) < 0.0001
+        );
+        // 地点固有の設定があればそれを使い、なければ共通設定(targetWindDirections)を使う
+        const activeWindFilters = (currentSpot && currentSpot.windFilters) 
+            ? currentSpot.windFilters 
+            : targetWindDirections;
+
         const drawReferenceTime = new Date();
         const totalDataCount = allData.data.time.length;
         const baseWindIcon = `<svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle; margin-right:2px; display:inline-block;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(-90)"/></svg>`;
@@ -2000,7 +2210,6 @@ async function draw() {
         const displayCount = totalDataCount - startIdx;
 
         // --- ウィジェット時の高さ切り替え ---
-        // 通常画面の構成を維持し、高さだけを80にする
         let windH = isWidget ? 80 : viewConfig.windHeight;
         let subH = isWidget ? 80 : viewConfig.subHeight;
         let gMargin = viewConfig.graphMargin || 0;
@@ -2066,21 +2275,23 @@ async function draw() {
         }
 
         svgW.innerHTML = wHtml;
-        // 天気SVG自体の高さも制御が必要な場合はここに追加
-        // svgW.style.height = `${windH}px`; 
 
         const svgWind = document.getElementById("svg-wind");
-        if (svgWind) svgWind.style.height = `${windH}px`; // 高さ固定
-        renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], windH, 5.0, true, false, true, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime);
+        if (svgWind) svgWind.style.height = `${windH}px`; 
+        
+        // 風セクション：特定した activeWindFilters を渡す
+        renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], windH, 5.0, true, false, true, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, activeWindFilters);
         
         const svgTemps = document.getElementById("svg-temps");
-        if (svgTemps) svgTemps.style.height = `${subH}px`; // 高さ固定
-        renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], subH, 5.0, false, !hasMarineData, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime);
+        if (svgTemps) svgTemps.style.height = `${subH}px`;
+        // 気温セクション：フィルタ不要のため null を渡す
+        renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], subH, 5.0, false, !hasMarineData, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, null);
         
         if (hasMarineData) {
             const svgMarine = document.getElementById("svg-marine");
-            if (svgMarine) svgMarine.style.height = `${subH}px`; // ★ここで150pxをsubH(80px)に上書き
-            renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], subH, 0.5, false, true, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime);
+            if (svgMarine) svgMarine.style.height = `${subH}px`; 
+            // 海洋セクション：フィルタ不要のため null を渡す
+            renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], subH, 0.5, false, true, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, null);
         } else {
             const svgM = document.getElementById("svg-marine");
             if (svgM) svgM.innerHTML = "";
@@ -2104,7 +2315,7 @@ async function draw() {
 /**
  * サブルーチン：セクション（グラフエリア）のレンダリング
  */
-function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLast, isFirst, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime) {
+function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLast, isFirst, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, activeWindFilters) {
     const svg = document.getElementById(svgId);
     const dateCont = document.getElementById(dateContId);
     const dateTop = document.getElementById('date-top');
@@ -2207,8 +2418,6 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
         }
     }
 
-
-
     datasets.forEach(ds => {
         if (ds.type === 'bar') {
             for(let i = startIdx; i < totalDataCount; i++){
@@ -2221,7 +2430,11 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                 const thHigh = viewConfig.windThresholdHigh;
                 const thMid  = viewConfig.windThresholdMid;
                 const thLow  = viewConfig.windThresholdLow;
-                let color = targetWindDirections.includes(dirText) 
+
+                // 【修正】渡された activeWindFilters があればそれを使い、なければ targetWindDirections を使う
+                const currentFilters = activeWindFilters || targetWindDirections;
+
+                let color = currentFilters.includes(dirText) 
                     ? (val >= thHigh ? '#dc143c' : val >= thMid ? '#ffa500' : val >= thLow ? '#87CEEB' : '#ccc') 
                     : (val >= thHigh ? 'rgba(220, 20, 60, 0.4)' : '#ccc');
                 html += `<rect x="${x - (hScale*0.4)}" y="${plotHeight-h}" width="${hScale*0.8}" height="${h}" fill="${color}" />`;
