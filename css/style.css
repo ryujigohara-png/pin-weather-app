@@ -204,8 +204,8 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     width: 100%; 
 }
 .section-weather { height: 80px; border: none; margin-bottom: 0px; }
-.section-wind { height: 280px; margin-bottom: 0px; }
-.section-temp, .section-marine { height: 160px; margin-bottom: 0px; }
+.section-wind { height: 180px; margin-bottom: 0px; }
+.section-temp, .section-marine { height: 100px; margin-bottom: 0px; }
 
 .sticky-label {
     position: sticky; left: 0; top: 0; width: var(--label-box-width);
@@ -395,33 +395,141 @@ svg { width: 100%; display: block; overflow: visible; }
     font-weight: bold;
 }
 
-/* 汎用ダイアログ用追加スタイル（修正版） */
-.btn-save { background: #007bff !important; color: white !important; }
+/* ============================================================
+   1. 汎用ダイアログ（app-common-modal）用スタイル
+   ============================================================ */
+
+.btn-save { 
+    background: #007bff !important; 
+    color: white !important; 
+}
+
 .btn-danger-outline { 
     background: #fff !important; 
     color: #dc3545 !important; 
     border: 1px solid #dc3545 !important; 
     font-size: 11px !important; 
     flex: 0.8 !important; 
-    margin-right: auto; /* 削除ボタンを左寄りに配置 */
+    margin-right: auto;
 }
-.btn-secondary { background: #6c757d !important; color: white !important; }
 
-/* style.css への追記・修正 */
+.btn-secondary { 
+    background: #6c757d !important; 
+    color: white !important; 
+}
+
+/* 共通モーダル外枠：モーダル表示時は内部スクロールを維持 */
+#app-common-modal .modal-content {
+    display: flex !important;
+    flex-direction: column !important;
+    max-height: 90vh !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+}
+
 #common-modal-header {
-    padding: 12px 15px; /* 上下を少し詰め、タイトルの存在感を適正化 */
+    display: block !important;
+    flex-shrink: 0 !important;
+    min-height: 50px;
+    visibility: visible !important;
+    padding: 12px 15px;
     text-align: center;
     border-bottom: 1px solid rgba(0,0,0,0.1);
 }
 
 #common-modal-title {
-    font-size: 17px; /* 18pxよりさらに1px下げ、UIに馴染ませる */
+    display: block !important;
+    color: #333 !important;
+    font-size: 17px !important;
     font-weight: bold;
     line-height: 1.4;
 }
 
 #common-modal-message {
-    font-size: 12px; /* メッセージはさらに小さくして対比を強調 */
+    font-size: 12px;
     color: #666;
     margin-top: 5px;
+}
+
+.view-settings-body {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 10px 20px 20px 20px;
+    -webkit-overflow-scrolling: touch;
+}
+
+#common-modal-footer {
+    flex-shrink: 0;
+    border-top: 1px solid #eee;
+    padding: 15px;
+    background: #f8f9fa;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+/* ============================================================
+   widget-mode専用：余白を最小化し、凡例とボタンを枠内に収める
+   ============================================================ */
+
+/* 1. body設定：ナビバーの余白(70px)を消し、スクロールを許可 */
+body.widget-mode {
+    padding-top: 0 !important;
+    background: #ffffff !important;
+    overflow: hidden !important;
+    height: auto !important;
+}
+
+/* 2. 不要UIの非表示 */
+body.widget-mode .control-wrapper,
+body.widget-mode .sidebar,
+body.widget-mode .sidebar-overlay,
+body.widget-mode .modal-overlay:not(#app-common-modal),
+body.widget-mode #user-guide-container,
+body.widget-mode .nav-container {
+    display: none !important;
+}
+
+/* 3. グラフ描画エリア：paddingを削って、凡例を上に引っ張り上げる */
+body.widget-mode .chart-stage {
+    /* topを5pxに、bottomを35px（日付文字-30pxの保護限界）に設定 */
+    padding: 15px 0 35px var(--label-box-width) !important;
+    margin-left: 0 !important;
+    display: inline-block !important;
+    min-width: 100% !important;
+}
+
+/* 4. グラフの高さ指定：3つとも80pxに固定（ご指定の仕様） */
+body.widget-mode .section-wind,
+body.widget-mode .section-temp,
+body.widget-mode .section-marine {
+    height: 80px !important;
+    margin-bottom: 0px !important;
+}
+
+/* 5. 凡例：折り返しを禁止して1行を死守 */
+body.widget-mode .legend-wind-container {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    justify-content: flex-start !important;
+    padding: 0px !important;
+    margin-top: 5px !important;
+}
+
+/* 6. y軸ラベル：親画面と全く同じsticky仕様を維持 */
+body.widget-mode .sticky-date-bottom .sticky-date-top {
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 50 !important;
+}
+
+/* 7. フッター：表示を維持し、下部に少しの余白を設ける */
+body.widget-mode .footer-info {
+    display: block !important;
+    visibility: visible !important;
+    position: relative !important;
+    clear: both !important;
+    padding-bottom: 0px !important;
 }

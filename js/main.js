@@ -77,6 +77,11 @@ const i18n = {
             btnCopyUrl: "🔗 URLをコピー",
             copySuccess: "✅ コピー完了！",
             copyError: "コピーに失敗しました。",
+            btnWidget: "🧩 ホームページに埋め込む",
+            widgetTitle: "ウィジェット埋め込み設定",
+            widgetDesc: "あなたのサイトにこの地点の気象グラフを埋め込むことができます。",
+            widgetCopy: "コードをコピー",
+            copySuccess: "コピーしました！",
 
             // --- 地図・地点登録モーダル ---
             mapClickGuide: "地点をクリックしてください",
@@ -182,6 +187,11 @@ const i18n = {
             btnCopyUrl: "🔗 Copy URL",
             copySuccess: "✅ Copied!",
             copyError: "Failed to copy.",
+            btnWidget: "🧩 Embed in Website",
+            widgetTitle: "Widget Embedding Settings",
+            widgetDesc: "You can embed this weather graph into your website or blog.",
+            widgetCopy: "Copy Code",
+            copySuccess: "Copied to clipboard!",
 
             // --- Map & Spot Modal ---
             mapClickGuide: "Click on the map",
@@ -695,9 +705,140 @@ function initCopyUrlEvent() {
         }, 2000);
     };
 }
+
+/**
+ * サブルーチン：ウィジェットプレビューモーダルを開く
+ * 1. 地名(place)と座標(lat/lon)をiframeに確実に引き継ぎます。
+ * 2. 表示言語をコピーコードと完全に一致させます。
+ * 3. プレビュー枠の高さを維持しつつ、ボタンが隠れないよう調整します。
+ */
+function openWidgetPreview() {
+    console.log("DEBUG: openWidgetPreview [START]");
+
+    const titleArea = document.getElementById('common-modal-title');
+    const msgArea = document.getElementById('common-modal-message');
+    const widgetArea = document.getElementById('widget-preview-area');
+    const iframe = document.getElementById('widget-preview-iframe');
+    const codeArea = document.getElementById('widget-code-area');
+    const copyBtnText = document.getElementById('widget-copy-btn-text');
+    const modal = document.getElementById('app-common-modal');
+
+    if (!modal) return;
+
+    // 他のモーダル利用時に影響が出ないよう、一旦初期化
+    const allModalContents = modal.querySelectorAll('.modal-content-unit'); 
+    allModalContents.forEach(el => el.style.display = 'none');
+
+    // --- 1. タイトルとメッセージの表示 ---
+    if (titleArea) {
+        let titleText = "Widget Settings";
+        if (typeof i18n !== 'undefined') {
+            titleText = (typeof i18n.t === 'function') ? i18n.t('widgetTitle') : titleText;
+        }
+        titleArea.innerText = titleText;
+        titleArea.style.display = 'block';
+    }
+
+    if (msgArea && typeof i18n !== 'undefined' && typeof i18n.t === 'function') {
+        msgArea.innerText = i18n.t('widgetDesc');
+        msgArea.style.display = 'block';
+    }
+
+    if (copyBtnText && typeof i18n !== 'undefined' && typeof i18n.t === 'function') {
+        copyBtnText.innerText = i18n.t('widgetCopy');
+    }
+
+    // 2. パラメータの構成
+    const currentUrl = window.location.origin + window.location.pathname;
+    const params = new URLSearchParams();
+    params.set('mode', 'widget');
+
+    const placeName = (typeof currentLabel !== 'undefined') ? currentLabel : '';
+    if (placeName) params.set('place', placeName);
+
+    if (typeof currentLat !== 'undefined' && currentLat !== null) params.set('lat', currentLat);
+    if (typeof currentLon !== 'undefined' && currentLon !== null) params.set('lon', currentLon);
+    
+    const widgetUrl = `${currentUrl}?${params.toString()}`;
+    const embedCode = `<iframe src="${widgetUrl}" width="100%" height="660" frameborder="0" style="border:1px solid #eee; border-radius:8px;"></iframe>`;
+
+    if (codeArea) codeArea.value = embedCode;
+
+    // --- 3. プレビューエリアの表示制御 ---
+    if (widgetArea) {
+        widgetArea.style.display = 'block';
+        widgetArea.style.height = "auto"; 
+    }
+
+    if (iframe) {
+        iframe.src = widgetUrl;
+    }
+
+    const actionArea = document.getElementById('widget-action-area');
+    if (actionArea) actionArea.style.display = 'block';
+
+    // --- 4. モーダル本体の表示 ---
+    modal.style.display = 'block';
+    window.history.pushState({ page: 'modal', id: 'app-common-modal' }, "");
+    
+    console.log("DEBUG: openWidgetPreview [END]");
+}
+
+/**
+ * サブルーチン：ウィジェットコードをコピー
+ */
+function copyWidgetCode() {
+    const area = document.getElementById("widget-code-area");
+    if (area) {
+        area.select();
+        try {
+            document.execCommand("copy");
+            const msg = (typeof i18n !== 'undefined') ? i18n.t('copySuccess') : "Copied!";
+            alert(msg);
+        } catch (err) {
+            console.error("Copy failed:", err);
+        }
+    }
+}
+
+/**
+ * サブルーチン：ウィジェット専用ヘッダーの自律生成（確定版）
+ * グローバル変数ではなく、URLパラメータから直接値を抽出して表示します。
+ */
+function setupWidgetHeader() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('mode') !== 'widget') return;
+
+    // --- 修正ポイント：変数からではなく、URLから直接取得する ---
+    const pPlace = urlParams.get('place');
+    const pLat = urlParams.get('lat');
+    const pLon = urlParams.get('lon');
+
+    // 表示用の値を確定（デコード処理を含む）
+    const displayLabel = pPlace ? decodeURIComponent(pPlace) : "";
+    const latNum = pLat ? parseFloat(pLat).toFixed(3) : "";
+    const lonNum = pLon ? parseFloat(pLon).toFixed(3) : "";
+
+    // 二重表示防止
+    const oldHeader = document.querySelector('.widget-only-header');
+    if (oldHeader) oldHeader.remove();
+
+    const header = document.createElement('div');
+    header.className = 'widget-only-header';
+    header.style.cssText = "padding: 10px 15px; background: #fff; border-bottom: 1px solid #eee; font-family: sans-serif; display: block; position: relative; z-index: 9999;";
+
+    // HTMLの構築
+    const coordsHtml = (latNum && lonNum) 
+        ? `<span style="font-size:0.85em; color:#666; margin-left:10px; font-weight:normal;">${latNum}, ${lonNum}</span>` 
+        : '';
+
+    header.innerHTML = `<div style="font-weight:bold; color:#333; font-size:16px;"><span>${displayLabel}</span>${coordsHtml}</div>`;
+    
+    document.body.prepend(header);
+}
+
 /**
  * サブルーチン：環境判定とUIへの反映
- * index.htmlの構造に合わせてセレクタを修正
  */
 function applyEnvVisuals() {
     const hostname = window.location.hostname;
@@ -723,14 +864,12 @@ function applyEnvVisuals() {
         };
     }
 
-    // 2. ヘッダー（control-wrapper）背景色の反映
     const headerEl = document.querySelector('.control-wrapper');
     if (headerEl) {
         headerEl.style.backgroundColor = config.headerColor;
         headerEl.style.transition = "background-color 0.3s ease";
     }
 
-    // 3. フッター（footer-info）の下に環境名を表示
     const footerDisclaimer = document.querySelector('.footer-info');
     if (footerDisclaimer) {
         const oldBadge = document.getElementById('footer-env-badge');
@@ -754,17 +893,33 @@ function applyEnvVisuals() {
 
 /**
  * サブルーチン：アプリ起動時の初期化
- * 1. 保存データがあればロード
- * 2. データがない場合はIPから現在地を推定して即時描画
- * 3. WelcomeダイアログでGPS/Mapの選択を促す
- * ※PWABuilder等のボット解析時はダイアログを抑制してタイムアウトを防止
+ * 1. 【最優先】URLパラメータがあれば地点を上書き
+ * 2. 保存データがあればロード
+ * 3. データがない場合はIPから現在地を推定して即時描画（Welcomeダイアログは表示しない）
  */
 async function initApp() {
-    // 【追加】まず最初にドメイン移行が必要かチェックする
-    checkDomainMigration();
+    // ドメイン移行チェックは削除済みのため呼び出しをカット
 
     window.history.replaceState({ page: 'home' }, "");
 
+    // --- 【重要】URLパラメータの解析 ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const pMode = urlParams.get('mode');
+    const pPlace = urlParams.get('place');
+    const pLat = urlParams.get('lat');
+    const pLon = urlParams.get('lon');
+
+    // ウィジェットモードかつ座標パラメータがある場合、ストレージより優先して適用
+    let isParamLoaded = false;
+    if (pMode === 'widget' && pLat && pLon) {
+        currentLat = parseFloat(pLat);
+        currentLon = parseFloat(pLon);
+        currentLabel = pPlace ? decodeURIComponent(pPlace) : "Selected Location";
+        isParamLoaded = true;
+        console.log("DEBUG: Location loaded from URL parameters.");
+    }
+
+    // --- ストレージの確認 ---
     const savedData = localStorage.getItem('pin_weather_spots');
     let parsedData = null;
     try {
@@ -773,7 +928,12 @@ async function initApp() {
         parsedData = null;
     }
 
-    if (parsedData && parsedData.length > 0) {
+    // --- 地点確定ロジック ---
+    if (isParamLoaded) {
+        // URLパラメータでロード済みの場合はそのまま初期化
+        finalizeInit(); 
+    } else if (parsedData && parsedData.length > 0) {
+        // ストレージにデータがある場合
         mySpots = parsedData;
         const lastSpot = mySpots[0];
         currentLat = lastSpot.lat;
@@ -781,37 +941,28 @@ async function initApp() {
         currentLabel = lastSpot.label;
         finalizeInit(); 
     } else {
+        // どちらもない場合はIP推定
         mySpots = [];
-        // IP推定（おおよその位置）が完了するまで待機（真っ白回避）
+        // 推定地点の取得（非同期）
         await setApproximateLocation(); 
         
-        // 推定地点（失敗時はサンプル）で背景を先に描画
+        // 【修正点】Welcomeダイアログ関連の呼び出しを削除し、即座にメイン画面を初期化
         finalizeInit();
 
-        // PWABuilder や Lighthouse などの解析ボットでない場合のみダイアログを表示
-        const isBot = /Lighthouse|Chrome-Lighthouse|PWABuilder/i.test(navigator.userAgent);
-
-        if (!isBot) {
-            // Welcomeダイアログ表示
-            setTimeout(() => {
-                if (typeof showAppDialog === 'function') {
-                    showAppDialog({
-                        title: "Welcome",
-                        messageKey: 'welcomeGuide',
-                        onMap: () => openMap(currentLat, currentLon), // 推定位置を初期値にする
-                        onSave: () => handleGPSClick() 
-                    });
-                    setupWelcomeButtons();
-                }
-            }, 500);
-        }
-
-        // バックグラウンドGPSは「座標の更新」のみ。renderTabsは呼ばない。
+        // バックグラウンドGPS更新
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
-                    currentLat = pos.coords.latitude;
-                    currentLon = pos.coords.longitude;
+                    // 【修正】currentLat/Lon を直接書き換えない
+                    // もし「現在地」として保存したい場合は別の変数に入れるか、
+                    // ここでは何もしないのが設計上安全です。
+                    console.log("GPS accuracy position acquired, but not overwriting current view.");
+                    
+                    /* 
+                    // もし現在地を常に把握しておきたいなら、別名の変数に保持する
+                    this.latestGpsLat = pos.coords.latitude;
+                    this.latestGpsLon = pos.coords.longitude;
+                    */
                 },
                 null,
                 { timeout: 8000 }
@@ -849,29 +1000,13 @@ async function setApproximateLocation() {
     }
 }
 
-/**
- * サブルーチン：Welcomeダイアログのボタン外観調整
- */
-function setupWelcomeButtons() {
-    const footer = document.getElementById('common-modal-footer');
-    if (!footer) return;
-    const buttons = footer.getElementsByTagName('button');
-    for (let btn of buttons) {
-        // 「適用/保存」ボタンのクラス（btn-save）を探してGPSに書き換え
-        if (btn.classList.contains('btn-save')) {
-            btn.innerText = "GPS";
-        }
-        // 「閉じる/キャンセル」ボタン（btn-secondary）を非表示にする
-        if (btn.classList.contains('btn-secondary')) {
-            btn.style.display = 'none';
-        }
-    }
-}
 
 /**
  * サブルーチン：共通の初期化プロセス
  */
 function finalizeInit() {
+// 【追加】ウィジェットモードならヘッダーを表示
+    setupWidgetHeader();
     initViewSettings();
     initCopyUrlEvent();
     applyEnvVisuals(); 
@@ -955,6 +1090,15 @@ function setupGeneralEvents() {
             window.open(privacyUrl, '_blank');
         };
     }
+
+    // 9. ウィジェット埋め込みボタン
+    const widgetBtn = document.getElementById('open-widget-modal-btn');
+    if (widgetBtn) {
+        widgetBtn.onclick = openWidgetPreview;
+        console.log("DEBUG: widgetBtn event attached");
+    } else {
+        console.warn("DEBUG: widgetBtn element not found in setupGeneralEvents");
+    }
 }
 
 /**
@@ -993,6 +1137,7 @@ function toggleSidebar() {
 /**
  * サイドバー内のボタンからモーダルを呼び出す専用関数
  * 戻るボタンの競合（一瞬で消える現象）を防ぐための完全版
+ * 修正内容：ウィジェット設定時は翻訳データを反映する処理を追加
  */
 function openModalFromSidebar(modalId) {
     const sb = document.getElementById('sidebar');
@@ -1005,6 +1150,22 @@ function openModalFromSidebar(modalId) {
     sb.classList.remove('open');
     sb.style.display = 'none';
     if (overlay) overlay.style.display = 'none';
+
+    // 【追加】ウィジェット用モーダルの場合、表示テキストを辞書から取得してセット
+    if (modalId === 'app-common-modal') {
+        const titleArea = document.getElementById('common-modal-title');
+        const msgArea = document.getElementById('common-modal-message');
+        
+        // i18n が利用可能な場合に翻訳を実行
+        if (typeof i18n !== 'undefined') {
+            if (titleArea) titleArea.innerText = i18n.t('widgetTitle');
+            if (msgArea) msgArea.innerText = i18n.t('widgetDesc');
+        } else {
+            // 万が一のフォールバック
+            if (titleArea) titleArea.innerText = "ウィジェット埋め込み設定";
+            if (msgArea) msgArea.innerText = "あなたのサイトやブログに、この地点の気象グラフを埋め込むことができます。";
+        }
+    }
 
     // 2. サイドバー用に積んでいた履歴を「モーダル用」として再利用（上書き）
     // これにより popstate が発火せず、一瞬で消える現象を回避する
@@ -1069,7 +1230,10 @@ function initCompassUI() {
 }
 
 /**
- * サブルーチン：環境色を反映した汎用ダイアログを表示（多言語・サイズ調整版）
+ * サブルーチン：環境色を反映した汎用ダイアログを表示（多言語・サイズ調整・安全版）
+ * 1. ウィジェットプレビュー関連の要素を確実にリセットします。
+ * 2. ホスト名に応じてヘッダー色を変更します。
+ * 3. 渡された引数に応じてボタンと入力を動的に生成します。
  */
 function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onSave = null, onDelete = null }) {
     const modal = document.getElementById('app-common-modal');
@@ -1080,7 +1244,19 @@ function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onS
     const input = document.getElementById('common-modal-input');
     const footer = document.getElementById('common-modal-footer');
 
-    // 1. 環境色の厳密な一致（applyEnvVisualsのロジックを流用）
+    // --- ウィジェット関連要素の確実なリセット ---
+    const widgetArea = document.getElementById('widget-preview-area');
+    const widgetActionArea = document.getElementById('widget-action-area'); // コピーボタン等のエリア
+    if (widgetArea) widgetArea.style.display = 'none';
+    if (widgetActionArea) widgetActionArea.style.display = 'none';
+
+    // 必須要素の存在確認（クラッシュ防止）
+    if (!modal || !header || !titleEl || !msgEl || !footer) {
+        console.error("Critical Error: Required modal elements not found.");
+        return;
+    }
+
+    // 1. 環境色の反映（ホスト名による判定）
     const hostname = window.location.hostname;
     let bgColor = "#007bff"; // Main (Blue)
     let textColor = "#ffffff";
@@ -1093,22 +1269,25 @@ function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onS
         textColor = "#333333";
     }
 
+    // スタイル適用
     header.style.backgroundColor = bgColor;
     titleEl.style.color = textColor;
 
-    // 2. コンテンツのセット（多言語化対応）
+    // 2. コンテンツのセット
     titleEl.innerText = title;
-    // メッセージキーがあれば翻訳、なければ空
     msgEl.innerText = messageKey ? i18n.t(messageKey) : "";
     
-    if (inputValue !== null) {
-        inputArea.style.display = 'block';
-        input.value = inputValue;
-    } else {
-        inputArea.style.display = 'none';
+    // 入力エリアの表示制御
+    if (inputArea && input) {
+        if (inputValue !== null) {
+            inputArea.style.display = 'block';
+            input.value = inputValue;
+        } else {
+            inputArea.style.display = 'none';
+        }
     }
 
-    // 3. ボタンの生成
+    // 3. ボタンの生成（初期化してから追加）
     footer.innerHTML = "";
     
     // 削除ボタン
@@ -1116,7 +1295,6 @@ function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onS
         const btnDelete = document.createElement('button');
         btnDelete.className = "btn btn-danger-outline";
         btnDelete.innerText = i18n.t('btnDelete'); 
-        
         btnDelete.onclick = () => {
             onDelete();
             modal.style.display = 'none';
@@ -1124,10 +1302,10 @@ function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onS
         footer.appendChild(btnDelete);
     }
 
-    // 地図ボタン（新規追加）
+    // 地図ボタン
     if (onMap) {
         const btnMap = document.createElement('button');
-        btnMap.className = "btn btn-map-view"; // 既存の地図ボタン用クラスを流用
+        btnMap.className = "btn btn-map-view";
         btnMap.innerText = "Map"; 
         btnMap.onclick = () => {
             onMap();
@@ -1140,21 +1318,25 @@ function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onS
     const btnCancel = document.createElement('button');
     btnCancel.className = "btn btn-secondary";
     btnCancel.innerText = i18n.t('btnClose');
-    btnCancel.onclick = () => modal.style.display = 'none';
+    btnCancel.onclick = () => {
+        modal.style.display = 'none';
+    };
     footer.appendChild(btnCancel);
 
-    // 保存ボタン
+    // 保存・適用ボタン
     if (onSave) {
         const btnSave = document.createElement('button');
         btnSave.className = "btn btn-save";
         btnSave.innerText = i18n.t('btnApply') || i18n.t('btnSaveSettings');
         btnSave.onclick = () => {
-            onSave(input.value);
+            const value = input ? input.value : null;
+            onSave(value);
             modal.style.display = 'none';
         };
         footer.appendChild(btnSave);
     }
 
+    // 表示（flexで中央揃えを維持）
     modal.style.display = 'flex';
 }
 
@@ -1455,6 +1637,7 @@ window.history.replaceState({ page: 'home' }, "");
 
 /**
  * 監視役：ブラウザの「戻る」が押されたら実行（一本化）
+ * 背景固定の解除処理を追加しました。
  */
 window.onpopstate = function(event) {
     console.log("DEBUG: Back Button Pressed!", event.state);
@@ -1468,6 +1651,9 @@ window.onpopstate = function(event) {
         }
     });
     
+    // 背景固定を解除し、スクロールを有効にする
+    document.body.style.overflow = '';
+
     // 地図の仮マーカー消去
     if (typeof tempMarker !== 'undefined' && tempMarker && map) {
         map.removeLayer(tempMarker);
@@ -1495,11 +1681,16 @@ function openModal(id) {
 
 /**
  * 共通サブルーチン：モーダルを閉じる
+ * 背景固定の解除処理を追加しました。
  */
 function closeModal(id) {
     const modal = document.getElementById(id);
     if (modal && modal.style.display === 'block') {
         modal.style.display = 'none';
+        
+        // 背景固定を解除してスクロール可能にする
+        document.body.style.overflow = '';
+        console.log("DEBUG: Modal closed, body scroll restored.");
         
         if (window.history.state && window.history.state.page === 'modal') {
             window.history.back();
@@ -1542,56 +1733,75 @@ async function executeMapSearch() {
     } catch (err) { console.error(err); }
 }
 
-async function onMapClick(e) {
+function onMapClick(e) {
     const { lat, lng } = e.latlng;
-    if (tempMarker) map.removeLayer(tempMarker);
-    tempMarker = L.marker([lat, lng]).addTo(map);
-    await fetchAddressInfo(lat, lng);
+    
+    // 【DEBUG】クリックされた瞬間の座標を記録
+    console.log(`[DEBUG] Map Clicked: lat=${lat}, lon=${lng}`);
+
+    currentLat = lat;
+    currentLon = lng;
+
+    if (tempMarker) {
+        tempMarker.setLatLng(e.latlng);
+    } else {
+        tempMarker = L.marker(e.latlng).addTo(map);
+    }
+
+    // 住所取得。この後に currentLabel がどう変わるかが重要
+    if (typeof fetchAddressInfo === 'function') {
+        fetchAddressInfo(currentLat, currentLon);
+    }
 }
 
-/**
- * サブルーチン：地図モーダル内での住所情報取得とボタン設定
- */
 async function fetchAddressInfo(lat, lng) {
+    // 【DEBUG】関数開始時の座標を確認
+    console.log(`[DEBUG] fetchAddressInfo started: lat=${lat}, lon=${lng}`);
+
     const statusEl = document.getElementById('map-status');
     if (statusEl) statusEl.innerText = i18n.t('mapStatusFetching');
     
     try {
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=${i18n._currentLang}`);
         const data = await res.json();
+        
+        // 【DEBUG】APIから返ってきた住所データを確認
+        console.log(`[DEBUG] Address Data:`, data.address);
+
         const addr = data.address;
         const city = addr.city || addr.town || addr.village || "";
         const district = addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district || "";
         const defaultName = (city + district) || i18n.t('mapNewSpot');
 
-        const tempViewBtn = document.getElementById('temp-view-btn');
-        if (tempViewBtn) {
-            tempViewBtn.onclick = () => {
-                const suffix = i18n._currentLang === 'ja' ? "(未登録)" : "(Temp)";
-                updateLocation(lat, lng, defaultName + suffix);
-                closeModal('map-modal');
-            };
-            tempViewBtn.disabled = false;
-        }
-
         const saveSpotBtn = document.getElementById('save-spot-btn');
         if (saveSpotBtn) {
             saveSpotBtn.onclick = () => {
+                // 【DEBUG】ボタンが押された瞬間の lat, lng を確認
+                console.log(`[DEBUG] Save button clicked for: ${defaultName} (lat:${lat}, lon:${lng})`);
+
                 showAppDialog({
                     title: defaultName,
                     messageKey: 'mapSavePrompt',
                     inputValue: defaultName,
-                    // fetchAddressInfo 内の地図からの保存処理
                     onSave: (spotName) => {
+                        // 【DEBUG】ダイアログで保存が押された後の最終確認
+                        console.log(`[DEBUG] Dialog onSave triggered: name=${spotName}, lat=${lat}, lon=${lng}`);
+
                         if (!spotName) return;
 
-                        // サブルーチンでチェック
-                        if (!checkSpotLimit(spotName)) return;
+                        if (!checkSpotLimit(spotName)) {
+                            console.warn(`[DEBUG] checkSpotLimit returned false for: ${spotName}`);
+                            return;
+                        }
 
                         const filtered = mySpots.filter(s => s.label !== spotName);
                         mySpots = [{ lat, lon: lng, label: spotName }, ...filtered];
                         
                         localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                        
+                        // 【DEBUG】ストレージ保存完了の確認
+                        console.log("[DEBUG] Storage update success. Current mySpots length:", mySpots.length);
+
                         updateLocation(lat, lng, spotName);
                         renderTabs(spotName);
                         closeModal('map-modal');
@@ -1603,6 +1813,7 @@ async function fetchAddressInfo(lat, lng) {
         
         if (statusEl) statusEl.innerText = "📍：" + defaultName;
     } catch (err) {
+        console.error("[DEBUG] fetchAddressInfo Error:", err);
         if (statusEl) statusEl.innerText = i18n.t('mapStatusFail');
     }
 }
@@ -1760,6 +1971,9 @@ function resetGraphScroll() {
 // ツールチップ消去用タイマー変数
 let tooltipTimer = null;
 
+/**
+ * メインサブルーチン：描画処理
+ */
 async function draw() {
     try {
         if (typeof currentLat === 'undefined' || currentLat === null || typeof currentLon === 'undefined' || currentLon === null) {
@@ -1768,18 +1982,33 @@ async function draw() {
             return;
         }
 
+        const params = new URLSearchParams(window.location.search);
+        const isWidget = params.get('mode') === 'widget';
+        
         allData = await fetchWithCache(currentLat, currentLon);
         const svgW = document.getElementById('svg-weather');
         if (!svgW || !allData || !allData.data) return;
 
-        // 【重要】この描画セッションにおける「現在時刻」をここで固定する
         const drawReferenceTime = new Date();
-
         const totalDataCount = allData.data.time.length;
         const baseWindIcon = `<svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle; margin-right:2px; display:inline-block;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(-90)"/></svg>`;
 
         const fullIdx = allData.data.time.findIndex(t => new Date(t) > drawReferenceTime) - 1;
         const startIdx = Math.max(0, fullIdx - 4);
+        
+        const hScale = viewConfig.hourWidth; 
+        const displayCount = totalDataCount - startIdx;
+
+        // --- ウィジェット時の高さ切り替え ---
+        // 通常画面の構成を維持し、高さだけを80にする
+        let windH = isWidget ? 80 : viewConfig.windHeight;
+        let subH = isWidget ? 80 : viewConfig.subHeight;
+        let gMargin = viewConfig.graphMargin || 0;
+
+        if (isWidget) {
+            const nav = document.querySelector('.nav-container') || document.querySelector('nav');
+            if (nav) nav.style.display = 'none';
+        }
         
         const waveData = allData.data.wave_height ? allData.data.wave_height.slice(startIdx) : [];
         const tideData = allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl.slice(startIdx) : [];
@@ -1794,22 +2023,23 @@ async function draw() {
             titles[3].innerHTML = marineTitle;
         }
 
-        const displayCount = totalDataCount - startIdx;
-        const hScale = viewConfig.hourWidth; 
         const labelFS = viewConfig.fontSize;
         const iScale = viewConfig.iconScale;
-        const gMargin = viewConfig.graphMargin;
         const totalW = hScale * (displayCount - 1);
 
         const secWind = document.querySelector('.section-wind');
         const secTemp = document.querySelector('.section-temp');
         const secMarine = document.querySelector('.section-marine');
         const sections = [document.querySelector('.section-weather'), secWind, secTemp, secMarine];
+        
         sections.forEach(sec => { if(sec) sec.style.width = totalW + "px"; });
 
-        if (secWind) { secWind.style.height = viewConfig.windHeight + "px"; secWind.style.marginBottom = gMargin + "px"; }
-        if (secTemp) { secTemp.style.height = viewConfig.subHeight + "px"; secTemp.style.marginBottom = gMargin + "px"; }
-        if (secMarine) { secMarine.style.height = viewConfig.subHeight + "px"; }
+        if (secWind) { secWind.style.height = windH + "px"; secWind.style.marginBottom = gMargin + "px"; }
+        if (secTemp) { secTemp.style.height = subH + "px"; secTemp.style.marginBottom = gMargin + "px"; }
+        if (secMarine) { 
+            secMarine.style.height = subH + "px"; 
+            secMarine.style.marginBottom = "0px"; 
+        }
         
         let wHtml = "";
         const pData = allData.data.precipitation ? allData.data.precipitation.slice(startIdx) : [];
@@ -1834,14 +2064,23 @@ async function draw() {
                 wHtml += `<text x="${x}" y="${pBaseY - barH - 2}" font-size="${labelFS - 2}" font-weight="bold" fill="#0000FF" text-anchor="middle">${p.toFixed(1)}</text>`;
             }
         }
-        svgW.innerHTML = wHtml;
 
-        // renderSection に drawReferenceTime を渡す（内部で現在時刻線を描画するため）
-        renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], viewConfig.windHeight, 5.0, true, false, true, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime);
-        renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], viewConfig.subHeight, 5.0, false, !hasMarineData, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime);
+        svgW.innerHTML = wHtml;
+        // 天気SVG自体の高さも制御が必要な場合はここに追加
+        // svgW.style.height = `${windH}px`; 
+
+        const svgWind = document.getElementById("svg-wind");
+        if (svgWind) svgWind.style.height = `${windH}px`; // 高さ固定
+        renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], windH, 5.0, true, false, true, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime);
+        
+        const svgTemps = document.getElementById("svg-temps");
+        if (svgTemps) svgTemps.style.height = `${subH}px`; // 高さ固定
+        renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], subH, 5.0, false, !hasMarineData, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime);
         
         if (hasMarineData) {
-            renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], viewConfig.subHeight, 0.5, false, true, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime);
+            const svgMarine = document.getElementById("svg-marine");
+            if (svgMarine) svgMarine.style.height = `${subH}px`; // ★ここで150pxをsubH(80px)に上書き
+            renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], subH, 0.5, false, true, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime);
         } else {
             const svgM = document.getElementById("svg-marine");
             if (svgM) svgM.innerHTML = "";
@@ -1854,15 +2093,17 @@ async function draw() {
         updateWindLegend();
         resetGraphScroll();
         initScrollEvent(hScale, startIdx);
-        // 【重要】ツールチップ初期化にも基準時刻を渡す
         initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime);
-        
+
     } catch (e) { 
         console.error("Critical Draw Error:", e);
         if (typeof initApp === 'function') { initApp(); }
     }
 }
 
+/**
+ * サブルーチン：セクション（グラフエリア）のレンダリング
+ */
 function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLast, isFirst, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime) {
     const svg = document.getElementById(svgId);
     const dateCont = document.getElementById(dateContId);
@@ -1950,13 +2191,13 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
     }
 
     const startTime = new Date(allData.data.time[startIdx]).getTime();
-    // 【修正】引数で受け取った固定時刻 drawReferenceTime を使用する
     const nowTime = drawReferenceTime.getTime();
     const diffHoursNow = (nowTime - startTime) / (1000 * 60 * 60); 
     if (diffHoursNow >= 0 && diffHoursNow < (totalDataCount - startIdx)) {
         const nowX = diffHoursNow * hScale;
         html += `<line x1="${nowX}" y1="0" x2="${nowX}" y2="${plotHeight}" stroke="#0000FF" stroke-width="2.5" stroke-dasharray="4 3" />`;
     }
+
     if (allData.timestamp) {
         const fetchedTime = new Date(allData.timestamp).getTime();
         const diffHoursFetch = (fetchedTime - startTime) / (1000 * 60 * 60); 
@@ -1965,6 +2206,8 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
             html += `<line x1="${fetchX}" y1="0" x2="${fetchX}" y2="${plotHeight}" stroke="#228b22" stroke-width="2.5" stroke-dasharray="3 2" />`;
         }
     }
+
+
 
     datasets.forEach(ds => {
         if (ds.type === 'bar') {
@@ -2089,13 +2332,17 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
         tooltip.style.transform = "none";
 
         if (isAutoScroll) {
+            // 【スクロール時：グラフの下端に張り付く】
+            const rect = stage.getBoundingClientRect();
             tooltip.style.left = (100 + hs * 3) + "px";
-            tooltip.style.bottom = "70px"; 
-            tooltip.style.top = "auto";
+            tooltip.style.top = (rect.bottom - tooltip.offsetHeight) + "px";
+            tooltip.style.bottom = "auto";
         } else {
+            // 【マウス移動・クリック時：従前のとおり高さに合わせる】
             const tooltipWidth = tooltip.offsetWidth || 220;
             let tx = (clientX > window.innerWidth / 2) ? clientX - tooltipWidth - 20 : clientX + 20;
             tooltip.style.left = tx + "px";
+            
             let ty = clientY + 20;
             if (ty + tooltip.offsetHeight + 70 > window.innerHeight) {
                 tooltip.style.bottom = "70px"; 
@@ -2173,6 +2420,7 @@ function initScrollEvent(hScale, startIdx) {
                 const visualOffset = hs * 2; 
                 const targetX = sl + visualOffset; 
                 const hourIdx = (targetX / hs) + sIdx;
+                // isAutoScroll を true として呼び出し
                 window.updateTooltipFromScroll(hourIdx, 0, 0, true, sl);
             }
         };
@@ -2313,121 +2561,6 @@ window.addEventListener('appinstalled', () => {
 // DOM構築後に実行
 window.addEventListener('DOMContentLoaded', initPwaInstall);
 
-/**
- * サブルーチン：新ドメイン移行案内の表示
- * 概要：旧ドメインから新ドメインへのデータ引継ぎを行い、完了後はユーザーにアプリを閉じてブラウザで開き直すよう促す。
- * 新ドメイン起動時は、未インストールのユーザーに対してホーム画面追加（PWA）の手順を表示する。
- */
-function checkDomainMigration() {
-    const currentHost = window.location.hostname;
-    const newDomain = "pin-weather.pro"; 
-
-    // 1. 旧ドメイン（app.onrender.com）での処理
-    if (currentHost.includes("app.onrender.com")) {
-        window.goNewDomain = function() {
-            const spotsData = localStorage.getItem('pin_weather_spots');
-            const viewConfigData = localStorage.getItem('pin_weather_view_config');
-            const windFilterData = localStorage.getItem('pin_weather_wind_filter');
-            
-            let targetUrl = `https://${newDomain}/`;
-            const migrationPackage = {
-                spots: spotsData,
-                viewConfig: viewConfigData,
-                windFilter: windFilterData
-            };
-            const dataString = encodeURIComponent(JSON.stringify(migrationPackage));
-            targetUrl += `?migration_all=${dataString}`;
-            
-            window.location.replace(targetUrl);
-        };
-
-        const banner = document.createElement('div');
-        banner.id = 'migration-banner';
-        banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background-color:#d32f2f;color:white;text-align:center;padding:15px 10px;z-index:10000;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,0.3);';
-        banner.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 5px;">【重要】新URLへの移動とデータ引継ぎ</div>
-            <div style="margin-bottom: 10px; font-size: 14px; line-height: 1.4;">
-                新サイトpin-weather.proに転居しました。<br>登録地点は自動で引き継ぎます。<br>
-                新サイトに移動してください。
-            </div>
-            <button onclick="goNewDomain()" style="background-color: white; color: #d32f2f; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer;">地点データを保持して移動する</button>
-        `;
-        document.body.prepend(banner);
-        document.body.style.paddingTop = "130px";
-    }
-
-    // 2. 新ドメイン（pin-weather.pro）に届いた直後の処理
-    if (currentHost === newDomain || currentHost === `www.${newDomain}`) {
-        const urlParams = new URLSearchParams(window.location.search);
-        const migrationAll = urlParams.get('migration_all');
-        const isExplicitBrowser = urlParams.get('mode') === 'browser'; // ブラウザ表示モードの判定
-        
-        if (migrationAll) {
-            try {
-                const parsed = JSON.parse(decodeURIComponent(migrationAll));
-                if (parsed.spots) localStorage.setItem('pin_weather_spots', parsed.spots);
-                if (parsed.viewConfig) localStorage.setItem('pin_weather_view_config', parsed.viewConfig);
-                if (parsed.windFilter) localStorage.setItem('pin_weather_wind_filter', parsed.windFilter);
-
-                // 保存が完了したら、パラメータのないクリーンなURLへ差し替え
-                sessionStorage.setItem('migration_final_alert', 'true');
-                window.location.replace(window.location.origin + window.location.pathname);
-                return; 
-            } catch (e) {
-                console.error("Migration error", e);
-            }
-        }
-
-        // 3. パラメータが消えた後、ユーザーに案内を表示
-        if (sessionStorage.getItem('migration_final_alert') === 'true') {
-            setTimeout(() => {
-                sessionStorage.removeItem('migration_final_alert');
-                
-                if (typeof showAppDialog === 'function') {
-                    showAppDialog({
-                        title: "データ引継ぎ完了",
-                        message: "データの移行に成功しました。\n下記のリンクをタップしてブラウザで開き直し、ホーム画面への再登録をお願いします。",
-                        onSave: () => {
-                            document.body.innerHTML = `
-                                <div style="padding:50px; text-align:center; font-family:sans-serif;">
-                                    <h3>移行準備が整いました</h3>
-                                    <p style="margin-top:20px; line-height:1.6;">
-                                        以下のリンクをタップして<br>新サイトをブラウザで開き直してください。<br><br>
-                                        新サイトをワンクリックで開けるようにするときは、<br>
-                                        <b>・≡サイドバーメニューから「インストール」</b>するか<br>
-                                        ・AndroidはChrome等「ホーム画面に追加」<br>
-                                        ・iPhoneはSafari「共有」⇒「ホーム画面に追加」<br>
-                                        をしてPWAをインストールしてください。<br><br>
-                                        <a href="https://pin-weather.pro/?mode=browser" style="display:inline-block; background-color:#d32f2f; color:white; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold;">新サイトをブラウザで開く</a>
-                                    </p>
-                                    <p style="margin-top:20px; color:#666;">ホーム画面の古いアイコンは紛らわしいので、必ず削除してください。</p>
-                                </div>`;
-                        }
-                    });
-                }
-            }, 1000);
-        }
-
-        // 4. インストールを促すバナーの表示条件判定
-        const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-        const isNewDomain = currentHost === newDomain || currentHost === `www.${newDomain}`;
-        
-        // 【修正】PWA起動中であっても、URLに mode=browser が含まれている場合は強制表示する
-        if (isNewDomain && (!isPWA || isExplicitBrowser) && !sessionStorage.getItem('migration_final_alert')) {
-            const installGuide = document.createElement('div');
-            installGuide.id = 'pwa-install-banner';
-            // z-index を 100 に下げてサイドバーの下に隠れるように修正
-            installGuide.style.cssText = 'background-color: #fff3e0; color: #e65100; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 1px solid #ffe0b2; line-height: 1.5; z-index: 100; position: relative;';
-            installGuide.innerHTML = `
-                ${i18n.t('pwa_install_msg')}<br>
-                <span style="font-size: 11px; font-weight: normal;">
-                    ${i18n.t('pwa_install_sub')}
-                </span>
-            `;
-            document.body.prepend(installGuide);
-        }
-    }
-}
 
 /**
  * サブルーチン：AdMobバナー広告の初期化（既存フッター対応版）
