@@ -707,10 +707,10 @@ function initCopyUrlEvent() {
 }
 
 /**
- * サブルーチン：ウィジェットプレビューモーダルを開く（地名・言語同期 修正版）
+ * サブルーチン：ウィジェットプレビューモーダルを開く（修正版）
  * 1. 地名(place)と座標(lat/lon)をiframeに確実に引き継ぎます。
  * 2. 表示言語をコピーコードと完全に一致させます。
- * 3. プレビュー枠の高さを660pxに固定します。
+ * 3. プレビュー枠の高さを維持しつつ、ボタンが隠れないよう調整します。
  */
 function openWidgetPreview() {
     console.log("DEBUG: openWidgetPreview [START]");
@@ -725,12 +725,15 @@ function openWidgetPreview() {
 
     if (!modal) return;
 
-    // --- 1. タイトルとメッセージの表示（i18nエラーを回避） ---
-    // i18n.exists メソッドを使用せず、安全にテキストを取得します
+    // 他のモーダル利用時に影響が出ないよう、一旦初期化（念のため）
+    // ※通常はモーダルを閉じる処理で行いますが、ここで明示的に制御します
+    const allModalContents = modal.querySelectorAll('.modal-content-unit'); // 汎用パーツ
+    allModalContents.forEach(el => el.style.display = 'none');
+
+    // --- 1. タイトルとメッセージの表示 ---
     if (titleArea) {
-        let titleText = "Widget Settings"; // デフォルト
+        let titleText = "Widget Settings";
         if (typeof i18n !== 'undefined') {
-            // i18n.t が存在するか確認し、存在すれば翻訳を試みる
             titleText = (typeof i18n.t === 'function') ? i18n.t('widgetTitle') : titleText;
         }
         titleArea.innerText = titleText;
@@ -739,6 +742,7 @@ function openWidgetPreview() {
 
     if (msgArea && typeof i18n !== 'undefined' && typeof i18n.t === 'function') {
         msgArea.innerText = i18n.t('widgetDesc');
+        msgArea.style.display = 'block';
     }
 
     if (copyBtnText && typeof i18n !== 'undefined' && typeof i18n.t === 'function') {
@@ -750,7 +754,6 @@ function openWidgetPreview() {
     const params = new URLSearchParams();
     params.set('mode', 'widget');
 
-    // 地名：ローカルストレージ由来の変数を確実に取得
     const placeName = (typeof currentLabel !== 'undefined') ? currentLabel : '';
     if (placeName) params.set('place', placeName);
 
@@ -761,23 +764,28 @@ function openWidgetPreview() {
     const embedCode = `<iframe src="${widgetUrl}" width="100%" height="660" frameborder="0" style="border:1px solid #eee; border-radius:8px;"></iframe>`;
 
     if (codeArea) codeArea.value = embedCode;
+
+    // --- 3. プレビューエリアの表示制御 ---
     if (widgetArea) {
         widgetArea.style.display = 'block';
-        // プレビューエリア全体の高さを660pxに固定（余白を持たせる）
-        widgetArea.style.height = "660px";
-        widgetArea.style.overflow = "hidden";
+        // 内部のiframeを包む枠自体の高さは、ボタンを押し出さない程度（例: 400px〜）にするか、
+        // あるいはiframe側の指定に任せます。ここでは660pxの枠を確保しつつ溢れを許容します。
+        widgetArea.style.height = "auto"; 
     }
 
-    // --- 3. 表示 ---
-    modal.style.display = 'block';
-    window.history.pushState({ page: 'modal', id: 'app-common-modal' }, "");
-
-    // --- 4. iframe内の地名・座標の復元注入 ---
     if (iframe) {
         iframe.src = widgetUrl;
-        // iframe自体の高さも660pxに確実に固定
-        iframe.style.height = "660px";
+        iframe.style.display = 'block';
+        iframe.style.height = "480px"; // モーダル内プレビューとして適切な高さに調整
     }
+
+    // コピーボタン等のエリアがあれば表示
+    const actionArea = document.getElementById('widget-action-area'); // IDは実際の構造に合わせてください
+    if (actionArea) actionArea.style.display = 'block';
+
+    // --- 4. モーダル本体の表示 ---
+    modal.style.display = 'block';
+    window.history.pushState({ page: 'modal', id: 'app-common-modal' }, "");
     
     console.log("DEBUG: openWidgetPreview [END]");
 }
@@ -1249,6 +1257,9 @@ function initCompassUI() {
 
 /**
  * サブルーチン：環境色を反映した汎用ダイアログを表示（多言語・サイズ調整・安全版）
+ * 1. ウィジェットプレビュー関連の要素を確実にリセットします。
+ * 2. ホスト名に応じてヘッダー色を変更します。
+ * 3. 渡された引数に応じてボタンと入力を動的に生成します。
  */
 function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onSave = null, onDelete = null }) {
     const modal = document.getElementById('app-common-modal');
@@ -1258,6 +1269,12 @@ function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onS
     const inputArea = document.getElementById('common-modal-input-area');
     const input = document.getElementById('common-modal-input');
     const footer = document.getElementById('common-modal-footer');
+
+    // --- ウィジェット関連要素の確実なリセット ---
+    const widgetArea = document.getElementById('widget-preview-area');
+    const widgetActionArea = document.getElementById('widget-action-area'); // コピーボタン等のエリア
+    if (widgetArea) widgetArea.style.display = 'none';
+    if (widgetActionArea) widgetActionArea.style.display = 'none';
 
     // 必須要素の存在確認（クラッシュ防止）
     if (!modal || !header || !titleEl || !msgEl || !footer) {
