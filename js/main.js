@@ -1174,15 +1174,15 @@ function setupGeneralEvents() {
 
             // ボタン3: キャンセル
             const cancelBtn = document.createElement('button');
-            cancelBtn.id = "btnCancel"; 
+            cancelBtn.id = "btnClose"; 
             cancelBtn.style.cssText = baseBtnStyle + "background: #6c757d; color: white;";
-            cancelBtn.innerText = i18n.t('btnCancel') || "Cancel";
+            cancelBtn.innerText = i18n.t('btnClose') || "Cancel";
             cancelBtn.onclick = () => closeModal('wind-modal');
 
             // ボタン4: 適用（変更して登録）
             const finalApplyBtn = document.createElement('button');
             finalApplyBtn.style.cssText = baseBtnStyle + "background: #007bff; color: white; flex: 1.2;";
-            finalApplyBtn.innerText = i18n.t('btnApplyChanges') || "Apply Changes";
+            finalApplyBtn.innerText = i18n.t('btnSaveSettings') || "Apply Changes";
             finalApplyBtn.onclick = executeApply; // ここでイベントを再登録
 
             // フッター再構築
