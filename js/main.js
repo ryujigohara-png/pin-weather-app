@@ -166,7 +166,7 @@ const i18n = {
             btnDelete: "削除",
             confirmDeletePrefix: "本当に削除しますか：",
 
-            condition_summary_btn: "📋 コンディション概況",
+            condition_summary_btn: "コンディション概況",
             summary_title: "【コンディション概況】",
             as_of: "現在",
             tomorrow: "明日",
@@ -301,7 +301,7 @@ const i18n = {
             btnDelete: "Delete",
             confirmDeletePrefix: "Are you sure you want to delete:",
 
-            condition_summary_btn: "📋 Condition Summary",
+            condition_summary_btn: "Condition Summary",
             summary_title: "[Condition Summary] ",
             as_of: "As of",
             tomorrow: "tomorrow ",
@@ -342,7 +342,21 @@ function updateLanguageSelect() {
 function updateStaticUI() {
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
-        el.innerHTML = i18n.t(key);
+        
+        // コンディション概況ボタンの場合は現在の地名を合成
+        if (key === 'condition_summary_btn') {
+            const isJa = i18n._currentLang === 'ja';
+            const baseLabel = i18n.t(key).replace("📋 ", "");
+            const icon = "📋 ";
+            if (isJa) {
+                el.innerHTML = `${icon}${currentLabel} ${baseLabel}`;
+            } else {
+                el.innerHTML = `${icon}${baseLabel} for ${currentLabel}`;
+            }
+        } else if (typeof i18n.dict[i18n._currentLang][key] === 'string') {
+            // confirmDelete のような関数型データでない場合のみ text を置換
+            el.innerHTML = i18n.t(key); // HTMLタグを含む場合があるため innerHTML を使用
+        }
     });
 }
 
@@ -715,7 +729,7 @@ async function saveViewSettings() {
 
 /**
  * サブルーチン：設定のリセット処理
- * 定義済みの defaultViewConfig を使用して設定を初期化する
+ * 定義済みの defaultViewConfig を使用して設定を初期化し、メモリとUIを同期させます。
  */
 function resetViewSettings() {
     // 汎用ダイアログを呼び出し
@@ -723,10 +737,21 @@ function resetViewSettings() {
         title: i18n.t('btnResetAll'), // タイトル
         messageKey: 'confirmReset',    // メッセージ
         onSave: () => {
-            // 「保存（実行）」ボタンが押された時の処理
-            // 深いコピーを行い、localStorage のキー名を「pin_weather_view_config」に統一
+            // 1. デフォルト設定を深いコピーで取得
             const resetData = JSON.parse(JSON.stringify(defaultViewConfig));
-            localStorage.setItem('pin_weather_view_config', JSON.stringify(resetData));
+
+            // 2. メモリ上の実行用変数の中身を更新
+            // オブジェクトの参照を維持したまま、中身だけを既定値で上書きします。
+            // これにより、const宣言時や他からの参照がある場合でも確実に同期されます。
+            Object.assign(viewConfig, resetData);
+
+            // 3. LocalStorage を更新（キー名：pin_weather_view_config）
+            localStorage.setItem('pin_weather_view_config', JSON.stringify(viewConfig));
+
+            // 4. UI（スライダーやラベル）を現在の viewConfig の値に同期
+            syncSliderValues();
+
+            // 5. 設定を全画面に波及させるためにリロード
             location.reload();
         }
     });
@@ -2051,19 +2076,36 @@ async function fetchAddressInfo(lat, lng) {
     }
 }
 
+/**
+ * サブルーチン：現在地の更新と描画
+ * 地名が変わるたびにボタン内の地名表示エリアのみを書き換えます。
+ */
 async function updateLocation(lat, lon, label) {
     const timerLabel = `📊 描画所要時間 [${label}]`;    
     console.time(timerLabel);
+    
     currentLat = lat; 
     currentLon = lon; 
     currentLabel = label;
+
+    // --- コンディション概況ボタンの地名部分のみを更新 ---
+    const locationSpan = document.getElementById('summary-btn-location');
+    if (locationSpan) {
+        const isJa = i18n._currentLang === 'ja';
+        // 日本語なら「地名 」、英語なら「for 地名」のように調整可能
+        if (isJa) {
+            locationSpan.innerText = label + " ";
+        } else {
+            locationSpan.innerText = "for " + label;
+        }
+    }
+
     try {
         // 実際の描画処理
         await draw(); 
     } catch (err) {
         console.error(`描画エラー [${label}]:`, err);
     } finally {
-        // 計測終了（コンソールに "📊 描画所要時間 [地点名]: 123.456ms" と表示される）
         console.timeEnd(timerLabel);
     }
 }
@@ -2297,7 +2339,11 @@ function getAzimuth(degrees) {
  * サブルーチン：気象データから概況文章を生成
  * 全ての文言を i18n 辞書から取得し、多言語および構造化に対応します。
  */
-function generateWeatherSummary(data) {
+/**
+ * サブルーチン：気象データから概況文章を生成
+ * getLocalizedDate を活用して日付処理を共通化し、描画時刻と地名を反映します。
+ */
+function generateWeatherSummary(data, label) {
     // データ異常系チェック
     if (!data || !data.time || !data.weather_code || !data.wind_speed_10m) {
         return i18n.t('analyzing');
@@ -2305,8 +2351,10 @@ function generateWeatherSummary(data) {
 
     const isJa = i18n._currentLang === 'ja';
 
-    // 1. 現在時刻（赤線）に最も近いインデックスを特定
+    // 1. 現在時刻（描画時刻）を取得
     const now = new Date();
+    
+    // 2. 解析用の基準インデックスを特定
     let nowIdx = 0;
     let minDiff = Infinity;
     for (let i = 0; i < data.time.length; i++) {
@@ -2317,32 +2365,22 @@ function generateWeatherSummary(data) {
         }
     }
 
-    const baseTime = new Date(data.time[nowIdx]);
-    const targetHours = 24;
-
-    // 時刻ヘッダーの生成（辞書内の days, months を使用）
-    const langDict = i18n.dict[i18n._currentLang];
-    const dayName = langDict.days[baseTime.getDay()];
-    const monthNum = baseTime.getMonth(); // 0-11
-    const dateNum = baseTime.getDate();
-    const hours = baseTime.getHours().toString().padStart(2, '0');
-    const minutes = baseTime.getMinutes().toString().padStart(2, '0');
+    // 3. 時刻ヘッダーの生成（getLocalizedDate を使用）
+    const dateStr = getLocalizedDate(now);
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
 
     let timeHeader = "";
     if (isJa) {
-        // 日本語形式: 5/6(水) 22:00
-        timeHeader = `${monthNum + 1}/${dateNum}(${dayName}) ${hours}:${minutes}`;
+        // 日本語形式: 地名：4/1(水) 22:15
+        timeHeader = `${label}：${dateStr} ${hours}:${minutes}`;
     } else {
-        // 英語形式: Wed, May 6th 22:00
-        const monthName = langDict.months[monthNum];
-        // 序数 (st, nd, rd, th) の判定
-        let suffix = "th";
-        if (dateNum % 10 === 1 && dateNum !== 11) suffix = "st";
-        else if (dateNum % 10 === 2 && dateNum !== 12) suffix = "nd";
-        else if (dateNum % 10 === 3 && dateNum !== 13) suffix = "rd";
-        
-        timeHeader = `${dayName}, ${monthName} ${dateNum}${suffix} ${hours}:${minutes}`;
+        // 英語形式: label: Wed, Apr 1st 22:15
+        timeHeader = `${label}: ${dateStr} ${hours}:${minutes}`;
     }
+
+    const baseTime = new Date(data.time[nowIdx]);
+    const targetHours = 24;
 
     // 単位の設定
     const wUnit = (typeof viewConfig !== 'undefined') ? 
@@ -2371,11 +2409,10 @@ function generateWeatherSummary(data) {
     const minTemp = Math.min(...temps);
     const tempDiff = maxTemp - minTemp;
 
-    // 天気文章の組み立て
     let weatherFinal = i18n.t('weather_now').replace('{weather}', currentWeatherName);
     if (changeIdx !== -1) {
         const cTime = new Date(data.time[changeIdx]);
-        const dayLabel = cTime.getDate() !== baseTime.getDate() ? i18n.t('tomorrow') : "";
+        const dayLabel = cTime.getDate() !== now.getDate() ? i18n.t('tomorrow') : "";
         weatherFinal += i18n.t('weather_change')
             .replace('{day}', dayLabel)
             .replace('{time}', cTime.getHours());
@@ -2383,7 +2420,6 @@ function generateWeatherSummary(data) {
         weatherFinal += i18n.t('stable_weather');
     }
 
-    // 気温情報の組み立て
     let tempPart = i18n.t('temp_info')
         .replace('{max}', maxTemp.toFixed(1))
         .replace('{min}', minTemp.toFixed(1));
@@ -2404,7 +2440,7 @@ function generateWeatherSummary(data) {
         .replace('{unit}', wUnit);
 
     if (maxWind - currentWindSpeed >= 3) {
-        const dayLabel = mTime.getDate() !== baseTime.getDate() ? i18n.t('tomorrow') : "";
+        const dayLabel = mTime.getDate() !== now.getDate() ? i18n.t('tomorrow') : "";
         const mWindDir = getAzimuth(data.wind_direction_10m[maxWindIdx]);
         windFinal += i18n.t('wind_strengthen')
             .replace('{day}', dayLabel)
@@ -2433,11 +2469,7 @@ function generateWeatherSummary(data) {
         }
     }
 
-    // タイトルの取得
     let title = i18n.t('summary_title');
-    // タイトルの前後が [] や 【】 でない場合に太字化するため、辞書側の設定を優先しつつ
-    // もし英字タイトルなら太字（markdown的```ではなく、プレーンテキストに流し込む前提なのでそのまま結合）
-    // 最終的なinnerTextで改行も含めて整形
 
     return `${title} ${timeHeader} ${i18n.t('as_of')}\n${weatherFinal}\n${windFinal}\n${waveFinal}`;
 }
@@ -2467,7 +2499,7 @@ async function draw() {
         allData = await fetchWithCache(currentLat, currentLon);
         if (allData) {
             // ここで実行
-            const summaryText = generateWeatherSummary(allData.data);
+            const summaryText = generateWeatherSummary(allData.data, currentLabel);
             const el = document.getElementById('weather-summary');
             if (el) {
                 el.innerText = summaryText;
