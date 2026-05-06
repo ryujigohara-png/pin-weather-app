@@ -3,7 +3,7 @@ let allData = {};
 
 // 2. 詳細設定の初期値
 const defaultViewConfig = {
-    forecastDays: 16,           // 予報日数（最大16日）
+    forecastDays: 7,           // 予報日数（最大16日）
     tooltipDuration: 3,         // ツールチップ表示時間（s）
     temperatureUnit: 'celsius', // 気温単位
     windSpeedUnit: 'ms',        // 風速単位
@@ -13,8 +13,8 @@ const defaultViewConfig = {
     windThresholdLow: 3.0,
     // ----------------------------
     iconScale: 0.7,             // 風向アイコン倍率
-    hourWidth: 20,              // 1時間の幅
-    windHeight: 180,            // 風速グラフ高さ
+    hourWidth: 18,              // 1時間の幅
+    windHeight: 100,            // 風速グラフ高さ
     subHeight: 100,             // 気温・海象グラフ高さ
     graphMargin: 0,             // グラフ間余白
     fontSize: 12,               // ラベルフォントサイズ

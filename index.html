@@ -233,33 +233,33 @@
             <div class="config-group">
                 <div class="config-label-area">
                     <span class="config-title" data-i18n="cfgHourWidth">1時間の幅 (hScale)</span>
-                    <span id="val-hourWidth" class="config-value">32px</span>
+                    <span id="val-hourWidth" class="config-value">18px</span>
                 </div>
-                <input type="range" id="input-hourWidth" class="config-slider" min="10" max="100" value="32">
+                <input type="range" id="input-hourWidth" class="config-slider" min="10" max="100" value="30">
             </div>
 
             <div class="config-group">
                 <div class="config-label-area">
                     <span class="config-title" data-i18n="cfgWindHeight">風速グラフの高さ</span>
-                    <span id="val-windHeight" class="config-value">280px</span>
+                    <span id="val-windHeight" class="config-value">100px</span>
                 </div>
-                <input type="range" id="input-windHeight" class="config-slider" min="80" max="200" step="10" value="180">
+                <input type="range" id="input-windHeight" class="config-slider" min="70" max="200" step="10" value="180">
             </div>
 
             <div class="config-group">
                 <div class="config-label-area">
                     <span class="config-title" data-i18n="cfgSubHeight">気温・海象グラフの高さ</span>
-                    <span id="val-subHeight" class="config-value">160px</span>
+                    <span id="val-subHeight" class="config-value">100px</span>
                 </div>
-                <input type="range" id="input-subHeight" class="config-slider" min="80" max="150" step="10" value="100">
+                <input type="range" id="input-subHeight" class="config-slider" min="70" max="150" step="10" value="100">
             </div>
 
             <div class="config-group">
                 <div class="config-label-area">
                     <span class="config-title" data-i18n="cfgMargin">グラフ間の余白</span>
-                    <span id="val-margin" class="config-value">15px</span>
+                    <span id="val-margin" class="config-value">0px</span>
                 </div>
-                <input type="range" id="input-margin" class="config-slider" min="0" max="20" step="1" value="0">
+                <input type="range" id="input-margin" class="config-slider" min="0" max="10" step="1" value="0">
             </div>
 
             <div class="config-group">
@@ -267,7 +267,7 @@
                     <span class="config-title" data-i18n="cfgFontSize">ラベル文字サイズ</span>
                     <span id="val-fontSize" class="config-value">12px</span>
                 </div>
-                <input type="range" id="input-fontSize" class="config-slider" min="8" max="16" step="1" value="12">
+                <input type="range" id="input-fontSize" class="config-slider" min="8" max="14" step="1" value="12">
             </div>
 
         </div>
@@ -388,10 +388,10 @@
         <span style="margin-left: 5px; opacity: 0.8;">| Powered by <a href="https://pin-weather.pro/" target="_blank" style="color: #888;">Pin-Weather Pro</a></span><br>
     </div>
 
-    <div id="user-guide-container" style="text-align: left; margin: 10px 20px; padding: 5px; background: #f9f9f9; border-radius: 12px; border: 1px solid #eee;">
+<div id="user-guide-container" style="text-align: left; margin: 10px 20px; padding: 5px; background: #f9f9f9; border-radius: 12px; border: 1px solid #eee;">
         <h3 id="guide-main-title" data-i18n="guideMainTitle" style="font-size: 14px; margin-bottom: 10px; color: #333; border-left: 4px solid #007bff; padding-left: 8px;">Pin-Weather.Pro 活用ガイド</h3>
         
-        <details class="guide-item" style="margin-bottom: 8px;">
+        <details class="guide-item" style="margin-bottom: 8px;" open>
             <summary id="guide-label-1" data-i18n="guideLabel1" style="cursor: pointer; font-size: 13px; font-weight: bold; color: #007bff; outline: none;">16日間気象予報・8日間海洋気象予報</summary>
             <div id="guide-body-1" data-i18n="guideBody1" style="padding: 10px; font-size: 12px; color: #444; line-height: 1.6;">
                 風速・風向・気温などの気象データは<strong>最大16日間</strong>表示。<br>
@@ -400,7 +400,7 @@
             </div>
         </details>
 
-        <details class="guide-item" style="margin-bottom: 8px;">
+        <details class="guide-item" style="margin-bottom: 8px;" open>
             <summary id="guide-label-2" data-i18n="guideLabel2" style="cursor: pointer; font-size: 13px; font-weight: bold; color: #007bff; outline: none;">MySpots 10箇所登録</summary>
             <div id="guide-body-2" data-i18n="guideBody2" style="padding: 10px; font-size: 12px; color: #444; line-height: 1.6;">
                 お気に入りのゲレンデやマリーナを最大10箇所まで保存可能。登録した地点はタブで簡単に切り替え可能。各地点の天気をすぐに確認できます。<br><br>
@@ -413,7 +413,7 @@
             </div>
         </details>
 
-        <details class="guide-item">
+        <details class="guide-item" open>
             <summary id="guide-label-3" data-i18n="guideLabel3" style="cursor: pointer; font-size: 13px; font-weight: bold; color: #007bff; outline: none;">自分専用表示カスタマイズ</summary>
             <div id="guide-body-3" data-i18n="guideBody3" style="padding: 10px; font-size: 12px; color: #444; line-height: 1.6;">
                 <strong>風向色付設定</strong>ボタンから色付けする風向を指定可能。<br>
@@ -421,7 +421,6 @@
             </div>
         </details>
     </div>
-</div>
 
 <div id="tooltip" class="tooltip"></div>
 
