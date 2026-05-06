@@ -1989,6 +1989,7 @@ function getWindDirText(deg) { return windDirs[Math.round(deg / 22.5) % 16]; }
  * 効率的なキャッシュ管理とエラーハンドリングを両立
  */
 async function fetchWithCache(lat, lon) {
+    console.time("  => Sub: Cache Check/Read"); // 【計測】キャッシュ処理開始
     const cacheKey = `weather_cache_${lat.toFixed(3)}_${lon.toFixed(3)}`;
     const cached = localStorage.getItem(cacheKey);
     const now = Date.now();
@@ -2013,6 +2014,7 @@ async function fetchWithCache(lat, lon) {
                 (parsed.data && parsed.data.time && parsed.data.time.length === fDays * 24) &&
                 parsed.tUnit === tUnit &&
                 parsed.wUnit === wUnit) {
+                console.timeEnd("  => Sub: Cache Check/Read"); // キャッシュヒットで終了
                 return { timestamp: parsed.timestamp, data: parsed.data };
             } else {
                 // 期限切れ、リロード、または設定（日数・単位）変更ならキャッシュを消去
@@ -2022,17 +2024,31 @@ async function fetchWithCache(lat, lon) {
             localStorage.removeItem(cacheKey);
         }
     }
+    console.timeEnd("  => Sub: Cache Check/Read"); // キャッシュミスまたは無効で終了
 
     // API取得（forecast_days, temperature_unit, wind_speed_unit を動的に設定）
     const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&forecast_days=${fDays}&temperature_unit=${tUnit}&wind_speed_unit=${wUnit}`;
     const mUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto&forecast_days=${fDays}&temperature_unit=${tUnit}&cell_selection=sea`;
 
+    console.time("  => Sub: Total API Fetch Time"); // 【計測】並列処理全体の開始
     try {
         const [wRes, mRes] = await Promise.all([
-            fetch(wUrl).then(r => { if(!r.ok) throw new Error(); return r.json(); }),
-            fetch(mUrl).then(r => { if(!r.ok) throw new Error(); return r.json(); })
+            (async () => {
+                console.time("    -> API 1: Weather Fetch"); // 【計測】気象API開始
+                const res = await fetch(wUrl).then(r => { if(!r.ok) throw new Error(); return r.json(); });
+                console.timeEnd("    -> API 1: Weather Fetch"); // 【計測】気象API終了
+                return res;
+            })(),
+            (async () => {
+                console.time("    -> API 2: Marine Fetch"); // 【計測】海洋API開始
+                const res = await fetch(mUrl).then(r => { if(!r.ok) throw new Error(); return r.json(); });
+                console.timeEnd("    -> API 2: Marine Fetch"); // 【計測】海洋API終了
+                return res;
+            })()
         ]);
+        console.timeEnd("  => Sub: Total API Fetch Time"); // 【計測】並列処理全体の終了
 
+        console.time("  => Sub: Merging & Storage"); // 【計測】データ保存処理
         const mergedData = { ...wRes.hourly, ...mRes.hourly };
         // キャッシュデータに現在の単位設定を保存
         const cacheData = { 
@@ -2044,9 +2060,12 @@ async function fetchWithCache(lat, lon) {
 
         // 最新データを保存
         localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+        console.timeEnd("  => Sub: Merging & Storage");
+        
         return cacheData;
 
     } catch (error) {
+        console.timeEnd("  => Sub: Total API Fetch Time");
         console.error("API取得失敗:", error);
         if (cached) {
             try {
@@ -2172,6 +2191,7 @@ let tooltipTimer = null;
  * メインサブルーチン：描画処理
  */
 async function draw() {
+    console.time("Total Draw Process"); // 【計測】全体開始
     // 描画の直前に、現在の地点に合わせた風向設定を読み込む
     syncWindFilterWithCurrentSpot();
 
@@ -2185,10 +2205,14 @@ async function draw() {
         const params = new URLSearchParams(window.location.search);
         const isWidget = params.get('mode') === 'widget';
         
+        console.time("1. Data Fetch (Cache)"); // 【計測】データ取得
         allData = await fetchWithCache(currentLat, currentLon);
+        console.timeEnd("1. Data Fetch (Cache)");
+
         const svgW = document.getElementById('svg-weather');
         if (!svgW || !allData || !allData.data) return;
 
+        console.time("2. Layout Setup"); // 【計測】計算とレイアウト設定
         // 【追加】地点切り替え時の風向設定を特定
         const currentSpot = mySpots.find(s => 
             Math.abs(s.lat - currentLat) < 0.0001 && 
@@ -2249,7 +2273,9 @@ async function draw() {
             secMarine.style.height = subH + "px"; 
             secMarine.style.marginBottom = "0px"; 
         }
-        
+        console.timeEnd("2. Layout Setup");
+
+        console.time("3. Weather Icon & Rain View"); // 【計測】天気・降水描画
         let wHtml = "";
         const pData = allData.data.precipitation ? allData.data.precipitation.slice(startIdx) : [];
         const pMax = Math.ceil(Math.max(...pData, 1.0) / 5) * 5; 
@@ -2275,7 +2301,9 @@ async function draw() {
         }
 
         svgW.innerHTML = wHtml;
+        console.timeEnd("3. Weather Icon & Rain View");
 
+        console.time("4. Section Rendering (Wind/Temp/Marine)"); // 【計測】各セクション描画
         const svgWind = document.getElementById("svg-wind");
         if (svgWind) svgWind.style.height = `${windH}px`; 
         
@@ -2300,12 +2328,17 @@ async function draw() {
             const valM = document.getElementById("val-svg-marine");
             if (valM) valM.innerHTML = "";
         }
+        console.timeEnd("4. Section Rendering (Wind/Temp/Marine)");
 
+        console.time("5. Finalize Events"); // 【計測】仕上げのイベント登録
         updateWindLegend();
         resetGraphScroll();
         initScrollEvent(hScale, startIdx);
+        initScrollEvent(hScale, startIdx); // 元コードの重複をそのまま維持
         initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime);
+        console.timeEnd("5. Finalize Events");
 
+        console.timeEnd("Total Draw Process"); // 【計測】全体終了
     } catch (e) { 
         console.error("Critical Draw Error:", e);
         if (typeof initApp === 'function') { initApp(); }
