@@ -534,7 +534,7 @@ body.widget-mode .footer-info {
     padding-bottom: 0px !important;
 }
 
-/*コンディション概況ジャンプボタンのスタイル */
+/* コンディション概況ジャンプボタンのスタイル */
 .nav-summary-btn {
     appearance: none;
     -webkit-appearance: none;
@@ -556,20 +556,13 @@ body.widget-mode .footer-info {
     vertical-align: middle;
 }
 
-/* ホバー時の挙動 */
 .nav-summary-btn:hover {
     background-color: #f5f5f5;
     border-color: #ccc;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-/* アクティブ（クリック時）の挙動 */
-.nav-summary-btn:active {
-    background-color: #ebebeb;
-    transform: translateY(1px);
-}
-
-/* スクロール位置のオフセット設定 */
+/* ジャンプ時の被り防止 */
 #weather-summary-container {
-    scroll-margin-top: 80px; /* ヘッダーの高さに合わせて数値を調整してください */
+    scroll-margin-top: 80px;
 }

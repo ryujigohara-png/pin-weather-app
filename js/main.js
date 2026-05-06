@@ -164,7 +164,26 @@ const i18n = {
             noLocationError: "地点情報がありません。",
             editSpotGuide: "地点名を編集、または削除します",
             btnDelete: "削除",
-            confirmDeletePrefix: "本当に削除しますか："
+            confirmDeletePrefix: "本当に削除しますか：",
+
+            condition_summary_btn: "📋 コンディション概況",
+            summary_title: "【コンディション概況】",
+            as_of: "現在",
+            tomorrow: "明日",
+            analyzing: "予報データを分析中...",
+            weather_now: "現在は{weather}ですが、",
+            weather_change: "{day}{time}時頃から天気が変わる見込みです。",
+            stable_weather: "向こう24時間は安定した天気が続く予報です。",
+            temp_info: "気温は最高{max}℃、最低{min}℃で、",
+            temp_diff_warn: "寒暖差にご注意ください。",
+            temp_stable: "落ち着いた推移となるでしょう。",
+            wind_current: "風は現在、{dir}の風が{speed}{unit}ですが、",
+            wind_strengthen: "{day}{time}時頃にかけて強まり、最大で{maxDir}の風が{maxSpeed}{unit}に達する予報です。",
+            wind_stable: "今後も{dir}寄りの風が安定して吹く見込みです。",
+            wave_current: "波高は現在{current}mですが、",
+            wave_rise: "次第に高まり、{future}m前後に達する傾向にあります。",
+            wave_fall: "徐々に落ち着き、{future}m前後まで下がる見込みです。",
+            wave_stable: "明日まで大きな変化はなく、概ね安定した海面コンディションが続くでしょう。"
         },
         'en': {
             // --- Graph & Tooltip ---
@@ -280,7 +299,26 @@ const i18n = {
             noLocationError: "No location information available.",
             editSpotGuide: "Edit or delete the spot name",
             btnDelete: "Delete",
-            confirmDeletePrefix: "Are you sure you want to delete:"
+            confirmDeletePrefix: "Are you sure you want to delete:",
+
+            condition_summary_btn: "📋 Condition Summary",
+            summary_title: "[Condition Summary] ",
+            as_of: "As of",
+            tomorrow: "tomorrow ",
+            analyzing: "Analyzing forecast data...",
+            weather_now: "Currently {weather}, ",
+            weather_change: "weather is expected to change around {day}{time}:00.",
+            stable_weather: "Stable weather is expected for the next 24 hours.",
+            temp_info: "High: {max}℃, Low: {min}℃. ",
+            temp_diff_warn: "Watch for temperature swings.",
+            temp_stable: "Temperatures will remain steady.",
+            wind_current: "Wind is {dir} at {speed}{unit}, ",
+            wind_strengthen: "expected to strengthen to {maxSpeed}{unit} from {maxDir} around {day}{time}:00.",
+            wind_stable: "Stable {dir} winds are expected to continue.",
+            wave_current: "Wave height is {current}m, ",
+            wave_rise: "expected to rise to around {future}m.",
+            wave_fall: "expected to subside to around {future}m.",
+            wave_stable: "expected to remain stable through tomorrow."
         }
     },
     t(key) { 
@@ -2241,19 +2279,20 @@ function getAzimuth(degrees) {
 
 /**
  * サブルーチン：気象データから概況文章を生成
- * ツールチップ（赤線）の時刻と数値を基準に、24時間の変化を分析します。
+ * 全ての文言を i18n 辞書から取得し、多言語および構造化に対応します。
  */
 function generateWeatherSummary(data) {
-    // データチェック
+    // データ異常系チェック
     if (!data || !data.time || !data.weather_code || !data.wind_speed_10m) {
-        return "予報データを分析中...";
+        return i18n.t('analyzing');
     }
+
+    const isJa = i18n._currentLang === 'ja';
 
     // 1. 現在時刻（赤線）に最も近いインデックスを特定
     const now = new Date();
     let nowIdx = 0;
     let minDiff = Infinity;
-    
     for (let i = 0; i < data.time.length; i++) {
         const diff = Math.abs(new Date(data.time[i]) - now);
         if (diff < minDiff) {
@@ -2262,45 +2301,52 @@ function generateWeatherSummary(data) {
         }
     }
 
-    const baseTime = new Date(data.time[nowIdx]); // 解析の起点時刻
-    const targetHours = 24; 
+    const baseTime = new Date(data.time[nowIdx]);
+    const targetHours = 24;
 
-    // タイトル用の時刻文字列を作成 (m/d(曜) hh:mm 形式)
-    const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
-    const month = baseTime.getMonth() + 1;
-    const date = baseTime.getDate();
-    const day = dayNames[baseTime.getDay()];
+    // 時刻ヘッダーの生成（辞書内の days, months を使用）
+    const langDict = i18n.dict[i18n._currentLang];
+    const dayName = langDict.days[baseTime.getDay()];
+    const monthNum = baseTime.getMonth(); // 0-11
+    const dateNum = baseTime.getDate();
     const hours = baseTime.getHours().toString().padStart(2, '0');
     const minutes = baseTime.getMinutes().toString().padStart(2, '0');
-    const timeHeader = `${month}/${date}(${day}) ${hours}:${minutes}`;
 
-    // 単位の取得
-    const tUnit = (typeof viewConfig !== 'undefined' && viewConfig.temperatureUnit === 'fahrenheit') ? '℉' : '℃';
+    let timeHeader = "";
+    if (isJa) {
+        // 日本語形式: 5/6(水) 22:00
+        timeHeader = `${monthNum + 1}/${dateNum}(${dayName}) ${hours}:${minutes}`;
+    } else {
+        // 英語形式: Wed, May 6th 22:00
+        const monthName = langDict.months[monthNum];
+        // 序数 (st, nd, rd, th) の判定
+        let suffix = "th";
+        if (dateNum % 10 === 1 && dateNum !== 11) suffix = "st";
+        else if (dateNum % 10 === 2 && dateNum !== 12) suffix = "nd";
+        else if (dateNum % 10 === 3 && dateNum !== 13) suffix = "rd";
+        
+        timeHeader = `${dayName}, ${monthName} ${dateNum}${suffix} ${hours}:${minutes}`;
+    }
+
+    // 単位の設定
     const wUnit = (typeof viewConfig !== 'undefined') ? 
-                  (viewConfig.windSpeedUnit === 'kn' ? 'kn' : 
-                   viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 
-                   viewConfig.windSpeedUnit === 'mph' ? 'mph' : 'm/s') : 'm/s';
+                (viewConfig.windSpeedUnit === 'kn' ? 'kn' : 
+                viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 
+                viewConfig.windSpeedUnit === 'mph' ? 'mph' : 'm/s') : 'm/s';
 
     // --- 1. 天気と気温の解析 ---
-    let weatherText = "";
     const currentCode = data.weather_code[nowIdx];
     const currentWeatherName = getI18nWeatherName(currentCode);
-    
     const isClearGroup = (code) => [0, 1, 2].includes(code);
-    
+
     let changeIdx = -1;
     const endIdx = Math.min(nowIdx + targetHours, data.time.length - 1);
     for (let i = nowIdx + 1; i <= endIdx; i++) {
-        if (isClearGroup(currentCode)) {
-            if (!isClearGroup(data.weather_code[i])) {
-                changeIdx = i;
-                break;
-            }
-        } else {
-            if (data.weather_code[i] !== currentCode) {
-                changeIdx = i;
-                break;
-            }
+        const isCurrentlyClear = isClearGroup(currentCode);
+        const isNextClear = isClearGroup(data.weather_code[i]);
+        if (isCurrentlyClear !== isNextClear || (!isCurrentlyClear && data.weather_code[i] !== currentCode)) {
+            changeIdx = i;
+            break;
         }
     }
 
@@ -2309,54 +2355,75 @@ function generateWeatherSummary(data) {
     const minTemp = Math.min(...temps);
     const tempDiff = maxTemp - minTemp;
 
-    weatherText = `現在は${currentWeatherName}ですが、`;
+    // 天気文章の組み立て
+    let weatherFinal = i18n.t('weather_now').replace('{weather}', currentWeatherName);
     if (changeIdx !== -1) {
         const cTime = new Date(data.time[changeIdx]);
-        const dayLabel = cTime.getDate() !== baseTime.getDate() ? "明日" : "";
-        weatherText += `${dayLabel}${cTime.getHours()}時頃から天気が変わる見込みです。`;
+        const dayLabel = cTime.getDate() !== baseTime.getDate() ? i18n.t('tomorrow') : "";
+        weatherFinal += i18n.t('weather_change')
+            .replace('{day}', dayLabel)
+            .replace('{time}', cTime.getHours());
     } else {
-        weatherText += `向こう24時間は安定した天気が続く予報です。`;
+        weatherFinal += i18n.t('stable_weather');
     }
-    weatherText += `気温は最高${maxTemp.toFixed(1)}${tUnit}、最低${minTemp.toFixed(1)}${tUnit}で、${tempDiff >= 10 ? '寒暖差にご注意ください。' : '落ち着いた推移となるでしょう。'}`;
+
+    // 気温情報の組み立て
+    let tempPart = i18n.t('temp_info')
+        .replace('{max}', maxTemp.toFixed(1))
+        .replace('{min}', minTemp.toFixed(1));
+    tempPart += (tempDiff >= 10) ? i18n.t('temp_diff_warn') : i18n.t('temp_stable');
+    weatherFinal += tempPart;
 
     // --- 2. 風向・風速の解析 ---
-    let windText = "";
     const currentWindSpeed = data.wind_speed_10m[nowIdx];
     const currentWindDir = getAzimuth(data.wind_direction_10m[nowIdx]);
-    
     const winds = data.wind_speed_10m.slice(nowIdx, endIdx + 1);
     const maxWind = Math.max(...winds);
-    const relativeMaxIdx = winds.indexOf(maxWind);
-    const maxWindIdx = nowIdx + relativeMaxIdx;
+    const maxWindIdx = nowIdx + winds.indexOf(maxWind);
     const mTime = new Date(data.time[maxWindIdx]);
 
-    windText = `風は現在、${currentWindDir}の風が${currentWindSpeed.toFixed(1)}${wUnit}ですが、`;
+    let windFinal = i18n.t('wind_current')
+        .replace('{dir}', currentWindDir)
+        .replace('{speed}', currentWindSpeed.toFixed(1))
+        .replace('{unit}', wUnit);
+
     if (maxWind - currentWindSpeed >= 3) {
-        const dayLabel = mTime.getDate() !== baseTime.getDate() ? "明日" : "";
-        const maxWindDir = getAzimuth(data.wind_direction_10m[maxWindIdx]);
-        windText += `${dayLabel}${mTime.getHours()}時頃にかけて強まり、最大で${maxWindDir}の風が${maxWind.toFixed(1)}${wUnit}に達する予報です。`;
+        const dayLabel = mTime.getDate() !== baseTime.getDate() ? i18n.t('tomorrow') : "";
+        const mWindDir = getAzimuth(data.wind_direction_10m[maxWindIdx]);
+        windFinal += i18n.t('wind_strengthen')
+            .replace('{day}', dayLabel)
+            .replace('{time}', mTime.getHours())
+            .replace('{maxDir}', mWindDir)
+            .replace('{maxSpeed}', maxWind.toFixed(1))
+            .replace('{unit}', wUnit);
     } else {
-        windText += `今後も${currentWindDir}寄りの風が安定して吹く見込みです。`;
+        windFinal += i18n.t('wind_stable').replace('{dir}', currentWindDir);
     }
 
     // --- 3. 波の解析 ---
-    let waveText = "";
+    let waveFinal = "";
     if (data.wave_height) {
         const currentWave = data.wave_height[nowIdx];
         const futureWave = data.wave_height[endIdx];
         const waveDiff = futureWave - currentWave;
-
-        waveText = `波高は現在${currentWave.toFixed(2)}mですが、`;
+        waveFinal = i18n.t('wave_current').replace('{current}', currentWave.toFixed(2));
+        
         if (waveDiff >= 0.3) {
-            waveText += `次第に高まり、${futureWave.toFixed(2)}m前後に達する傾向にあります。`;
+            waveFinal += i18n.t('wave_rise').replace('{future}', futureWave.toFixed(2));
         } else if (waveDiff <= -0.3) {
-            waveText += `徐々に落ち着き、${futureWave.toFixed(2)}m前後まで下がる見込みです。`;
+            waveFinal += i18n.t('wave_fall').replace('{future}', futureWave.toFixed(2));
         } else {
-            waveText += `明日まで大きな変化はなく、概ね安定した海面コンディションが続くでしょう。`;
+            waveFinal += i18n.t('wave_stable');
         }
     }
 
-    return `【コンディション概況】${timeHeader}現在\n${weatherText}\n${windText}\n${waveText}`;
+    // タイトルの取得
+    let title = i18n.t('summary_title');
+    // タイトルの前後が [] や 【】 でない場合に太字化するため、辞書側の設定を優先しつつ
+    // もし英字タイトルなら太字（markdown的```ではなく、プレーンテキストに流し込む前提なのでそのまま結合）
+    // 最終的なinnerTextで改行も含めて整形
+
+    return `${title} ${timeHeader} ${i18n.t('as_of')}\n${weatherFinal}\n${windFinal}\n${waveFinal}`;
 }
 
 // ツールチップ消去用タイマー変数
