@@ -281,6 +281,10 @@
     </div>
 </div>
 
+<button class="nav-summary-btn" onclick="scrollToSummary()">
+    📋 コンディション概況
+</button>
+
 <div class="main-card">
     <div class="scroll-container" id="scroll-root">
         <div class="chart-stage" id="stage">
@@ -344,6 +348,13 @@
     <div class="legend-wind-item">
         <span class="legend-wind-rect" style="background: #ccc;"></span>
         <span class="legend-wind-label">…</span>
+    </div>
+</div>
+
+<!-- id="condition-summary-target" を追加するだけ（他は一切変えません） -->
+<div id="weather-summary-container" id="condition-summary-target" style="margin: 10px 0; padding: 15px; background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 8px;">
+    <div id="weather-summary" style="white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: #333; font-family: sans-serif;">
+        <!-- ここに generateWeatherSummary の戻り値が流し込まれます -->
     </div>
 </div>
 
