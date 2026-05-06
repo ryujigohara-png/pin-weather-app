@@ -568,3 +568,8 @@ body.widget-mode .footer-info {
     background-color: #ebebeb;
     transform: translateY(1px);
 }
+
+/* スクロール位置のオフセット設定 */
+#weather-summary-container {
+    scroll-margin-top: 80px; /* ヘッダーの高さに合わせて数値を調整してください */
+}
