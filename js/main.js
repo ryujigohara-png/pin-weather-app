@@ -1971,8 +1971,11 @@ function onMapClick(e) {
     }
 }
 
+/**
+ * サブルーチン：座標から住所情報を取得し、モーダル内のボタンに機能を割り当てる
+ * グラフ表示時は1番目タブに地名を挿入し、内部座標(currentLat/Lon)を同期させます。
+ */
 async function fetchAddressInfo(lat, lng) {
-    // 【DEBUG】関数開始時の座標を確認
     console.log(`[DEBUG] fetchAddressInfo started: lat=${lat}, lon=${lng}`);
 
     const statusEl = document.getElementById('map-status');
@@ -1982,7 +1985,6 @@ async function fetchAddressInfo(lat, lng) {
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=${i18n._currentLang}`);
         const data = await res.json();
         
-        // 【DEBUG】APIから返ってきた住所データを確認
         console.log(`[DEBUG] Address Data:`, data.address);
 
         const addr = data.address;
@@ -1990,42 +1992,56 @@ async function fetchAddressInfo(lat, lng) {
         const district = addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district || "";
         const defaultName = (city + district) || i18n.t('mapNewSpot');
 
+        // --- 「MySpotsに登録」ボタンの制御 (既存ロジックを維持) ---
         const saveSpotBtn = document.getElementById('save-spot-btn');
         if (saveSpotBtn) {
             saveSpotBtn.onclick = () => {
-                // 【DEBUG】ボタンが押された瞬間の lat, lng を確認
-                console.log(`[DEBUG] Save button clicked for: ${defaultName} (lat:${lat}, lon:${lng})`);
-
                 showAppDialog({
                     title: defaultName,
                     messageKey: 'mapSavePrompt',
                     inputValue: defaultName,
                     onSave: (spotName) => {
-                        // 【DEBUG】ダイアログで保存が押された後の最終確認
-                        console.log(`[DEBUG] Dialog onSave triggered: name=${spotName}, lat=${lat}, lon=${lng}`);
-
                         if (!spotName) return;
-
-                        if (!checkSpotLimit(spotName)) {
-                            console.warn(`[DEBUG] checkSpotLimit returned false for: ${spotName}`);
-                            return;
-                        }
+                        if (!checkSpotLimit(spotName)) return;
 
                         const filtered = mySpots.filter(s => s.label !== spotName);
                         mySpots = [{ lat, lon: lng, label: spotName }, ...filtered];
-                        
                         localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
                         
-                        // 【DEBUG】ストレージ保存完了の確認
-                        console.log("[DEBUG] Storage update success. Current mySpots length:", mySpots.length);
-
+                        // 描画とタブ更新
                         updateLocation(lat, lng, spotName);
-                        renderTabs(spotName);
+                        renderTabs(spotName); 
                         closeModal('map-modal');
                     }
                 });
             };
             saveSpotBtn.disabled = false;
+        }
+
+        // --- 「グラフ表示」ボタンの制御 (要件に基づき新規実装) ---
+        const tempViewBtn = document.getElementById('temp-view-btn');
+        if (tempViewBtn) {
+            tempViewBtn.onclick = () => {
+                console.log(`[DEBUG] Temp Graph View: ${defaultName} (lat:${lat}, lon:${lng})`);
+                
+                // 1. 内部変数を📌地点の座標とラベルで更新
+                // これにより Map ボタンを押した際もこの地点が開かれるようになります
+                currentLat = lat;
+                currentLon = lng;
+                currentLabel = defaultName;
+
+                // 2. 提供された updateLocation を実行（描画処理）
+                updateLocation(lat, lng, defaultName);
+
+                // 3. 提供された renderTabs を実行
+                // activeOverrideLabel として defaultName を渡すことで、
+                // mySpotsには保存せず「1番目のタブ」にこの地名を挿入・表示させます
+                renderTabs(defaultName); 
+
+                // 4. モーダルを閉じる
+                closeModal('map-modal');
+            };
+            tempViewBtn.disabled = false;
         }
         
         if (statusEl) statusEl.innerText = "📍：" + defaultName;
