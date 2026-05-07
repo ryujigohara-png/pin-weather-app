@@ -430,7 +430,7 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 const defaultSpots = [
-    {lat: 31.337, lon: 130.795, label: "高須沖(鹿児島県)"},
+//    {lat: 31.337, lon: 130.795, label: "高須沖(鹿児島県)"},
     {lat: 35.30, lon: 139.48, label: "江の島沖(神奈川県)"}
 ];
 
