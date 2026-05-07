@@ -2346,19 +2346,15 @@ function getAzimuth(degrees) {
 
 /**
  * サブルーチン：気象データから概況文章を生成
- * 全ての文言を i18n 辞書から取得し、多言語および構造化に対応します。
- */
-/**
- * サブルーチン：気象データから概況文章を生成
- * getLocalizedDate を活用して日付処理を共通化し、描画時刻と地名を反映します。
+ * 値が null の場合でもクラッシュしないようにガードを追加
  */
 function generateWeatherSummary(data, label) {
     // データ異常系チェック
     if (!data || !data.time || !data.weather_code || !data.wind_speed_10m) {
-        return i18n.t('analyzing');
+        return typeof i18n !== 'undefined' ? i18n.t('analyzing') : "Analyzing...";
     }
 
-    const isJa = i18n._currentLang === 'ja';
+    const isJa = typeof i18n !== 'undefined' && i18n._currentLang === 'ja';
 
     // 1. 現在時刻（描画時刻）を取得
     const now = new Date();
@@ -2374,22 +2370,17 @@ function generateWeatherSummary(data, label) {
         }
     }
 
-    // 3. 時刻ヘッダーの生成（getLocalizedDate を使用）
+    // 3. 時刻ヘッダーの生成
     const dateStr = getLocalizedDate(now);
     const hours = now.getHours().toString().padStart(2, '0');
     const minutes = now.getMinutes().toString().padStart(2, '0');
 
-    let timeHeader = "";
-    if (isJa) {
-        // 日本語形式: 地名：4/1(水) 22:15
-        timeHeader = `${label}：${dateStr} ${hours}:${minutes}`;
-    } else {
-        // 英語形式: label: Wed, Apr 1st 22:15
-        timeHeader = `${label}: ${dateStr} ${hours}:${minutes}`;
-    }
+    let timeHeader = isJa 
+        ? `${label}：${dateStr} ${hours}:${minutes}` 
+        : `${label}: ${dateStr} ${hours}:${minutes}`;
 
-    const baseTime = new Date(data.time[nowIdx]);
     const targetHours = 24;
+    const endIdx = Math.min(nowIdx + targetHours, data.time.length - 1);
 
     // 単位の設定
     const wUnit = (typeof viewConfig !== 'undefined') ? 
@@ -2403,7 +2394,6 @@ function generateWeatherSummary(data, label) {
     const isClearGroup = (code) => [0, 1, 2].includes(code);
 
     let changeIdx = -1;
-    const endIdx = Math.min(nowIdx + targetHours, data.time.length - 1);
     for (let i = nowIdx + 1; i <= endIdx; i++) {
         const isCurrentlyClear = isClearGroup(currentCode);
         const isNextClear = isClearGroup(data.weather_code[i]);
@@ -2413,73 +2403,78 @@ function generateWeatherSummary(data, label) {
         }
     }
 
-    const temps = data.temperature_2m.slice(nowIdx, endIdx + 1);
-    const maxTemp = Math.max(...temps);
-    const minTemp = Math.min(...temps);
-    const tempDiff = maxTemp - minTemp;
-
+    // 気温データの抽出と null チェック
+    const rawTemps = data.temperature_2m.slice(nowIdx, endIdx + 1).filter(v => v !== null && typeof v === 'number');
+    let tempPart = "";
     let weatherFinal = i18n.t('weather_now').replace('{weather}', currentWeatherName);
+
     if (changeIdx !== -1) {
         const cTime = new Date(data.time[changeIdx]);
         const dayLabel = cTime.getDate() !== now.getDate() ? i18n.t('tomorrow') : "";
-        weatherFinal += i18n.t('weather_change')
-            .replace('{day}', dayLabel)
-            .replace('{time}', cTime.getHours());
+        weatherFinal += i18n.t('weather_change').replace('{day}', dayLabel).replace('{time}', cTime.getHours());
     } else {
         weatherFinal += i18n.t('stable_weather');
     }
 
-    let tempPart = i18n.t('temp_info')
-        .replace('{max}', maxTemp.toFixed(1))
-        .replace('{min}', minTemp.toFixed(1));
-    tempPart += (tempDiff >= 10) ? i18n.t('temp_diff_warn') : i18n.t('temp_stable');
+    if (rawTemps.length > 0) {
+        const maxTemp = Math.max(...rawTemps);
+        const minTemp = Math.min(...rawTemps);
+        const tempDiff = maxTemp - minTemp;
+        tempPart = i18n.t('temp_info').replace('{max}', maxTemp.toFixed(1)).replace('{min}', minTemp.toFixed(1));
+        tempPart += (tempDiff >= 10) ? i18n.t('temp_diff_warn') : i18n.t('temp_stable');
+    }
     weatherFinal += tempPart;
 
     // --- 2. 風向・風速の解析 ---
     const currentWindSpeed = data.wind_speed_10m[nowIdx];
     const currentWindDir = getAzimuth(data.wind_direction_10m[nowIdx]);
-    const winds = data.wind_speed_10m.slice(nowIdx, endIdx + 1);
-    const maxWind = Math.max(...winds);
-    const maxWindIdx = nowIdx + winds.indexOf(maxWind);
-    const mTime = new Date(data.time[maxWindIdx]);
+    const rawWinds = data.wind_speed_10m.slice(nowIdx, endIdx + 1).filter(v => v !== null && typeof v === 'number');
 
-    let windFinal = i18n.t('wind_current')
-        .replace('{dir}', currentWindDir)
-        .replace('{speed}', currentWindSpeed.toFixed(1))
-        .replace('{unit}', wUnit);
-
-    if (maxWind - currentWindSpeed >= 3) {
-        const dayLabel = mTime.getDate() !== now.getDate() ? i18n.t('tomorrow') : "";
-        const mWindDir = getAzimuth(data.wind_direction_10m[maxWindIdx]);
-        windFinal += i18n.t('wind_strengthen')
-            .replace('{day}', dayLabel)
-            .replace('{time}', mTime.getHours())
-            .replace('{maxDir}', mWindDir)
-            .replace('{maxSpeed}', maxWind.toFixed(1))
+    let windFinal = "";
+    if (currentWindSpeed !== null && typeof currentWindSpeed === 'number') {
+        windFinal = i18n.t('wind_current')
+            .replace('{dir}', currentWindDir)
+            .replace('{speed}', currentWindSpeed.toFixed(1))
             .replace('{unit}', wUnit);
-    } else {
-        windFinal += i18n.t('wind_stable').replace('{dir}', currentWindDir);
+
+        if (rawWinds.length > 0) {
+            const maxWind = Math.max(...rawWinds);
+            if (maxWind - currentWindSpeed >= 3) {
+                const maxWindIdx = nowIdx + data.wind_speed_10m.slice(nowIdx, endIdx + 1).indexOf(maxWind);
+                const mTime = new Date(data.time[maxWindIdx]);
+                const dayLabel = mTime.getDate() !== now.getDate() ? i18n.t('tomorrow') : "";
+                const mWindDir = getAzimuth(data.wind_direction_10m[maxWindIdx]);
+                windFinal += i18n.t('wind_strengthen')
+                    .replace('{day}', dayLabel)
+                    .replace('{time}', mTime.getHours())
+                    .replace('{maxDir}', mWindDir)
+                    .replace('{maxSpeed}', maxWind.toFixed(1))
+                    .replace('{unit}', wUnit);
+            } else {
+                windFinal += i18n.t('wind_stable').replace('{dir}', currentWindDir);
+            }
+        }
     }
 
     // --- 3. 波の解析 ---
     let waveFinal = "";
-    if (data.wave_height) {
+    if (data.wave_height && data.wave_height[nowIdx] !== null) {
         const currentWave = data.wave_height[nowIdx];
         const futureWave = data.wave_height[endIdx];
-        const waveDiff = futureWave - currentWave;
-        waveFinal = i18n.t('wave_current').replace('{current}', currentWave.toFixed(2));
-        
-        if (waveDiff >= 0.3) {
-            waveFinal += i18n.t('wave_rise').replace('{future}', futureWave.toFixed(2));
-        } else if (waveDiff <= -0.3) {
-            waveFinal += i18n.t('wave_fall').replace('{future}', futureWave.toFixed(2));
-        } else {
-            waveFinal += i18n.t('wave_stable');
+        if (typeof currentWave === 'number' && typeof futureWave === 'number') {
+            const waveDiff = futureWave - currentWave;
+            waveFinal = i18n.t('wave_current').replace('{current}', currentWave.toFixed(2));
+            if (waveDiff >= 0.3) {
+                waveFinal += i18n.t('wave_rise').replace('{future}', futureWave.toFixed(2));
+            } else if (waveDiff <= -0.3) {
+                waveFinal += i18n.t('wave_fall').replace('{future}', futureWave.toFixed(2));
+            } else {
+                waveFinal += i18n.t('wave_stable');
+            }
         }
     }
 
     let title = i18n.t('summary_title');
-
     return `${title} ${timeHeader} ${i18n.t('as_of')}\n${weatherFinal}\n${windFinal}\n${waveFinal}`;
 }
 
@@ -2491,6 +2486,7 @@ let tooltipTimer = null;
  */
 async function draw() {
     console.time("Total Draw Process"); // 【計測】全体開始
+    
     // 描画の直前に、現在の地点に合わせた風向設定を読み込む
     syncWindFilterWithCurrentSpot();
 
@@ -2507,26 +2503,25 @@ async function draw() {
         console.time("1. Data Fetch (Cache)"); // 【計測】データ取得
         allData = await fetchWithCache(currentLat, currentLon);
         if (allData) {
-            // ここで実行
             const summaryText = generateWeatherSummary(allData.data, currentLabel);
             const el = document.getElementById('weather-summary');
             if (el) {
                 el.innerText = summaryText;
             }
-            // draw(allData); 
         }
         console.timeEnd("1. Data Fetch (Cache)");
-
 
         const svgW = document.getElementById('svg-weather');
         if (!svgW || !allData || !allData.data) return;
 
         console.time("2. Layout Setup"); // 【計測】計算とレイアウト設定
-        // 【追加】地点切り替え時の風向設定を特定
+        
+        // 【最適化】地点検索をここで行い、以降使い回す
         const currentSpot = mySpots.find(s => 
             Math.abs(s.lat - currentLat) < 0.0001 && 
             Math.abs(s.lon - currentLon) < 0.0001
         );
+        
         // 地点固有の設定があればそれを使い、なければ共通設定(targetWindDirections)を使う
         const activeWindFilters = (currentSpot && currentSpot.windFilters) 
             ? currentSpot.windFilters 
@@ -2542,7 +2537,6 @@ async function draw() {
         const hScale = viewConfig.hourWidth; 
         const displayCount = totalDataCount - startIdx;
 
-        // --- ウィジェット時の高さ切り替え ---
         let windH = isWidget ? 80 : viewConfig.windHeight;
         let subH = isWidget ? 80 : viewConfig.subHeight;
         let gMargin = viewConfig.graphMargin || 0;
@@ -2616,18 +2610,15 @@ async function draw() {
         const svgWind = document.getElementById("svg-wind");
         if (svgWind) svgWind.style.height = `${windH}px`; 
         
-        // 風セクション：特定した activeWindFilters を渡す
         renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], windH, 5.0, true, false, true, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, activeWindFilters);
         
         const svgTemps = document.getElementById("svg-temps");
         if (svgTemps) svgTemps.style.height = `${subH}px`;
-        // 気温セクション：フィルタ不要のため null を渡す
         renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], subH, 5.0, false, !hasMarineData, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, null);
         
         if (hasMarineData) {
             const svgMarine = document.getElementById("svg-marine");
             if (svgMarine) svgMarine.style.height = `${subH}px`; 
-            // 海洋セクション：フィルタ不要のため null を渡す
             renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], subH, 0.5, false, true, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, null);
         } else {
             const svgM = document.getElementById("svg-marine");
@@ -2643,11 +2634,11 @@ async function draw() {
         updateWindLegend();
         resetGraphScroll();
         initScrollEvent(hScale, startIdx);
-        initScrollEvent(hScale, startIdx); // 元コードの重複をそのまま維持
+        initScrollEvent(hScale, startIdx); // 元コードの重複を維持
         initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime);
         console.timeEnd("5. Finalize Events");
 
-        console.timeEnd("Total Draw Process"); // 【計測】全体終了
+        console.timeEnd("Total Draw Process");
     } catch (e) { 
         console.error("Critical Draw Error:", e);
         if (typeof initApp === 'function') { initApp(); }
@@ -2665,10 +2656,7 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
     const valCont = document.getElementById(`val-${svgId}`);
 
     if (!svg || !dateCont) return;
-    dateCont.innerHTML = "";
-    if (isFirst && dateTop) dateTop.innerHTML = "";
-    if (isFirst && timeTop) timeTop.innerHTML = ""; 
-    
+
     const allVals = datasets.flatMap(ds => ds.data ? ds.data.slice(startIdx) : [])
                             .filter(v => typeof v === 'number' && !isNaN(v));
     if (allVals.length === 0) return;
@@ -2682,7 +2670,12 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
     }
     const range = (max - min) || 1;
     const plotHeight = height - 20; 
+    
+    // 【高速化】HTMLとDOM要素を文字列として蓄積し、最後に一括反映する
     let html = "";
+    let dateContHtml = "";
+    let dateTopHtml = "";
+    let timeTopHtml = "";
 
     for (let v = min; v <= max; v += stepY) {
         const yPosSvg = plotHeight - (((v - min) / range) * plotHeight);
@@ -2700,42 +2693,26 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
             const localizedDateStr = getLocalizedDate(d);
             const labelContent = `<span style="color:${dayColor}; font-size:${labelFS * 1.5}px;" class="notranslate">${localizedDateStr}</span>`;
 
-            const dateDiv = document.createElement('div');
-            dateDiv.className = 'sticky-date-bottom';
-            dateDiv.style.left = `${x}px`;
-            dateDiv.dataset.x = x;
+            // 文字列ベースで組み立て
+            dateContHtml += `<div class="sticky-date-bottom" style="left:${x}px;" data-x="${x}">`;
+            if (isLast) dateContHtml += labelContent;
+            dateContHtml += `</div>`;
 
             if (isFirst && dateTop) {
-                const topDiv = document.createElement('div');
-                topDiv.className = 'sticky-date-top';
-                topDiv.style.left = `${x}px`;
-                topDiv.dataset.x = x;
-                topDiv.innerHTML = labelContent;
-                dateTop.appendChild(topDiv);
-
-                const topTimeDiv = document.createElement('div');
-                topTimeDiv.style.position = 'absolute';
-                topTimeDiv.style.left = `${x}px`;
-                topTimeDiv.style.transform = 'translateX(-50%)';
-                topTimeDiv.dataset.x = x;
-                topTimeDiv.innerHTML = `<span class="label-time" style="font-size:${labelFS+4}px; display: inline-block; width: 2em; text-align: center;">${d.getHours()}</span>`;
-                timeTop.appendChild(topTimeDiv);
+                dateTopHtml += `<div class="sticky-date-top" style="left:${x}px;" data-x="${x}">${labelContent}</div>`;
+                timeTopHtml += `<div style="position:absolute; left:${x}px; transform:translateX(-50%);" data-x="${x}">
+                                    <span class="label-time" style="font-size:${labelFS+4}px; display: inline-block; width: 2em; text-align: center;">${d.getHours()}</span>
+                                </div>`;
             }
             if (isLast) {
-                dateDiv.innerHTML = labelContent;
                 html += `<text x="${x}" y="${plotHeight + 15}" class="label-time" font-size="${labelFS}" text-anchor="middle">${d.getHours()}</text>`;
             }
-            dateCont.appendChild(dateDiv);
         } else if (i % 3 === 0) {
             html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight}" class="grid-3h" />`;
             if (isFirst && timeTop) {
-                const topTimeDiv = document.createElement('div');
-                topTimeDiv.style.position = 'absolute';
-                topTimeDiv.style.left = `${x}px`;
-                topTimeDiv.style.transform = 'translateX(-50%)';
-                topTimeDiv.dataset.x = x;
-                topTimeDiv.innerHTML = `<span class="label-time" style="font-size:${labelFS+4}px; display: inline-block; width: 2em; text-align: center;">${d.getHours()}</span>`;
-                timeTop.appendChild(topTimeDiv);
+                timeTopHtml += `<div style="position:absolute; left:${x}px; transform:translateX(-50%);" data-x="${x}">
+                                    <span class="label-time" style="font-size:${labelFS+4}px; display: inline-block; width: 2em; text-align: center;">${d.getHours()}</span>
+                                </div>`;
             }
             if (isLast) {
                 html += `<text x="${x}" y="${plotHeight + 15}" class="label-time" font-size="${labelFS}" text-anchor="middle">${d.getHours()}</text>`;
@@ -2762,6 +2739,11 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
 
     datasets.forEach(ds => {
         if (ds.type === 'bar') {
+            const currentFilters = activeWindFilters || targetWindDirections;
+            const thHigh = viewConfig.windThresholdHigh;
+            const thMid  = viewConfig.windThresholdMid;
+            const thLow  = viewConfig.windThresholdLow;
+
             for(let i = startIdx; i < totalDataCount; i++){
                 const val = ds.data[i];
                 if (val === null || typeof val === 'undefined') continue;
@@ -2769,12 +2751,6 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                 const x = (i - startIdx) * hScale;
                 const deg = allData.data.wind_direction_10m[i];
                 const dirText = getWindDirText(deg);
-                const thHigh = viewConfig.windThresholdHigh;
-                const thMid  = viewConfig.windThresholdMid;
-                const thLow  = viewConfig.windThresholdLow;
-
-                // 【修正】渡された activeWindFilters があればそれを使い、なければ targetWindDirections を使う
-                const currentFilters = activeWindFilters || targetWindDirections;
 
                 let color = currentFilters.includes(dirText) 
                     ? (val >= thHigh ? '#dc143c' : val >= thMid ? '#ffa500' : val >= thLow ? '#87CEEB' : '#ccc') 
@@ -2800,7 +2776,12 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
             if (currentPoints.length > 1) { html += `<polyline class="${ds.cls}" points="${currentPoints.join(' ')}" />`; }
         }
     });
+
+    // 最後に一括でDOMに反映
     svg.innerHTML = html;
+    dateCont.innerHTML = dateContHtml;
+    if (isFirst && dateTop) dateTop.innerHTML = dateTopHtml;
+    if (isFirst && timeTop) timeTop.innerHTML = timeTopHtml;
 }
 
 /**
