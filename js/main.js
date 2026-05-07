@@ -625,35 +625,35 @@ function initViewSettings() {
         }
     });
 
-    // --- 風速単位切り替え時のリアルタイム数値変換処理 ---
+    // --- 風速単位切り替え時の数値自動換算ロジック (整数統一版) ---
     const windUnitInput = document.getElementById('input-windUnit');
     if (windUnitInput) {
-        // 前回の単位を保持しておくための変数（クロージャ用）
         let lastUnit = viewConfig.windSpeedUnit || 'ms';
 
         windUnitInput.addEventListener('change', () => {
             const nextUnit = windUnitInput.value;
             const thresholdUnitSpan = document.getElementById('val-windThresholds');
             
-            // 1. ラベルの更新
             if (thresholdUnitSpan) {
                 thresholdUnitSpan.textContent = `(${windUnitInput.options[windUnitInput.selectedIndex].text})`;
             }
 
-            // 2. 入力欄の数値を変換（現在の値を一度m/sに戻してから、新しい単位に変換）
+            const toMs = { 'ms': 1.0, 'kn': 0.514444, 'kmh': 0.277778, 'mph': 0.44704 };
+            const fromMs = { 'ms': 1.0, 'kn': 1.94384, 'kmh': 3.6, 'mph': 2.23694 };
+
             const thIds = ['input-windThresholdHigh', 'input-windThresholdMid', 'input-windThresholdLow'];
             thIds.forEach(id => {
                 const el = document.getElementById(id);
                 if (el) {
                     const currentVal = parseFloat(el.value);
-                    // 前の単位(lastUnit)からm/sへ戻す
-                    const msVal = convertWindSpeedValue(currentVal, lastUnit, true);
-                    // 新しい単位(nextUnit)へ変換して丸める
-                    el.value = Math.round(convertWindSpeedValue(msVal, nextUnit, false));
+                    if (!isNaN(currentVal)) {
+                        let newVal = (currentVal * toMs[lastUnit]) * fromMs[nextUnit];
+                        // 全ての単位において、四捨五入して整数にする
+                        el.value = Math.round(newVal);
+                    }
                 }
             });
             
-            // 次回の変換のために現在の単位を保存
             lastUnit = nextUnit;
         });
     }
@@ -670,11 +670,8 @@ function syncSliderValues() {
     ];
 
     const windUnitInput = document.getElementById('input-windUnit');
-    // 現在保存されている単位
-    const currentUnit = viewConfig.windSpeedUnit || 'ms';
-
     if (windUnitInput) {
-        windUnitInput.value = currentUnit;
+        windUnitInput.value = viewConfig.windSpeedUnit;
         const thresholdUnitSpan = document.getElementById('val-windThresholds');
         if (thresholdUnitSpan) {
             const unitText = windUnitInput.options[windUnitInput.selectedIndex].text;
@@ -691,14 +688,14 @@ function syncSliderValues() {
         let val = viewConfig[configKey];
         if (id === 'forecastDays' && val === undefined) val = 9;
 
-        // 保存されている m/s の値を現在の表示単位に変換してセット
-        if (id === 'windThresholdHigh' || id === 'windThresholdMid' || id === 'windThresholdLow') {
-            val = Math.round(convertWindSpeedValue(val, currentUnit, false));
-        }
-
         const input = document.getElementById(`input-${id}`);
         if (input) {
-            input.value = val;
+            // 反映時も念のため整数に丸める
+            if (id.includes('windThreshold')) {
+                input.value = Math.round(val);
+            } else {
+                input.value = val;
+            }
         }
         
         const valSpan = document.getElementById(`val-${id}`);
@@ -725,17 +722,11 @@ async function saveViewSettings() {
     viewConfig.tooltipDuration = parseInt(document.getElementById('input-tooltipDuration').value);
     
     viewConfig.temperatureUnit = document.getElementById('input-tempUnit').value;
-    const selectedWindUnit = document.getElementById('input-windUnit').value;
-    viewConfig.windSpeedUnit = selectedWindUnit;
+    viewConfig.windSpeedUnit = document.getElementById('input-windUnit').value;
 
-    // 入力された数値を選択中の単位から m/s へ逆算して保存
-    const rawHigh = parseFloat(document.getElementById('input-windThresholdHigh').value);
-    const rawMid  = parseFloat(document.getElementById('input-windThresholdMid').value);
-    const rawLow  = parseFloat(document.getElementById('input-windThresholdLow').value);
-
-    viewConfig.windThresholdHigh = convertWindSpeedValue(rawHigh, selectedWindUnit, true);
-    viewConfig.windThresholdMid  = convertWindSpeedValue(rawMid, selectedWindUnit, true);
-    viewConfig.windThresholdLow  = convertWindSpeedValue(rawLow, selectedWindUnit, true);
+    viewConfig.windThresholdHigh = Math.round(parseFloat(document.getElementById('input-windThresholdHigh').value));
+    viewConfig.windThresholdMid = Math.round(parseFloat(document.getElementById('input-windThresholdMid').value));
+    viewConfig.windThresholdLow = Math.round(parseFloat(document.getElementById('input-windThresholdLow').value));
 
     const savedSpots = localStorage.getItem('pin_weather_spots');
     let hasSpots = false;
@@ -745,11 +736,9 @@ async function saveViewSettings() {
     } catch(e) { hasSpots = false; }
 
     if (!hasSpots) {
-        if (typeof setApproximateLocation === 'function') {
-            await setApproximateLocation();
-            const newSpot = { label: currentLabel, lat: currentLat, lon: currentLon };
-            localStorage.setItem('pin_weather_spots', JSON.stringify([newSpot]));
-        }
+        await setApproximateLocation();
+        const newSpot = { label: currentLabel, lat: currentLat, lon: currentLon };
+        localStorage.setItem('pin_weather_spots', JSON.stringify([newSpot]));
     }
 
     localStorage.setItem('pin_weather_view_config', JSON.stringify(viewConfig));
@@ -2672,71 +2661,42 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
     const range = (max - min) || 1;
     const plotHeight = height - 20; 
     
-    // 【高速化】HTMLとDOM要素を文字列として蓄積し、最後に一括反映する
     let html = "";
     let dateContHtml = "";
     let dateTopHtml = "";
     let timeTopHtml = "";
 
+    // グリッド（Y軸）
     for (let v = min; v <= max; v += stepY) {
         const yPosSvg = plotHeight - (((v - min) / range) * plotHeight);
         html += `<line x1="0" y1="${yPosSvg}" x2="${totalW}" y2="${yPosSvg}" class="grid-y-sub" />`;
     }
 
+    // グリッド（X軸・時間）
     for (let i = startIdx; i < totalDataCount; i++) {
         const x = (i - startIdx) * hScale;
         const d = new Date(allData.data.time[i]);
-        
         if (i % 24 === 0 || i === startIdx) {
             html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight}" class="grid-day" />`;
             const dayIdx = d.getDay();
             let dayColor = (dayIdx === 0) ? "#FF0000" : (dayIdx === 6 ? "#0000FF" : "#000000");
             const localizedDateStr = getLocalizedDate(d);
             const labelContent = `<span style="color:${dayColor}; font-size:${labelFS * 1.5}px;" class="notranslate">${localizedDateStr}</span>`;
-
-            // 文字列ベースで組み立て
-            dateContHtml += `<div class="sticky-date-bottom" style="left:${x}px;" data-x="${x}">`;
-            if (isLast) dateContHtml += labelContent;
-            dateContHtml += `</div>`;
-
-            if (isFirst && dateTop) {
-                dateTopHtml += `<div class="sticky-date-top" style="left:${x}px;" data-x="${x}">${labelContent}</div>`;
-                timeTopHtml += `<div style="position:absolute; left:${x}px; transform:translateX(-50%);" data-x="${x}">
-                                    <span class="label-time" style="font-size:${labelFS+4}px; display: inline-block; width: 2em; text-align: center;">${d.getHours()}</span>
-                                </div>`;
-            }
-            if (isLast) {
-                html += `<text x="${x}" y="${plotHeight + 15}" class="label-time" font-size="${labelFS}" text-anchor="middle">${d.getHours()}</text>`;
-            }
-        } else if (i % 3 === 0) {
-            html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight}" class="grid-3h" />`;
+            dateContHtml += `<div class="sticky-date-bottom" style="left:${x}px;" data-x="${x}">${isLast ? labelContent : ''}</div>`;
+            if (isFirst && dateTop) dateTopHtml += `<div class="sticky-date-top" style="left:${x}px;" data-x="${x}">${labelContent}</div>`;
+        }
+        if (i % 3 === 0 || i % 24 === 0) {
             if (isFirst && timeTop) {
-                timeTopHtml += `<div style="position:absolute; left:${x}px; transform:translateX(-50%);" data-x="${x}">
-                                    <span class="label-time" style="font-size:${labelFS+4}px; display: inline-block; width: 2em; text-align: center;">${d.getHours()}</span>
-                                </div>`;
+                timeTopHtml += `<div style="position:absolute; left:${x}px; transform:translateX(-50%);" data-x="${x}"><span class="label-time" style="font-size:${labelFS+4}px;">${d.getHours()}</span></div>`;
             }
-            if (isLast) {
-                html += `<text x="${x}" y="${plotHeight + 15}" class="label-time" font-size="${labelFS}" text-anchor="middle">${d.getHours()}</text>`;
-            }
+            if (isLast) html += `<text x="${x}" y="${plotHeight + 15}" class="label-time" font-size="${labelFS}" text-anchor="middle">${d.getHours()}</text>`;
         }
     }
 
+    // 現在時刻線
     const startTime = new Date(allData.data.time[startIdx]).getTime();
-    const nowTime = drawReferenceTime.getTime();
-    const diffHoursNow = (nowTime - startTime) / (1000 * 60 * 60); 
-    if (diffHoursNow >= 0 && diffHoursNow < (totalDataCount - startIdx)) {
-        const nowX = diffHoursNow * hScale;
-        html += `<line x1="${nowX}" y1="0" x2="${nowX}" y2="${plotHeight}" stroke="#0000FF" stroke-width="2.5" stroke-dasharray="4 3" />`;
-    }
-
-    if (allData.timestamp) {
-        const fetchedTime = new Date(allData.timestamp).getTime();
-        const diffHoursFetch = (fetchedTime - startTime) / (1000 * 60 * 60); 
-        if (diffHoursFetch >= 0 && diffHoursFetch < (totalDataCount - startIdx)) {
-            const fetchX = diffHoursFetch * hScale;
-            html += `<line x1="${fetchX}" y1="0" x2="${fetchX}" y2="${plotHeight}" stroke="#228b22" stroke-width="2.5" stroke-dasharray="3 2" />`;
-        }
-    }
+    const nowX = (drawReferenceTime.getTime() - startTime) / 3600000 * hScale;
+    if (nowX >= 0 && nowX <= totalW) html += `<line x1="${nowX}" y1="0" x2="${nowX}" y2="${plotHeight}" stroke="#0000FF" stroke-width="2.5" stroke-dasharray="4 3" />`;
 
     datasets.forEach(ds => {
         if (ds.type === 'bar') {
@@ -2746,39 +2706,45 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
             const thLow  = viewConfig.windThresholdLow;
 
             for(let i = startIdx; i < totalDataCount; i++){
-                const val = ds.data[i];
+                const val = ds.data[i]; // APIが指定単位で返しているので、これをそのまま比較に使う
                 if (val === null || typeof val === 'undefined') continue;
+                
                 const h = ((val - min) / range) * plotHeight;
                 const x = (i - startIdx) * hScale;
                 const deg = allData.data.wind_direction_10m[i];
                 const dirText = getWindDirText(deg);
 
-                let color = currentFilters.includes(dirText) 
-                    ? (val >= thHigh ? '#dc143c' : val >= thMid ? '#ffa500' : val >= thLow ? '#87CEEB' : '#ccc') 
-                    : (val >= thHigh ? 'rgba(220, 20, 60, 0.4)' : '#ccc');
+                const isTargetDir = currentFilters.includes(dirText);
+                let color = '#ccc'; 
+
+                // APIの数値をそのまま設定値と比較
+                if (isTargetDir) {
+                    if (val >= thHigh) color = '#dc143c';
+                    else if (val >= thMid) color = '#ffa500';
+                    else if (val >= thLow) color = '#87CEEB';
+                } else {
+                    if (val >= thHigh) color = 'rgba(220, 20, 60, 0.4)';
+                }
+
                 html += `<rect x="${x - (hScale*0.4)}" y="${plotHeight-h}" width="${hScale*0.8}" height="${h}" fill="${color}" />`;
                 if (isWind) {
                     html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-25}) rotate(${(deg+180)%360}) scale(${1.6 * iScale})" class="wind-arrow" />`;
                 }
             }
         } else {
-            let currentPoints = [];
+            let points = [];
             for(let i = startIdx; i < totalDataCount; i++){
                 const v = ds.data[i];
-                if (v === null || typeof v === 'undefined') {
-                    if (currentPoints.length > 1) { html += `<polyline class="${ds.cls}" points="${currentPoints.join(' ')}" />`; }
-                    currentPoints = [];
-                    continue;
+                if (v === null) {
+                    if (points.length > 1) html += `<polyline class="${ds.cls}" points="${points.join(' ')}" />`;
+                    points = []; continue;
                 }
-                const x = (i - startIdx) * hScale;
-                const y = plotHeight - (((v - min) / range) * plotHeight);
-                currentPoints.push(`${x},${y}`);
+                points.push(`${(i - startIdx) * hScale},${plotHeight - (((v - min) / range) * plotHeight)}`);
             }
-            if (currentPoints.length > 1) { html += `<polyline class="${ds.cls}" points="${currentPoints.join(' ')}" />`; }
+            if (points.length > 1) html += `<polyline class="${ds.cls}" points="${points.join(' ')}" />`;
         }
     });
 
-    // 最後に一括でDOMに反映
     svg.innerHTML = html;
     dateCont.innerHTML = dateContHtml;
     if (isFirst && dateTop) dateTop.innerHTML = dateTopHtml;
