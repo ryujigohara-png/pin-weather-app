@@ -550,63 +550,65 @@ function updateStaticUI() {
 }
 
 /**
+ * 新設サブルーチン：風速の単位変換ヘルパー
+ * @param {number} value - 変換前の数値
+ * @param {string} unit - ターゲットの単位 ('kn', 'kmh', 'mph', 'ms')
+ * @param {boolean} reverse - trueなら「表示単位からm/s」へ逆算、falseなら「m/sから表示単位」へ変換
+ */
+function convertWindSpeedValue(value, unit, reverse = false) {
+    const factors = {
+        'kn': 1.94384,
+        'kmh': 3.6,
+        'mph': 2.23694,
+        'ms': 1.0
+    };
+    const factor = factors[unit] || 1.0;
+    return reverse ? (value / factor) : (value * factor);
+}
+
+/**
  * サブルーチン：詳細設定モーダルの初期化
- * HTML側に onclick を書かず、JS側で全てのイベントを紐付ける。
  */
 function initViewSettings() {
     const modal = document.getElementById('viewSettingsModal');
-    const openBtn = document.getElementById('openSettingsBtn'); // サイドバーのボタン
-    const closeBtn = document.getElementById('closeViewSettings'); // モーダル内の閉じるボタン
-    const saveBtn = document.getElementById('saveViewSettings'); // モーダル内の保存ボタン
+    const openBtn = document.getElementById('openSettingsBtn');
+    const closeBtn = document.getElementById('closeViewSettings');
+    const saveBtn = document.getElementById('saveViewSettings');
 
     if (!modal || !openBtn) return;
 
-    // 表示詳細設定モーダルの初期化処理などの付近に挿入してください
     const toggleBtn = document.getElementById('toggle-optional-settings');
     const optionalArea = document.getElementById('optional-settings');
 
     if (toggleBtn && optionalArea) {
         toggleBtn.addEventListener('click', () => {
             const isHidden = optionalArea.style.display === 'none';
-            
-            // 表示・非表示の切り替え
             optionalArea.style.display = isHidden ? 'block' : 'none';
-            
-            // 多言語化対応したテキストの切り替え
             if (typeof i18n !== 'undefined') {
-                toggleBtn.innerText = isHidden 
-                    ? i18n.t('btnOptionalClose') 
-                    : i18n.t('btnOptionalOpen');
+                toggleBtn.innerText = isHidden ? i18n.t('btnOptionalClose') : i18n.t('btnOptionalOpen');
             } else {
-                // フォールバック
-                toggleBtn.innerText = isHidden 
-                    ? 'オプション設定を閉じる ▲' 
-                    : 'オプション設定 (表示倍率・サイズ等) ▼';
+                toggleBtn.innerText = isHidden ? 'オプション設定を閉じる ▲' : 'オプション設定 (表示倍率・サイズ等) ▼';
             }
         });
     }
 
-    // 1. サイドバーのボタンを押した時の動作
     openBtn.addEventListener('click', () => {
         syncSliderValues();
         openModal('viewSettingsModal');
     });
 
-    // 2. 閉じるボタン
     if (closeBtn) {
         closeBtn.addEventListener('click', () => {
             closeModal('viewSettingsModal');
         });
     }
 
-    // 3. 保存ボタン
     if (saveBtn) {
         saveBtn.addEventListener('click', () => {
             saveViewSettings();
         });
     }
 
-    // 4. スライダーを動かした時の数値リアルタイム表示
     const configIds = ['hourWidth', 'windHeight', 'subHeight', 'margin', 'fontSize', 'iconScale', 'tooltipDuration', 'forecastDays'];
     configIds.forEach(id => {
         const input = document.getElementById(`input-${id}`);
@@ -614,28 +616,45 @@ function initViewSettings() {
             input.oninput = () => {
                 const valSpan = document.getElementById(`val-${id}`);
                 if (valSpan) {
-                    if (id === 'iconScale') {
-                        valSpan.textContent = input.value;
-                    } else if (id === 'tooltipDuration') {
-                        valSpan.textContent = input.value + "s";
-                    } else if (id === 'forecastDays') {
-                        valSpan.textContent = input.value + "days";
-                    } else {
-                        valSpan.textContent = input.value + "px";
-                    }
+                    if (id === 'iconScale') valSpan.textContent = input.value;
+                    else if (id === 'tooltipDuration') valSpan.textContent = input.value + "s";
+                    else if (id === 'forecastDays') valSpan.textContent = input.value + "days";
+                    else valSpan.textContent = input.value + "px";
                 }
             };
         }
     });
 
-    // initViewSettings サブルーチンの最後の方に追加
+    // --- 風速単位切り替え時のリアルタイム数値変換処理 ---
     const windUnitInput = document.getElementById('input-windUnit');
     if (windUnitInput) {
+        // 前回の単位を保持しておくための変数（クロージャ用）
+        let lastUnit = viewConfig.windSpeedUnit || 'ms';
+
         windUnitInput.addEventListener('change', () => {
+            const nextUnit = windUnitInput.value;
             const thresholdUnitSpan = document.getElementById('val-windThresholds');
+            
+            // 1. ラベルの更新
             if (thresholdUnitSpan) {
                 thresholdUnitSpan.textContent = `(${windUnitInput.options[windUnitInput.selectedIndex].text})`;
             }
+
+            // 2. 入力欄の数値を変換（現在の値を一度m/sに戻してから、新しい単位に変換）
+            const thIds = ['input-windThresholdHigh', 'input-windThresholdMid', 'input-windThresholdLow'];
+            thIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    const currentVal = parseFloat(el.value);
+                    // 前の単位(lastUnit)からm/sへ戻す
+                    const msVal = convertWindSpeedValue(currentVal, lastUnit, true);
+                    // 新しい単位(nextUnit)へ変換して丸める
+                    el.value = Math.round(convertWindSpeedValue(msVal, nextUnit, false));
+                }
+            });
+            
+            // 次回の変換のために現在の単位を保存
+            lastUnit = nextUnit;
         });
     }
 }
@@ -644,20 +663,18 @@ function initViewSettings() {
  * 内部サブルーチン：現在の viewConfig の値をスライダーとラベルに反映させる
  */
 function syncSliderValues() {
-    // 1. 各種 ID リスト
     const configIds = [
         'hourWidth', 'windHeight', 'subHeight', 'margin', 'fontSize', 
         'iconScale', 'tooltipDuration', 'forecastDays', 'tempUnit', 'windUnit',
         'windThresholdHigh', 'windThresholdMid', 'windThresholdLow'
     ];
 
-    // 2. 風速単位の表示を先に同期する
     const windUnitInput = document.getElementById('input-windUnit');
+    // 現在保存されている単位
+    const currentUnit = viewConfig.windSpeedUnit || 'ms';
+
     if (windUnitInput) {
-        // viewConfig に保存されている単位をセレクトボックスにセット
-        windUnitInput.value = viewConfig.windSpeedUnit;
-        
-        // 選択された単位のテキスト（例: "kn (ノット)"）を取得してしきい値ラベルに反映
+        windUnitInput.value = currentUnit;
         const thresholdUnitSpan = document.getElementById('val-windThresholds');
         if (thresholdUnitSpan) {
             const unitText = windUnitInput.options[windUnitInput.selectedIndex].text;
@@ -665,7 +682,6 @@ function syncSliderValues() {
         }
     }
 
-    // 3. 全ての値を入力欄に反映
     configIds.forEach(id => {
         let configKey = id;
         if (id === 'margin') configKey = 'graphMargin';
@@ -675,33 +691,30 @@ function syncSliderValues() {
         let val = viewConfig[configKey];
         if (id === 'forecastDays' && val === undefined) val = 9;
 
+        // 保存されている m/s の値を現在の表示単位に変換してセット
+        if (id === 'windThresholdHigh' || id === 'windThresholdMid' || id === 'windThresholdLow') {
+            val = Math.round(convertWindSpeedValue(val, currentUnit, false));
+        }
+
         const input = document.getElementById(`input-${id}`);
         if (input) {
             input.value = val;
         }
         
-        // 数値表示ラベル（スライダー横）の更新
         const valSpan = document.getElementById(`val-${id}`);
         if (valSpan) {
-            if (id === 'iconScale') {
-                valSpan.textContent = val;
-            } else if (id === 'tooltipDuration') {
-                valSpan.textContent = val + "s";
-            } else if (id === 'forecastDays') {
-                valSpan.textContent = val + "days";
-            } else {
-                valSpan.textContent = val + "px";
-            }
+            if (id === 'iconScale') valSpan.textContent = val;
+            else if (id === 'tooltipDuration') valSpan.textContent = val + "s";
+            else if (id === 'forecastDays') valSpan.textContent = val + "days";
+            else valSpan.textContent = val + "px";
         }
     });
 }
 
 /**
  * サブルーチン：設定の保存と適用
- * localStorageに書き込み、ページをリロードして定数を再定義させる。
  */
 async function saveViewSettings() {
-    // 1. UIから値を取得して viewConfig を更新
     viewConfig.forecastDays = parseInt(document.getElementById('input-forecastDays').value);
     viewConfig.hourWidth = parseInt(document.getElementById('input-hourWidth').value);
     viewConfig.windHeight = parseInt(document.getElementById('input-windHeight').value);
@@ -711,16 +724,19 @@ async function saveViewSettings() {
     viewConfig.iconScale = parseFloat(document.getElementById('input-iconScale').value);
     viewConfig.tooltipDuration = parseInt(document.getElementById('input-tooltipDuration').value);
     
-    // 温度単位と風速単位を取得
     viewConfig.temperatureUnit = document.getElementById('input-tempUnit').value;
-    viewConfig.windSpeedUnit = document.getElementById('input-windUnit').value;
+    const selectedWindUnit = document.getElementById('input-windUnit').value;
+    viewConfig.windSpeedUnit = selectedWindUnit;
 
-    // 【追加】風速色付け閾値を取得（input type="number" から取得）
-    viewConfig.windThresholdHigh = parseFloat(document.getElementById('input-windThresholdHigh').value);
-    viewConfig.windThresholdMid = parseFloat(document.getElementById('input-windThresholdMid').value);
-    viewConfig.windThresholdLow = parseFloat(document.getElementById('input-windThresholdLow').value);
+    // 入力された数値を選択中の単位から m/s へ逆算して保存
+    const rawHigh = parseFloat(document.getElementById('input-windThresholdHigh').value);
+    const rawMid  = parseFloat(document.getElementById('input-windThresholdMid').value);
+    const rawLow  = parseFloat(document.getElementById('input-windThresholdLow').value);
 
-    // 2. 【重要】地点データが空（操作不能リスク）の状態かチェック
+    viewConfig.windThresholdHigh = convertWindSpeedValue(rawHigh, selectedWindUnit, true);
+    viewConfig.windThresholdMid  = convertWindSpeedValue(rawMid, selectedWindUnit, true);
+    viewConfig.windThresholdLow  = convertWindSpeedValue(rawLow, selectedWindUnit, true);
+
     const savedSpots = localStorage.getItem('pin_weather_spots');
     let hasSpots = false;
     try {
@@ -728,53 +744,36 @@ async function saveViewSettings() {
         if (parsed && parsed.length > 0) hasSpots = true;
     } catch(e) { hasSpots = false; }
 
-    // 地点がない場合は、リロード前に現在地を特定・保存して「真っ白」を防ぐ
     if (!hasSpots) {
-        console.log("No spots found during save. Fetching approximate location...");
-        await setApproximateLocation(); // 既存のIP Geolocation関数を利用
-        // 推定された地点を保存
-        const newSpot = { label: currentLabel, lat: currentLat, lon: currentLon };
-        localStorage.setItem('pin_weather_spots', JSON.stringify([newSpot]));
+        if (typeof setApproximateLocation === 'function') {
+            await setApproximateLocation();
+            const newSpot = { label: currentLabel, lat: currentLat, lon: currentLon };
+            localStorage.setItem('pin_weather_spots', JSON.stringify([newSpot]));
+        }
     }
 
-    // 3. 表示設定を保存（JSON形式）
-    // 保存キー名はご提示いただいた現状のコード（pin_weather_view_config）を厳守
     localStorage.setItem('pin_weather_view_config', JSON.stringify(viewConfig));
-
-    // 4. 完了通知なしでリロード
     location.reload();
 }
 
 /**
  * サブルーチン：設定のリセット処理
- * 定義済みの defaultViewConfig を使用して設定を初期化し、メモリとUIを同期させます。
  */
 function resetViewSettings() {
-    // 汎用ダイアログを呼び出し
-    showAppDialog({
-        title: i18n.t('btnResetAll'), // タイトル
-        messageKey: 'confirmReset',    // メッセージ
-        onSave: () => {
-            // 1. デフォルト設定を深いコピーで取得
-            const resetData = JSON.parse(JSON.stringify(defaultViewConfig));
-
-            // 2. メモリ上の実行用変数の中身を更新
-            // オブジェクトの参照を維持したまま、中身だけを既定値で上書きします。
-            // これにより、const宣言時や他からの参照がある場合でも確実に同期されます。
-            Object.assign(viewConfig, resetData);
-
-            // 3. LocalStorage を更新（キー名：pin_weather_view_config）
-            localStorage.setItem('pin_weather_view_config', JSON.stringify(viewConfig));
-
-            // 4. UI（スライダーやラベル）を現在の viewConfig の値に同期
-            syncSliderValues();
-
-            // 5. 設定を全画面に波及させるためにリロード
-            location.reload();
-        }
-    });
+    if (typeof showAppDialog === 'function') {
+        showAppDialog({
+            title: i18n.t('btnResetAll'),
+            messageKey: 'confirmReset',
+            onSave: () => {
+                const resetData = JSON.parse(JSON.stringify(defaultViewConfig));
+                Object.assign(viewConfig, resetData);
+                localStorage.setItem('pin_weather_view_config', JSON.stringify(viewConfig));
+                syncSliderValues();
+                location.reload();
+            }
+        });
+    }
 }
-
 
 /**
  * サブルーチン：QRコード生成
@@ -2984,27 +2983,36 @@ function hideTooltipUI() {
 
 /**
  * サブルーチン：風速凡例の動的表示更新
+ * 内部の m/s しきい値を現在の単位に変換し、整数に丸めて表示します。
  */
 function updateWindLegend() {
     const container = document.querySelector('.legend-wind-container');
     if (!container) return;
 
-    // 現在の単位ラベルを取得（例：m/s, kn）
+    // 1. 現在の表示単位を取得
     const unit = i18n.t('speedunit'); 
+    const unitKey = viewConfig.windSpeedUnit || 'ms';
 
+    // 2. 内部の m/s 値を表示単位へ変換し、整数に丸める
+    // convertWindSpeedValue サブルーチンを利用
+    const thHigh = Math.round(convertWindSpeedValue(viewConfig.windThresholdHigh, unitKey));
+    const thMid  = Math.round(convertWindSpeedValue(viewConfig.windThresholdMid, unitKey));
+    const thLow  = Math.round(convertWindSpeedValue(viewConfig.windThresholdLow, unitKey));
+
+    // 3. HTMLを生成して反映
     container.innerHTML = `
         <div class="legend-wind-item">
             <span class="legend-wind-label" data-i18n="legendWindTitle">${i18n.t('legendWindTitle')}</span>
             <span class="legend-wind-rect" style="background: #dc143c;"></span>
-            <span class="legend-wind-label">${viewConfig.windThresholdHigh}${unit}〜</span>
+            <span class="legend-wind-label">${thHigh}${unit}〜</span>
         </div>
         <div class="legend-wind-item">
             <span class="legend-wind-rect" style="background: #ffa500;"></span>
-            <span class="legend-wind-label">${viewConfig.windThresholdMid}${unit}〜</span>
+            <span class="legend-wind-label">${thMid}${unit}〜</span>
         </div>
         <div class="legend-wind-item">
             <span class="legend-wind-rect" style="background: #87ceeb;"></span>
-            <span class="legend-wind-label">${viewConfig.windThresholdLow}${unit}〜</span>
+            <span class="legend-wind-label">${thLow}${unit}〜</span>
         </div>
         <div class="legend-wind-item">
             <span class="legend-wind-rect" style="background: #ccc;"></span>
@@ -3013,6 +3021,20 @@ function updateWindLegend() {
     `;
 }
 
+/**
+ * 依存サブルーチン：風速の単位変換ヘルパー
+ * （既に定義済みであれば重複定義に注意してください）
+ */
+function convertWindSpeedValue(value, unit, reverse = false) {
+    const factors = {
+        'kn': 1.94384,
+        'kmh': 3.6,
+        'mph': 2.23694,
+        'ms': 1.0
+    };
+    const factor = factors[unit] || 1.0;
+    return reverse ? (value / factor) : (value * factor);
+}
 
 /**
  * 監視リスナー：4時間経過判定
