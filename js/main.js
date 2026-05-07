@@ -70,7 +70,6 @@ const i18n = {
             iosInstallGuide: "Safariの「共有ボタン（□に↑）」を押し、「ホーム画面に追加」を選択してください。",
             btnWindConfig: "🎐 風向色付設定",
             btnDetailSettings: "⚙ 表示詳細設定",
-            btnResetAll: "♻️ 全リセット",
             btnFeedback: "💬 ご意見・ご要望",
             linkAboutAndPrivacy: "運営者情報 ＆ プライバシーポリシー",
             shareQR: "スマホで共有",
@@ -81,7 +80,6 @@ const i18n = {
             widgetTitle: "ウィジェット埋め込み設定",
             widgetDesc: "あなたのサイトにこの地点の気象グラフを埋め込むことができます。",
             widgetCopy: "コードをコピー",
-            copySuccess: "コピーしました！",
 
             // --- 地図・地点登録モーダル ---
             mapClickGuide: "地点をクリックしてください",
@@ -113,7 +111,7 @@ const i18n = {
             cfgMargin: "グラフ間の余白",
             cfgFontSize: "ラベル文字サイズ",
             cfgIconScale: "風向アイコン倍率",
-            cfgTooltipDuration: "詳細情報の表示時間", // 「ツールチップ表示時間」から変更
+            cfgTooltipDuration: "詳細情報の表示時間", 
             cfgTempUnit: "温度単位",
             cfgWindUnit: "風速単位",
             cfgWindThresholds: "風速色付しきい値",
@@ -146,7 +144,7 @@ const i18n = {
                         ・マップ内の検索ボックスから施設名や地名で検索して登録することも可能です。<br><br>
                         <strong>管理・修正：</strong><br>
                         ・画面上の地点タブを長押しすると、登録地点の修正や削除が簡単に行えます。<br>
-                        ・現在表示中のグラフ地点をマップで即座に確認し、再調整することも可能です。`,
+                        ・現在表示中のグラフ地点をマップで即座に確認し、再調整することも可能です.`,
             guideLabel3: "自分専用表示カスタマイズ",
             guideBody3: `<strong>風向色付設定</strong>ボタンから色付けする風向を指定可能。<br>
                         <strong>表示詳細設定</strong>ボタンから風速の色付けしきい値を変更可能。自分の道具やレベルに合わせた「ベストコンディション」がグラフ上で一目で判別できるようになります。`,
@@ -156,7 +154,7 @@ const i18n = {
             pwa_install_sub: "左上の≡メニュー内「インストール」または、<br>Chrome ⋮ メニューから / Safari 共有 から<br>「ホーム画面に追加」",
             welcomeGuide: "表示したい地点を登録してください。現在地を取得するか、地図から場所を選択できます。登録は画面上部の地名タブを長押しまたは右クリックしてください。",
             confirmDelete: (name) => `「${name}」を削除しますか？`,
-            confirmInit: "初期化しますか？",
+            lastSpotWarning: "最後の1箇所は削除できません。アプリの動作には少なくとも1つの地点登録が必要です。",
             confirmReset: "表示設定をデフォルトに戻しますか？",
             gpsFetching: "取得中...",
             gpsError: "位置情報の取得に失敗しました。",
@@ -205,7 +203,6 @@ const i18n = {
             iosInstallGuide: "Tap the 'Share button' in Safari and select 'Add to Home Screen'.",
             btnWindConfig: "🎐 Wind Color Settings",
             btnDetailSettings: "⚙ Display Settings",
-            btnResetAll: "♻️ Reset All Spots",
             btnFeedback: "💬 Feedback & Requests",
             linkAboutAndPrivacy: "About & Privacy Policy",    
             shareQR: "Share with Mobile",
@@ -216,7 +213,6 @@ const i18n = {
             widgetTitle: "Widget Embedding Settings",
             widgetDesc: "You can embed this weather graph into your website or blog.",
             widgetCopy: "Copy Code",
-            copySuccess: "Copied to clipboard!",
 
             // --- Map & Spot Modal ---
             mapClickGuide: "Click on the map",
@@ -249,7 +245,7 @@ const i18n = {
             cfgMargin: "Graph Margin",
             cfgFontSize: "Font Size",
             cfgIconScale: "Icon Scale",
-            cfgTooltipDuration: "Info Display Duration", // Changed from "Tooltip Display Time",
+            cfgTooltipDuration: "Info Display Duration",
             cfgTempUnit: "Temperature Unit",
             cfgWindUnit: "Wind Speed Unit",
             cfgWindThresholds: "Wind Coloring Thresholds",
@@ -292,10 +288,11 @@ const i18n = {
             pwa_install_sub: "Select \"Install\" from the ≡ menu,<br>or use the browser menu (Chrome ⋮ / Safari Share)<br>and tap \"Add to Home Screen\"",
             welcomeGuide: "Please register the locations you want to display. You can get your current location or select a place from the map. To register, long-press or right-click on the location tab at the top of the screen.",
             confirmDelete: (name) => `Delete "${name}"?`,
-            confirmInit: "Initialize all spots?",
+            lastSpotWarning: "Cannot delete the last spot. At least one location is required for the app to function.",
             confirmReset: "Reset all view settings to default?",
             gpsFetching: "Locating...",
             gpsError: "Failed to get location.",
+            gpsDefaultLabel: "Current Location (GPS)",
             noLocationError: "No location information available.",
             editSpotGuide: "Edit or delete the spot name",
             btnDelete: "Delete",
@@ -548,7 +545,6 @@ function updateStaticUI() {
     }
 }
 
-
 /**
  * サブルーチン：詳細設定モーダルの初期化
  * HTML側に onclick を書かず、JS側で全てのイベントを紐付ける。
@@ -558,7 +554,6 @@ function initViewSettings() {
     const openBtn = document.getElementById('openSettingsBtn'); // サイドバーのボタン
     const closeBtn = document.getElementById('closeViewSettings'); // モーダル内の閉じるボタン
     const saveBtn = document.getElementById('saveViewSettings'); // モーダル内の保存ボタン
-    const resetBtn = document.getElementById('resetViewSettings'); // リセットボタン
 
     if (!modal || !openBtn) return;
 
@@ -582,14 +577,7 @@ function initViewSettings() {
         });
     }
 
-    // 4. リセットボタンのイベント紐付け
-    if (resetBtn) {
-        resetBtn.addEventListener('click', () => {
-            resetViewSettings();
-        });
-    }
-
-    // 5. スライダーを動かした時の数値リアルタイム表示
+    // 4. スライダーを動かした時の数値リアルタイム表示
     const configIds = ['hourWidth', 'windHeight', 'subHeight', 'margin', 'fontSize', 'iconScale', 'tooltipDuration', 'forecastDays'];
     configIds.forEach(id => {
         const input = document.getElementById(`input-${id}`);
@@ -610,6 +598,7 @@ function initViewSettings() {
             };
         }
     });
+
     // initViewSettings サブルーチンの最後の方に追加
     const windUnitInput = document.getElementById('input-windUnit');
     if (windUnitInput) {
@@ -1708,10 +1697,21 @@ function renderTabs(activeOverrideLabel = null) {
                             updateLocation(item.lat, item.lon, newName);
                             renderTabs(newName);
                         },
+                        // 修正：最後の1カ所を削除しようとした時の制御を追加
                         onDelete: spotIdx !== -1 ? () => {
-                            mySpots.splice(spotIdx, 1);
-                            localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-                            renderTabs();
+                            if (mySpots.length > 1) {
+                                // 地点が2つ以上ある場合は通常通り削除
+                                mySpots.splice(spotIdx, 1);
+                                localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                                renderTabs();
+                            } else {
+                                // 最後の1つの場合は汎用モーダルで警告を表示
+                                showAppDialog({
+                                    title: item.rawLabel,
+                                    messageKey: 'lastSpotWarning', 
+                                    onSave: null // 保存ボタンを消し、閉じる（OK）だけに誘導
+                                });
+                            }
                         } : null 
                     });
                 }
@@ -1727,52 +1727,32 @@ function renderTabs(activeOverrideLabel = null) {
 
 /**
  * サブルーチン：地点の削除確認（自作ダイアログ版）
- * @param {number} index - 削除対象の mySpots インデックス
+ * ※この関数を直接呼び出すケースがある場合に備え、ここにも最後の1個チェックを入れています
  */
 function confirmDelete(index) {
     if (index === -1 || !mySpots[index]) return;
 
     const targetLabel = mySpots[index].label;
 
+    if (mySpots.length <= 1) {
+        showAppDialog({
+            title: targetLabel,
+            messageKey: 'lastSpotWarning',
+            onSave: null
+        });
+        return;
+    }
+
     showAppDialog({
         title: targetLabel,
-        messageKey: 'editSpotGuide', // または削除専用のキー
+        messageKey: 'editSpotGuide',
         onDelete: () => {
-            // 自作ダイアログ内の「削除」ボタンが押された時の実処理
             mySpots.splice(index, 1);
             localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
             renderTabs();
         }
     });
 }
-
-const resetBtn = document.getElementById('reset-all-btn');
-if (resetBtn) {
-    resetBtn.onclick = () => {
-        // 自作ダイアログを表示
-        showAppDialog({
-            title: i18n.t('btnResetAll'), // 大きなタイトル
-            messageKey: 'confirmInit',    // 小さなメッセージ（「全て初期化しますか？」等）
-            onSave: () => {
-                // 「はい/実行」が押された時の実処理をここに集約
-                toggleSidebar();
-                
-                // 地点データの初期化
-                mySpots = JSON.parse(JSON.stringify(defaultSpots));
-                localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-                
-                // 風向フィルタの初期化
-                targetWindDirections = [...windDirs];
-                localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
-                
-                // 画面表示の更新
-                updateLocation(mySpots[0].lat, mySpots[0].lon, mySpots[0].label);
-            }
-        });
-    };
-}
-
-
 
 
 /**
