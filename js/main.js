@@ -105,6 +105,8 @@ const i18n = {
             settingsTitle: "グラフ表示詳細設定",
             configLangTitle: "Language / 表示言語",
             cfgForecastDays: "予報日数 (最大16日)",
+            btnOptionalOpen: "オプション設定 (表示倍率・サイズ等) ▼",
+            btnOptionalClose: "オプション設定を閉じる ▲",
             cfgHourWidth: "1時間の幅 (hScale)",
             cfgWindHeight: "風速グラフの高さ",
             cfgSubHeight: "気温・海象グラフの高さ",
@@ -239,6 +241,8 @@ const i18n = {
             settingsTitle: "Detailed Display Settings",
             configLangTitle: "Language",
             cfgForecastDays: "Forecast Days (Max 16)",
+            btnOptionalOpen: "Optional Settings (Scale, Size, etc.) ▼",
+            btnOptionalClose: "Close Optional Settings ▲",
             cfgHourWidth: "Hour Width (hScale)",
             cfgWindHeight: "Wind Graph Height",
             cfgSubHeight: "Sub Graph Height",
@@ -556,6 +560,31 @@ function initViewSettings() {
     const saveBtn = document.getElementById('saveViewSettings'); // モーダル内の保存ボタン
 
     if (!modal || !openBtn) return;
+
+    // 表示詳細設定モーダルの初期化処理などの付近に挿入してください
+    const toggleBtn = document.getElementById('toggle-optional-settings');
+    const optionalArea = document.getElementById('optional-settings');
+
+    if (toggleBtn && optionalArea) {
+        toggleBtn.addEventListener('click', () => {
+            const isHidden = optionalArea.style.display === 'none';
+            
+            // 表示・非表示の切り替え
+            optionalArea.style.display = isHidden ? 'block' : 'none';
+            
+            // 多言語化対応したテキストの切り替え
+            if (typeof i18n !== 'undefined') {
+                toggleBtn.innerText = isHidden 
+                    ? i18n.t('btnOptionalClose') 
+                    : i18n.t('btnOptionalOpen');
+            } else {
+                // フォールバック
+                toggleBtn.innerText = isHidden 
+                    ? 'オプション設定を閉じる ▲' 
+                    : 'オプション設定 (表示倍率・サイズ等) ▼';
+            }
+        });
+    }
 
     // 1. サイドバーのボタンを押した時の動作
     openBtn.addEventListener('click', () => {

@@ -221,52 +221,62 @@
                 </div>
             </div>
 
-            <div class="config-group">
-                <div class="config-label-area">
-                    <span class="config-title" data-i18n="cfgIconScale">風向アイコン倍率</span>
-                    <span id="val-iconScale" class="config-value">0.8</span>
-                </div>
-                <input type="range" id="input-iconScale" class="config-slider" min="0.5" max="1.5" step="0.1" value="0.8">
+            <!-- オプション切り替えボタン -->
+            <div style="margin: 10px 0; border-top: 1px solid #eee; padding-top: 10px; text-align: center;">
+                <button id="toggle-optional-settings" class="btn" style="background-color: #f8f8f8; color: #666; font-size: 12px; width: 100%; border: 1px dashed #ccc;">
+                    オプション設定 (表示倍率・サイズ等) ▼
+                </button>
             </div>
 
-            <div class="config-group">
-                <div class="config-label-area">
-                    <span class="config-title" data-i18n="cfgHourWidth">1時間の幅 (hScale)</span>
-                    <span id="val-hourWidth" class="config-value">18px</span>
+            <!-- 折りたたむ対象のグループ -->
+            <div id="optional-settings" style="display: none; border: 1px solid #f0f0f0; padding: 10px; border-radius: 5px; background: #fafafa;">
+                <div class="config-group">
+                    <div class="config-label-area">
+                        <span class="config-title" data-i18n="cfgIconScale">風向アイコン倍率</span>
+                        <span id="val-iconScale" class="config-value">0.8</span>
+                    </div>
+                    <input type="range" id="input-iconScale" class="config-slider" min="0.5" max="1.5" step="0.1" value="0.8">
                 </div>
-                <input type="range" id="input-hourWidth" class="config-slider" min="10" max="100" value="30">
-            </div>
 
-            <div class="config-group">
-                <div class="config-label-area">
-                    <span class="config-title" data-i18n="cfgWindHeight">風速グラフの高さ</span>
-                    <span id="val-windHeight" class="config-value">100px</span>
+                <div class="config-group">
+                    <div class="config-label-area">
+                        <span class="config-title" data-i18n="cfgHourWidth">1時間の幅 (hScale)</span>
+                        <span id="val-hourWidth" class="config-value">18px</span>
+                    </div>
+                    <input type="range" id="input-hourWidth" class="config-slider" min="10" max="100" value="30">
                 </div>
-                <input type="range" id="input-windHeight" class="config-slider" min="70" max="200" step="10" value="180">
-            </div>
 
-            <div class="config-group">
-                <div class="config-label-area">
-                    <span class="config-title" data-i18n="cfgSubHeight">気温・海象グラフの高さ</span>
-                    <span id="val-subHeight" class="config-value">100px</span>
+                <div class="config-group">
+                    <div class="config-label-area">
+                        <span class="config-title" data-i18n="cfgWindHeight">風速グラフの高さ</span>
+                        <span id="val-windHeight" class="config-value">100px</span>
+                    </div>
+                    <input type="range" id="input-windHeight" class="config-slider" min="70" max="200" step="10" value="180">
                 </div>
-                <input type="range" id="input-subHeight" class="config-slider" min="70" max="150" step="10" value="100">
-            </div>
 
-            <div class="config-group">
-                <div class="config-label-area">
-                    <span class="config-title" data-i18n="cfgMargin">グラフ間の余白</span>
-                    <span id="val-margin" class="config-value">0px</span>
+                <div class="config-group">
+                    <div class="config-label-area">
+                        <span class="config-title" data-i18n="cfgSubHeight">気温・海象グラフの高さ</span>
+                        <span id="val-subHeight" class="config-value">100px</span>
+                    </div>
+                    <input type="range" id="input-subHeight" class="config-slider" min="70" max="150" step="10" value="100">
                 </div>
-                <input type="range" id="input-margin" class="config-slider" min="0" max="10" step="1" value="0">
-            </div>
 
-            <div class="config-group">
-                <div class="config-label-area">
-                    <span class="config-title" data-i18n="cfgFontSize">ラベル文字サイズ</span>
-                    <span id="val-fontSize" class="config-value">12px</span>
+                <div class="config-group">
+                    <div class="config-label-area">
+                        <span class="config-title" data-i18n="cfgMargin">グラフ間の余白</span>
+                        <span id="val-margin" class="config-value">0px</span>
+                    </div>
+                    <input type="range" id="input-margin" class="config-slider" min="0" max="10" step="1" value="0">
                 </div>
-                <input type="range" id="input-fontSize" class="config-slider" min="8" max="14" step="1" value="12">
+
+                <div class="config-group">
+                    <div class="config-label-area">
+                        <span class="config-title" data-i18n="cfgFontSize">ラベル文字サイズ</span>
+                        <span id="val-fontSize" class="config-value">12px</span>
+                    </div>
+                    <input type="range" id="input-fontSize" class="config-slider" min="8" max="14" step="1" value="12">
+                </div>
             </div>
 
         </div>
