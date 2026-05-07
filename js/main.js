@@ -1626,15 +1626,61 @@ function checkSpotLimit(newName) {
 }
 
 /**
+ * サブルーチン：地点の削除確認（自作ダイアログ版）
+ */
+function confirmDeleteByLabel(label) {
+    if (!label) return;
+
+    const index = mySpots.findIndex(s => s.label === label);
+    if (index === -1) return;
+
+    // 1. 最後の1件チェック
+    if (mySpots.length <= 1) {
+        showAppDialog({
+            title: label,
+            messageKey: 'lastSpotWarning',
+            onSave: null
+        });
+        return;
+    }
+
+    // 2. 削除確認
+    const confirmMessage = i18n.t('confirmDelete', { name: label });
+
+    showAppDialog({
+        title: i18n.t('confirmDeletePrefix') + " " + label,
+        message: confirmMessage,
+        messageKey: null,
+        onSave: () => {
+            const finalIdx = mySpots.findIndex(s => s.label === label);
+            if (finalIdx > -1) {
+                // 配列から削除
+                mySpots.splice(finalIdx, 1);
+                localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                
+                // 【修正ポイント】
+                // 削除した地点を表示し続けると「未登録地点」としてタブに残るため、
+                // 残ったリストの最初の地点に切り替えて再描画します。
+                const nextSpot = mySpots[0];
+                if (nextSpot) {
+                    updateLocation(nextSpot.lat, nextSpot.lon, nextSpot.label);
+                    renderTabs(nextSpot.label);
+                } else {
+                    renderTabs();
+                }
+            }
+        }
+    });
+}
+
+/**
  * サブルーチン：地点タブの描画
- * 並び順：[1]表示中地点 [2]GPS固定 [3]Map固定 [4...]履歴
  */
 function renderTabs(activeOverrideLabel = null) {
     const container = document.getElementById('spot-tabs');
     if (!container) return;
     container.innerHTML = "";
 
-    // 10個制限
     if (mySpots.length > 10) {
         mySpots = mySpots.slice(0, 10);
         localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
@@ -1646,22 +1692,21 @@ function renderTabs(activeOverrideLabel = null) {
     let activeSpot = null;
     let isExternalSpot = false;
 
-    // [1] アクティブ地点（1番目）の抽出
+    // アクティブ地点の判定
     if (activeIdx > -1) {
         activeSpot = displaySpots.splice(activeIdx, 1)[0];
     } else if (activeLabel && !['gps', 'map', 'GPS', 'Map'].includes(activeLabel)) {
+        // 保存リストにない場合は「未登録地点」として扱う
         isExternalSpot = true;
         activeSpot = { label: activeLabel, lat: currentLat, lon: currentLon };
     }
 
     let items = [];
     if (activeSpot) {
-        items.push({ id: activeSpot.label, label: isExternalSpot ? activeSpot.label : `📍 ${activeSpot.label}`, lat: activeSpot.lat, lon: activeSpot.lon, rawLabel: activeSpot.label, isExternal: false });
+        items.push({ id: activeSpot.label, label: isExternalSpot ? activeSpot.label : `📍 ${activeSpot.label}`, lat: activeSpot.lat, lon: activeSpot.lon, rawLabel: activeSpot.label, isExternal: isExternalSpot });
     }
-    // [2][3] 固定ボタン
     items.push({ id: 'gps', label: 'GPS', isSpecial: true, isExternal: true });
     items.push({ id: 'map', label: 'Map', isSpecial: true, isExternal: true });
-    // [4以降] 履歴
     displaySpots.forEach(s => items.push({ id: s.label, label: `📍 ${s.label}`, lat: s.lat, lon: s.lon, rawLabel: s.label, isExternal: false }));
 
     items.forEach((item) => {
@@ -1684,7 +1729,6 @@ function renderTabs(activeOverrideLabel = null) {
             if (item.id === 'gps') {
                 handleGPSClick();
             } else if (item.id === 'map') {
-                // 設計通り、現在の位置を渡して地図を開く。ラベルの勝手な書き換えはしない。
                 openMap(currentLat, currentLon); 
             } else {
                 if (!item.isExternal) {
@@ -1700,88 +1744,46 @@ function renderTabs(activeOverrideLabel = null) {
             }
         };
 
-        // 編集・削除（長押し・右クリック）ロジックの直接記述
         if (!item.isSpecial) {
-            const spotIdx = mySpots.findIndex(s => s.label === item.rawLabel);
             const openEditor = (e) => {
                 if (e) { e.preventDefault(); e.stopPropagation(); }
-                if (typeof showAppDialog === 'function') {
-                    showAppDialog({
-                        title: item.rawLabel,
-                        messageKey: 'editSpotGuide',
-                        inputValue: item.rawLabel,
-                        onMap: () => { if (typeof openMap === 'function') openMap(item.lat, item.lon); },
-                        onSave: (newName) => {
-                            if (!newName || (typeof checkSpotLimit === 'function' && !checkSpotLimit(newName))) return;
-                            if (spotIdx !== -1) {
-                                const targetSpot = mySpots.splice(spotIdx, 1)[0];
-                                targetSpot.label = newName;
-                                mySpots.unshift(targetSpot);
-                            } else {
-                                const filtered = mySpots.filter(s => s.label !== newName);
-                                mySpots = [{ lat: item.lat, lon: item.lon, label: newName }, ...filtered];
-                            }
-                            localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-                            updateLocation(item.lat, item.lon, newName);
-                            renderTabs(newName);
-                        },
-                        // 修正：最後の1カ所を削除しようとした時の制御を追加
-                        onDelete: spotIdx !== -1 ? () => {
-                            if (mySpots.length > 1) {
-                                // 地点が2つ以上ある場合は通常通り削除
-                                mySpots.splice(spotIdx, 1);
-                                localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-                                renderTabs();
-                            } else {
-                                // 最後の1つの場合は汎用モーダルで警告を表示
-                                showAppDialog({
-                                    title: item.rawLabel,
-                                    messageKey: 'lastSpotWarning', 
-                                    onSave: null // 保存ボタンを消し、閉じる（OK）だけに誘導
-                                });
-                            }
-                        } : null 
-                    });
-                }
+                const currentLabelAtOpen = item.rawLabel;
+
+                showAppDialog({
+                    title: currentLabelAtOpen,
+                    messageKey: 'editSpotGuide',
+                    inputValue: currentLabelAtOpen,
+                    onMap: () => { if (typeof openMap === 'function') openMap(item.lat, item.lon); },
+                    onSave: (newName) => {
+                        if (!newName || (typeof checkSpotLimit === 'function' && !checkSpotLimit(newName))) return;
+                        const idx = mySpots.findIndex(s => s.label === currentLabelAtOpen);
+                        if (idx !== -1) {
+                            const targetSpot = mySpots.splice(idx, 1)[0];
+                            targetSpot.label = newName;
+                            mySpots.unshift(targetSpot);
+                        } else {
+                            const filtered = mySpots.filter(s => s.label !== newName);
+                            mySpots = [{ lat: item.lat, lon: item.lon, label: newName }, ...filtered];
+                        }
+                        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                        updateLocation(item.lat, item.lon, newName);
+                        renderTabs(newName);
+                    },
+                    onDelete: !item.isExternal ? () => {
+                        setTimeout(() => {
+                            confirmDeleteByLabel(currentLabelAtOpen);
+                        }, 50);
+                    } : null
+                });
             };
-            btn.oncontextmenu = openEditor; // 右クリック
+            btn.oncontextmenu = openEditor; 
             let timer;
-            btn.ontouchstart = (e) => { timer = setTimeout(() => openEditor(e), 800); }; // 長押し開始
-            btn.ontouchend = () => clearTimeout(timer); // 解除
+            btn.ontouchstart = (e) => { timer = setTimeout(() => openEditor(e), 800); }; 
+            btn.ontouchend = () => clearTimeout(timer); 
         }
         container.appendChild(btn);
     });
 }
-
-/**
- * サブルーチン：地点の削除確認（自作ダイアログ版）
- * ※この関数を直接呼び出すケースがある場合に備え、ここにも最後の1個チェックを入れています
- */
-function confirmDelete(index) {
-    if (index === -1 || !mySpots[index]) return;
-
-    const targetLabel = mySpots[index].label;
-
-    if (mySpots.length <= 1) {
-        showAppDialog({
-            title: targetLabel,
-            messageKey: 'lastSpotWarning',
-            onSave: null
-        });
-        return;
-    }
-
-    showAppDialog({
-        title: targetLabel,
-        messageKey: 'editSpotGuide',
-        onDelete: () => {
-            mySpots.splice(index, 1);
-            localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-            renderTabs();
-        }
-    });
-}
-
 
 /**
  * サブルーチン：GPSボタンクリック時の処理
