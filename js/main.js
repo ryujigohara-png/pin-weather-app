@@ -99,7 +99,7 @@ const i18n = {
             // --- 風向設定モーダル ---
             windModalTitle: "色付けする風向を選択",
             compassCenterText: "中央をクリックで<br>全選択 / 解除",
-            btnApply: "変更して登録",
+            btnApply: "更新",
 
             // --- 表示詳細設定モーダル ---
             settingsTitle: "グラフ表示詳細設定",
@@ -166,8 +166,8 @@ const i18n = {
             btnDelete: "削除",
             confirmDeletePrefix: "本当に削除しますか：",
 
-            condition_summary_btn: "コンディション概況",
-            summary_title: "【コンディション概況】",
+            condition_summary_btn: "概況",
+            summary_title: "【概況】",
             as_of: "現在",
             tomorrow: "明日",
             analyzing: "予報データを分析中...",
@@ -235,7 +235,7 @@ const i18n = {
             // --- Wind Modal ---
             windModalTitle: "Select Wind Directions to Color",
             compassCenterText: "Click Center to<br>Select/Deselect All",
-            btnApply: "Apply Changes",
+            btnApply: "Update",
 
             // --- Detail Settings Modal ---
             settingsTitle: "Detailed Display Settings",
@@ -302,8 +302,8 @@ const i18n = {
             btnDelete: "Delete",
             confirmDeletePrefix: "Are you sure you want to delete:",
 
-            condition_summary_btn: "Condition Summary",
-            summary_title: "[Condition Summary] ",
+            condition_summary_btn: "Summary",
+            summary_title: "[Summary] ",
             as_of: "As of",
             tomorrow: "tomorrow ",
             analyzing: "Analyzing forecast data...",
