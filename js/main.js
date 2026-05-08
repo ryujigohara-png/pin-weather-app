@@ -846,9 +846,10 @@ function initCopyUrlEvent() {
 
 /**
  * サブルーチン：ウィジェットプレビューモーダルを開く
- * 1. 地名(place)と座標(lat/lon)に加え、現在の色付け風向(wind)をパラメータに追加。
- * 2. 表示言語をコピーコードと完全に一致させます。
- * 3. プレビュー枠の高さを維持しつつ、ボタンが隠れないよう調整しました。
+ * * 変更点（厳守事項）:
+ * 1. 既存の地点(place), 座標(lat/lon), 風向(wind)の取得ロジックを完全維持。
+ * 2. 5つのパラメータ（wUnit, tUnit, thH, thM, thL）をURLSearchParamsに厳密に追加。
+ * 3. 構造化プログラミングに基づき、他のサブルーチンや変数への副作用を排除。
  */
 function openWidgetPreview() {
     console.log("DEBUG: openWidgetPreview [START]");
@@ -863,7 +864,7 @@ function openWidgetPreview() {
 
     if (!modal) return;
 
-    // 他のモーダル利用時に影響が出ないよう、一旦初期化
+    // 他のモーダル利用時に影響が出ないよう、一旦初期化（既存ロジックを継承）
     const allModalContents = modal.querySelectorAll('.modal-content-unit'); 
     allModalContents.forEach(el => el.style.display = 'none');
 
@@ -886,22 +887,42 @@ function openWidgetPreview() {
         copyBtnText.innerText = i18n.t('widgetCopy');
     }
 
-    // 2. パラメータの構成
+    // --- 2. パラメータの構成 ---
     const currentUrl = window.location.origin + window.location.pathname;
     const params = new URLSearchParams();
     params.set('mode', 'widget');
 
+    // 地点名と座標のセット
     const placeName = (typeof currentLabel !== 'undefined') ? currentLabel : '';
     if (placeName) params.set('place', placeName);
 
     if (typeof currentLat !== 'undefined' && currentLat !== null) params.set('lat', currentLat);
     if (typeof currentLon !== 'undefined' && currentLon !== null) params.set('lon', currentLon);
 
-    // --- 【追加】現在の色付け風向(targetWindDirections)をパラメータに追加 ---
+    // 現在の色付け風向(targetWindDirections)の追加（既存仕様）
     if (typeof targetWindDirections !== 'undefined' && targetWindDirections.length > 0) {
         params.set('wind', targetWindDirections.join(','));
     }
+
+    // --- 【重要】追加パラメータ：5つの表示設定 (viewConfigから取得) ---
+    if (typeof viewConfig !== 'undefined') {
+        // 風速単位・気温単位
+        if (viewConfig.windSpeedUnit) params.set('wUnit', viewConfig.windSpeedUnit);
+        if (viewConfig.temperatureUnit) params.set('tUnit', viewConfig.temperatureUnit);
+        
+        // 風速しきい値3種（数値の整合性を保つためMath.roundを適用）
+        if (viewConfig.windThresholdHigh !== undefined) {
+            params.set('thH', Math.round(viewConfig.windThresholdHigh));
+        }
+        if (viewConfig.windThresholdMid !== undefined) {
+            params.set('thM', Math.round(viewConfig.windThresholdMid));
+        }
+        if (viewConfig.windThresholdLow !== undefined) {
+            params.set('thL', Math.round(viewConfig.windThresholdLow));
+        }
+    }
     
+    // URLの生成とiframe埋め込みコードの作成
     const widgetUrl = `${currentUrl}?${params.toString()}`;
     const embedCode = `<iframe src="${widgetUrl}" width="100%" height="660" frameborder="0" style="border:1px solid #eee; border-radius:8px;"></iframe>`;
 
