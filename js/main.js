@@ -2669,6 +2669,7 @@ async function draw() {
 
 /**
  * サブルーチン：セクション（グラフエリア）のレンダリング
+ * 言語設定に関わらず、保存された風向フィルタを正しく適用する修正版。
  */
 function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLast, isFirst, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, activeWindFilters) {
     const svg = document.getElementById(svgId);
@@ -2737,8 +2738,16 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
             const thMid  = viewConfig.windThresholdMid;
             const thLow  = viewConfig.windThresholdLow;
 
+            // --- 修正箇所：言語に依存しないフィルタ比較用インデックスリストの作成 ---
+            // currentFiltersの中身が "北" でも "N" でも、対応する 0~15 の数値に変換する
+            const filterIndices = currentFilters.map(val => {
+                let idx = jaDirs.indexOf(val);
+                if (idx === -1) idx = enDirs.indexOf(val);
+                return idx;
+            }).filter(idx => idx !== -1);
+
             for(let i = startIdx; i < totalDataCount; i++){
-                const val = ds.data[i]; // APIが指定単位で返しているので、これをそのまま比較に使う
+                const val = ds.data[i];
                 if (val === null || typeof val === 'undefined') continue;
                 
                 const h = ((val - min) / range) * plotHeight;
@@ -2746,10 +2755,15 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                 const deg = allData.data.wind_direction_10m[i];
                 const dirText = getWindDirText(deg);
 
-                const isTargetDir = currentFilters.includes(dirText);
+                // --- 修正箇所：インデックスによる一致判定 ---
+                // 現在の風向 dirText が jaDirs/enDirs のどこにあるか探し、filterIndices に含まれるかチェック
+                let currentDirIdx = jaDirs.indexOf(dirText);
+                if (currentDirIdx === -1) currentDirIdx = enDirs.indexOf(dirText);
+                
+                const isTargetDir = filterIndices.includes(currentDirIdx);
+                
                 let color = '#ccc'; 
 
-                // APIの数値をそのまま設定値と比較
                 if (isTargetDir) {
                     if (val >= thHigh) color = '#dc143c';
                     else if (val >= thMid) color = '#ffa500';
