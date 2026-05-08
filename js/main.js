@@ -590,6 +590,7 @@ function initViewSettings() {
     const openBtn = document.getElementById('openSettingsBtn');
     const closeBtn = document.getElementById('closeViewSettings');
     const saveBtn = document.getElementById('saveViewSettings');
+    const resetBtn = document.getElementById('resetViewSettings'); // リセットボタン
 
     if (!modal || !openBtn) return;
 
@@ -622,6 +623,12 @@ function initViewSettings() {
     if (saveBtn) {
         saveBtn.addEventListener('click', () => {
             saveViewSettings();
+        });
+    }
+
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            resetViewSettings();
         });
     }
 
