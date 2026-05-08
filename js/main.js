@@ -49,7 +49,7 @@ const i18n = {
         // 言語切り替え時はリロードして整合性を確保
         location.reload();
     },
-    dict: {
+dict: {
         'ja': {
             // --- グラフ・ツールチップ用 ---
             days: ["日", "月", "火", "水", "木", "金", "土"],
@@ -96,6 +96,7 @@ const i18n = {
             layerSatellite: "衛星写真",
             layerGSI: "地理院地図",
             layerRain: "雨雲レーダー",
+
             // --- 風向設定モーダル ---
             windModalTitle: "色付けする風向を選択",
             compassCenterText: "中央をクリックで<br>全選択 / 解除",
@@ -122,6 +123,13 @@ const i18n = {
             btnRestoreDefault: "デフォルトに戻す",
             btnLoadDefault: "デフォルトを読込",
             btnSaveDefault: "デフォルトに保存",
+            
+            // --- 確認ダイアログ用追加分 ---
+            msgLoadConfirmTitle: "読込の確認",
+            msgLoadConfirmDesc: "保存されているデフォルト設定を読み込みますか？（現在の選択は上書きされます）",
+            msgSaveConfirmTitle: "保存の確認",
+            msgSaveConfirmDesc: "現在の設定をデフォルトとして保存しますか？",
+            
             msgLoadComplete: "読込完了",
             msgLoadDesc: "デフォルト設定を読み込みました。",
             msgSaveComplete: "保存完了",
@@ -258,6 +266,13 @@ const i18n = {
             btnRestoreDefault: "Restore Default",
             btnLoadDefault: "Load Default",
             btnSaveDefault: "Set Default",
+            
+            // --- Confirm Dialog for Settings ---
+            msgLoadConfirmTitle: "Confirm Load",
+            msgLoadConfirmDesc: "Do you want to load the saved default settings? (Current selection will be overwritten)",
+            msgSaveConfirmTitle: "Confirm Save",
+            msgSaveConfirmDesc: "Do you want to save the current settings as default?",
+            
             msgLoadComplete: "Loaded",
             msgLoadDesc: "Default settings loaded.",
             msgSaveComplete: "Saved",
@@ -322,6 +337,7 @@ const i18n = {
             wave_stable: "expected to remain stable through tomorrow."
         }
     },
+
     t(key) { 
         return this.dict[this._currentLang][key] || key; 
     }
@@ -1246,33 +1262,45 @@ function setupGeneralEvents() {
 
             const baseBtnStyle = "padding: 8px 4px; border-radius: 6px; font-size: 11px; font-weight: 500; border: none; cursor: pointer; transition: opacity 0.2s; flex: 1; white-space: nowrap;";
 
-            // ボタン1: デフォルトを読込
+            // ボタン1: デフォルトを読込（確認ダイアログ後にメモリ上の値を更新）
             const btnLoadDef = document.createElement('button');
             btnLoadDef.style.cssText = baseBtnStyle + "background: #f1f3f5; color: #495057;";
             btnLoadDef.innerText = i18n.t('btnLoadDefault');
             btnLoadDef.onclick = () => {
-                const savedDef = localStorage.getItem('pin_weather_wind_filter');
-                if (savedDef) {
-                    let raw = JSON.parse(savedDef);
-                    targetWindDirections = raw.map(val => {
-                        if (i18n._currentLang === 'en') {
-                            const idx = jaDirs.indexOf(val); return idx !== -1 ? enDirs[idx] : val;
-                        } else {
-                            const idx = enDirs.indexOf(val); return idx !== -1 ? jaDirs[idx] : val;
+                showAppDialog({ 
+                    title: i18n.t('msgLoadConfirmTitle') || "確認", 
+                    message: i18n.t('msgLoadConfirmDesc') || "デフォルト設定を読み込みますか？", 
+                    onSave: () => {
+                        const savedDef = localStorage.getItem('pin_weather_wind_filter');
+                        if (savedDef) {
+                            let raw = JSON.parse(savedDef);
+                            targetWindDirections = raw.map(val => {
+                                if (i18n._currentLang === 'en') {
+                                    const idx = jaDirs.indexOf(val); return idx !== -1 ? enDirs[idx] : val;
+                                } else {
+                                    const idx = enDirs.indexOf(val); return idx !== -1 ? jaDirs[idx] : val;
+                                }
+                            });
+                            if (typeof initCompassUI === 'function') initCompassUI();
                         }
-                    });
-                    if (typeof initCompassUI === 'function') initCompassUI();
-                    showAppDialog({ title: i18n.t('msgLoadComplete'), message: i18n.t('msgLoadDesc'), onSave: () => {} });
-                }
+                    } 
+                });
             };
 
-            // ボタン2: デフォルトに保存
+            // ボタン2: デフォルトに保存（【修正済】確認ダイアログ表示後に保存を実行）
             const btnSaveDef = document.createElement('button');
             btnSaveDef.style.cssText = baseBtnStyle + "background: #f1f3f5; color: #495057;";
             btnSaveDef.innerText = i18n.t('btnSaveDefault');
             btnSaveDef.onclick = () => {
-                localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
-                showAppDialog({ title: i18n.t('msgSaveComplete'), message: i18n.t('msgSaveDesc'), onSave: () => {} });
+                // ここでは保存せず、ダイアログを表示するだけにする
+                showAppDialog({ 
+                    title: i18n.t('msgSaveConfirmTitle') || "保存の確認", 
+                    message: i18n.t('msgSaveConfirmDesc') || "現在の設定をデフォルトとして保存しますか？", 
+                    onSave: () => {
+                        // ダイアログで「更新」が押された時のみ、ストレージを書き換える
+                        localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
+                    } 
+                });
             };
 
             // ボタン3: キャンセル
@@ -1282,11 +1310,11 @@ function setupGeneralEvents() {
             cancelBtn.innerText = i18n.t('btnClose') || "Cancel";
             cancelBtn.onclick = () => closeModal('wind-modal');
 
-            // ボタン4: 適用（変更して登録）
+            // ボタン4: 適用（現在の地点に保存して再描画）
             const finalApplyBtn = document.createElement('button');
             finalApplyBtn.style.cssText = baseBtnStyle + "background: #007bff; color: white; flex: 1.2;";
             finalApplyBtn.innerText = i18n.t('btnSaveSettings') || "Apply Changes";
-            finalApplyBtn.onclick = executeApply; // ここでイベントを再登録
+            finalApplyBtn.onclick = executeApply;
 
             // フッター再構築
             footer.innerHTML = ''; 
@@ -1479,11 +1507,11 @@ function initCompassUI() {
 
 /**
  * サブルーチン：環境色を反映した汎用ダイアログを表示（多言語・サイズ調整・安全版）
- * 1. ウィジェットプレビュー関連の要素を確実にリセットします。
- * 2. ホスト名に応じてヘッダー色を変更します。
- * 3. 渡された引数に応じてボタンと入力を動的に生成します。
+ * 1. ウィジェットプレビュー関連の要素をリセット。
+ * 2. ホスト名に応じてヘッダー色を変更。
+ * 3. 最後の1地点削除警告など、アクションがない場合でも「閉じる」ボタンを表示するよう修正。
  */
-function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onSave = null, onDelete = null }) {
+function showAppDialog({ title, message = null, messageKey = null, inputValue = null, onMap = null, onSave = null, onDelete = null }) {
     const modal = document.getElementById('app-common-modal');
     const header = document.getElementById('common-modal-header');
     const titleEl = document.getElementById('common-modal-title');
@@ -1492,40 +1520,40 @@ function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onS
     const input = document.getElementById('common-modal-input');
     const footer = document.getElementById('common-modal-footer');
 
-    // --- ウィジェット関連要素の確実なリセット ---
+    // --- ウィジェット関連要素のリセット ---
     const widgetArea = document.getElementById('widget-preview-area');
-    const widgetActionArea = document.getElementById('widget-action-area'); // コピーボタン等のエリア
+    const widgetActionArea = document.getElementById('widget-action-area');
     if (widgetArea) widgetArea.style.display = 'none';
     if (widgetActionArea) widgetActionArea.style.display = 'none';
 
-    // 必須要素の存在確認（クラッシュ防止）
-    if (!modal || !header || !titleEl || !msgEl || !footer) {
-        console.error("Critical Error: Required modal elements not found.");
-        return;
-    }
+    if (!modal || !header || !titleEl || !msgEl || !footer) return;
 
-    // 1. 環境色の反映（ホスト名による判定）
+    // 1. 環境色の反映
     const hostname = window.location.hostname;
-    let bgColor = "#007bff"; // Main (Blue)
+    let bgColor = "#007bff"; 
     let textColor = "#ffffff";
 
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.includes("192.168.")) {
-        bgColor = "#b0fbcf"; // Local (Greenish)
+        bgColor = "#b0fbcf"; 
         textColor = "#333333";
     } else if (hostname.includes("beta")) {
-        bgColor = "#f5dc1b"; // Beta (Yellow)
+        bgColor = "#f5dc1b"; 
         textColor = "#333333";
     }
 
-    // スタイル適用
     header.style.backgroundColor = bgColor;
     titleEl.style.color = textColor;
 
     // 2. コンテンツのセット
     titleEl.innerText = title;
-    msgEl.innerText = messageKey ? i18n.t(messageKey) : "";
+    if (messageKey) {
+        msgEl.innerText = i18n.t(messageKey);
+    } else if (message) {
+        msgEl.innerText = message;
+    } else {
+        msgEl.innerText = "";
+    }
     
-    // 入力エリアの表示制御
     if (inputArea && input) {
         if (inputValue !== null) {
             inputArea.style.display = 'block';
@@ -1535,64 +1563,69 @@ function showAppDialog({ title, messageKey, inputValue = null, onMap = null, onS
         }
     }
 
-    // 3. ボタンの生成（初期化してから追加）
+    // 3. ボタンの生成
     footer.innerHTML = "";
     
-    // 削除ボタン
-    if (onDelete) {
-        const btnDelete = document.createElement('button');
-        btnDelete.className = "btn btn-danger-outline";
-        btnDelete.innerText = i18n.t('btnDelete'); 
-        btnDelete.onclick = () => {
-            onDelete();
+    // 【判定ロジックの修正】
+    // ウィジェット設定画面（メッセージのみでタイトルが「ウィジェット埋め込み設定」）の場合はフッターを隠す。
+    // それ以外（削除警告メッセージなど）は、アクションがなくても「閉じる」ボタンを出す。
+    const isWidgetMode = (!onDelete && !onMap && !onSave && title === i18n.t('widgetTitle'));
+
+    if (isWidgetMode) {
+        footer.style.display = 'none';
+    } else {
+        footer.style.display = 'flex';
+
+        // 削除ボタン
+        if (onDelete) {
+            const btnDelete = document.createElement('button');
+            btnDelete.className = "btn btn-danger-outline";
+            btnDelete.innerText = i18n.t('btnDelete'); 
+            btnDelete.onclick = () => {
+                onDelete();
+                modal.style.display = 'none';
+            };
+            footer.appendChild(btnDelete);
+        }
+
+        // 地図ボタン
+        if (onMap) {
+            const btnMap = document.createElement('button');
+            btnMap.className = "btn btn-map-view";
+            btnMap.innerText = "Map"; 
+            btnMap.onclick = () => {
+                onMap();
+                modal.style.display = 'none';
+            };
+            footer.appendChild(btnMap);
+        }
+
+        // キャンセル（閉じる）ボタン：ウィジェット以外では常に表示
+        const btnCancel = document.createElement('button');
+        btnCancel.className = "btn btn-secondary";
+        btnCancel.innerText = i18n.t('btnClose');
+        btnCancel.onclick = () => {
             modal.style.display = 'none';
         };
-        footer.appendChild(btnDelete);
+        footer.appendChild(btnCancel);
+
+        // 保存・適用ボタン
+        if (onSave) {
+            const btnSave = document.createElement('button');
+            btnSave.className = "btn btn-save";
+            btnSave.innerText = i18n.t('btnApply') || i18n.t('btnSaveSettings') || "Update";
+            btnSave.onclick = () => {
+                const value = input ? input.value : null;
+                onSave(value);
+                modal.style.display = 'none';
+            };
+            footer.appendChild(btnSave);
+        }
     }
 
-    // 地図ボタン
-    if (onMap) {
-        const btnMap = document.createElement('button');
-        btnMap.className = "btn btn-map-view";
-        btnMap.innerText = "Map"; 
-        btnMap.onclick = () => {
-            onMap();
-            modal.style.display = 'none';
-        };
-        footer.appendChild(btnMap);
-    }
-
-    // キャンセルボタン
-    const btnCancel = document.createElement('button');
-    btnCancel.className = "btn btn-secondary";
-    btnCancel.innerText = i18n.t('btnClose');
-    btnCancel.onclick = () => {
-        modal.style.display = 'none';
-    };
-    footer.appendChild(btnCancel);
-
-    // 保存・適用ボタン
-    if (onSave) {
-        const btnSave = document.createElement('button');
-        btnSave.className = "btn btn-save";
-        btnSave.innerText = i18n.t('btnApply') || i18n.t('btnSaveSettings');
-        btnSave.onclick = () => {
-            const value = input ? input.value : null;
-            onSave(value);
-            modal.style.display = 'none';
-        };
-        footer.appendChild(btnSave);
-    }
-
-    // 表示（flexで中央揃えを維持）
     modal.style.display = 'flex';
 }
 
-/**
- * サブルーチン：地点登録数の制限チェック
- * @param {string} newName - 新しく登録しようとしている地点名
- * @returns {boolean} - 登録可能な場合は true
- */
 /**
  * サブルーチン：地点登録数の制限チェック
  */
@@ -1647,7 +1680,6 @@ function confirmDeleteByLabel(label) {
                 mySpots.splice(finalIdx, 1);
                 localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
                 
-                // 【修正ポイント】
                 // 削除した地点を表示し続けると「未登録地点」としてタブに残るため、
                 // 残ったリストの最初の地点に切り替えて再描画します。
                 const nextSpot = mySpots[0];
