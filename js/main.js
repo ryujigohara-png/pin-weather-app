@@ -49,7 +49,7 @@ const i18n = {
         // 言語切り替え時はリロードして整合性を確保
         location.reload();
     },
-dict: {
+    dict: {
         'ja': {
             // --- グラフ・ツールチップ用 ---
             days: ["日", "月", "火", "水", "木", "金", "土"],
@@ -180,9 +180,14 @@ dict: {
             tomorrow: "明日",
             analyzing: "予報データを分析中...",
             weather_now: "現在は{weather}ですが、",
-            weather_change: "{day}{time}時頃から天気が変わる見込みです。",
+            weather_change: "{day}{time}時頃から{status}見込みです。",
+            status_clear: "晴れ間が多くなる",
+            status_cloud: "雲が多くなる",
+            status_rain: "雨が降り出す",
+            status_snow: "雪が降り出す",
+            status_thunder: "雷雨になる",
             stable_weather: "向こう24時間は安定した天気が続く予報です。",
-            temp_info: "気温は最高{max}℃、最低{min}℃で、",
+            temp_info: "気温は最高{max}{unit}、最低{min}{unit}で、",
             temp_diff_warn: "寒暖差にご注意ください。",
             temp_stable: "落ち着いた推移となるでしょう。",
             wind_current: "風は現在、{dir}の風が{speed}{unit}ですが、",
@@ -324,8 +329,13 @@ dict: {
             analyzing: "Analyzing forecast data...",
             weather_now: "Currently {weather}, ",
             weather_change: "weather is expected to change around {day}{time}:00.",
-            stable_weather: "Stable weather is expected for the next 24 hours.",
-            temp_info: "High: {max}℃, Low: {min}℃. ",
+            weather_change: "{status} is expected around {day}{time}:00.",
+            status_clear: "clearer skies",
+            status_cloud: "cloudy skies",
+            status_rain: "rain",
+            status_snow: "snow",
+            status_thunder: "thunderstorms",
+            temp_info: "High: {max}{unit}, Low: {min}{unit}. ",
             temp_diff_warn: "Watch for temperature swings.",
             temp_stable: "Temperatures will remain steady.",
             wind_current: "Wind is {dir} at {speed}{unit}, ",
@@ -2396,7 +2406,7 @@ function getAzimuth(degrees) {
 
 /**
  * サブルーチン：気象データから概況文章を生成
- * 値が null の場合でもクラッシュしないようにガードを追加
+ * 天気の変化を具体的に（晴れ・曇り・雨など）記述するように拡張
  */
 function generateWeatherSummary(data, label) {
     // データ異常系チェック
@@ -2438,22 +2448,36 @@ function generateWeatherSummary(data, label) {
                 viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 
                 viewConfig.windSpeedUnit === 'mph' ? 'mph' : 'm/s') : 'm/s';
 
+    const tUnit = (typeof viewConfig !== 'undefined' && viewConfig.temperatureUnit === 'fahrenheit') ? '℉' : '℃';
+
     // --- 1. 天気と気温の解析 ---
     const currentCode = data.weather_code[nowIdx];
     const currentWeatherName = getI18nWeatherName(currentCode);
-    const isClearGroup = (code) => [0, 1, 2].includes(code);
+    
+    // 天気グループ判定ヘルパー
+    const getGroup = (code) => {
+        if ([0, 1].includes(code)) return 'clear';
+        if ([2, 3, 45, 48].includes(code)) return 'cloud';
+        if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return 'rain';
+        if ([71, 73, 75, 85, 86].includes(code)) return 'snow';
+        if ([95, 96, 99].includes(code)) return 'thunder';
+        return 'other';
+    };
 
+    const currentGroup = getGroup(currentCode);
     let changeIdx = -1;
+    let nextGroup = '';
+
     for (let i = nowIdx + 1; i <= endIdx; i++) {
-        const isCurrentlyClear = isClearGroup(currentCode);
-        const isNextClear = isClearGroup(data.weather_code[i]);
-        if (isCurrentlyClear !== isNextClear || (!isCurrentlyClear && data.weather_code[i] !== currentCode)) {
+        const targetGroup = getGroup(data.weather_code[i]);
+        if (targetGroup !== currentGroup) {
             changeIdx = i;
+            nextGroup = targetGroup;
             break;
         }
     }
 
-    // 気温データの抽出と null チェック
+    // 気温データの抽出
     const rawTemps = data.temperature_2m.slice(nowIdx, endIdx + 1).filter(v => v !== null && typeof v === 'number');
     let tempPart = "";
     let weatherFinal = i18n.t('weather_now').replace('{weather}', currentWeatherName);
@@ -2461,7 +2485,15 @@ function generateWeatherSummary(data, label) {
     if (changeIdx !== -1) {
         const cTime = new Date(data.time[changeIdx]);
         const dayLabel = cTime.getDate() !== now.getDate() ? i18n.t('tomorrow') : "";
-        weatherFinal += i18n.t('weather_change').replace('{day}', dayLabel).replace('{time}', cTime.getHours());
+        
+        // 変化後の状態（status）を決定
+        const statusKey = `status_${nextGroup}`;
+        const statusText = i18n.t(statusKey);
+
+        weatherFinal += i18n.t('weather_change')
+            .replace('{day}', dayLabel)
+            .replace('{time}', cTime.getHours())
+            .replace('{status}', statusText);
     } else {
         weatherFinal += i18n.t('stable_weather');
     }
@@ -2470,7 +2502,10 @@ function generateWeatherSummary(data, label) {
         const maxTemp = Math.max(...rawTemps);
         const minTemp = Math.min(...rawTemps);
         const tempDiff = maxTemp - minTemp;
-        tempPart = i18n.t('temp_info').replace('{max}', maxTemp.toFixed(1)).replace('{min}', minTemp.toFixed(1));
+        tempPart = i18n.t('temp_info')
+            .replace('{max}', maxTemp.toFixed(1))
+            .replace('{min}', minTemp.toFixed(1))
+            .replaceAll('{unit}', tUnit);
         tempPart += (tempDiff >= 10) ? i18n.t('temp_diff_warn') : i18n.t('temp_stable');
     }
     weatherFinal += tempPart;
@@ -3025,21 +3060,22 @@ function hideTooltipUI() {
 
 /**
  * サブルーチン：風速凡例の動的表示更新
- * 内部の m/s しきい値を現在の単位に変換し、整数に丸めて表示します。
+ * 【修正点】
+ * 1. 内部値を再計算(換算)せず、viewConfig内の数値をそのまま表示に反映させます。
+ * 2. 単位ラベルのみ現在の設定に合わせて表示します。
+ * 3. 構造とHTMLクラス、色指定を完全に維持します。
  */
 function updateWindLegend() {
     const container = document.querySelector('.legend-wind-container');
     if (!container) return;
 
-    // 1. 現在の表示単位を取得
+    // 1. 現在の表示単位（ラベル用）を取得
     const unit = i18n.t('speedunit'); 
-    const unitKey = viewConfig.windSpeedUnit || 'ms';
 
-    // 2. 内部の m/s 値を表示単位へ変換し、整数に丸める
-    // convertWindSpeedValue サブルーチンを利用
-    const thHigh = Math.round(convertWindSpeedValue(viewConfig.windThresholdHigh, unitKey));
-    const thMid  = Math.round(convertWindSpeedValue(viewConfig.windThresholdMid, unitKey));
-    const thLow  = Math.round(convertWindSpeedValue(viewConfig.windThresholdLow, unitKey));
+    // 2. 設定値をそのまま取得（既に選択単位に応じた整数として保持されているため）
+    const thHigh = Math.round(viewConfig.windThresholdHigh);
+    const thMid  = Math.round(viewConfig.windThresholdMid);
+    const thLow  = Math.round(viewConfig.windThresholdLow);
 
     // 3. HTMLを生成して反映
     container.innerHTML = `
