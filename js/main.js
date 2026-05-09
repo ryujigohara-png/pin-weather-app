@@ -1080,7 +1080,7 @@ function applyEnvVisuals() {
 
 /**
  * サブルーチン：アプリ起動時の初期化
- * 1. 【最優先】URLパラメータがあれば地点および「色付け風向(wind)」を上書き
+ * 1. 【最優先】URLパラメータがあれば地点および「色付け風向(wind)」および「表示設定(Unit/Threshold)」を上書き
  * 2. 保存データがあればロード
  * 3. データがない場合はIPから現在地を推定して即時描画
  */
@@ -1096,6 +1096,13 @@ async function initApp() {
     const pLon = urlParams.get('lon');
     const pWind = urlParams.get('wind');
 
+    // --- 追加：ウィジェット用の表示設定パラメータ ---
+    const pWUnit = urlParams.get('wUnit'); // 風速単位
+    const pTUnit = urlParams.get('tUnit'); // 温度単位
+    const pThH = urlParams.get('thH');     // しきい値(高)
+    const pThM = urlParams.get('thM');     // しきい値(中)
+    const pThL = urlParams.get('thL');     // しきい値(低)
+
     // ウィジェットモードかつ座標パラメータがある場合、ストレージより優先して適用
     let isParamLoaded = false;
     if (pMode === 'widget' && pLat && pLon) {
@@ -1106,7 +1113,6 @@ async function initApp() {
         // --- URLから色付け風向を復元 ---
         if (pWind) {
             const rawWindDirs = pWind.split(',');
-            // map内で言語変換を行い、直接 targetWindDirections を確定させる
             targetWindDirections = rawWindDirs.map(val => {
                 if (typeof i18n !== 'undefined' && i18n._currentLang === 'en') {
                     if (typeof jaDirs !== 'undefined' && typeof enDirs !== 'undefined') {
@@ -1123,12 +1129,21 @@ async function initApp() {
             });
             console.log("DEBUG: targetWindDirections restored from URL:", targetWindDirections);
         } else {
-            // パラメータにwindがない場合は空配列にして、全方位化を明示的に防ぐ
             targetWindDirections = [];
         }
 
+        // --- 今回の修正：URLから表示設定(viewConfig)を復元 ---
+        if (typeof viewConfig !== 'undefined') {
+            if (pWUnit) viewConfig.windSpeedUnit = pWUnit;
+            if (pTUnit) viewConfig.temperatureUnit = pTUnit;
+            if (pThH !== null) viewConfig.windThresholdHigh = parseFloat(pThH);
+            if (pThM !== null) viewConfig.windThresholdMid  = parseFloat(pThM);
+            if (pThL !== null) viewConfig.windThresholdLow  = parseFloat(pThL);
+            console.log("DEBUG: viewConfig updated from URL parameters:", viewConfig);
+        }
+
         isParamLoaded = true;
-        console.log("DEBUG: Location and Wind Filters loaded from URL parameters.");
+        console.log("DEBUG: Location, Wind Filters, and View Config loaded from URL parameters.");
     }
 
     // --- ストレージの確認 ---
@@ -1142,8 +1157,6 @@ async function initApp() {
 
     // --- 地点確定ロジック（上書きガード付き） ---
     if (isParamLoaded) {
-        // 【最重要】パラメータロード済みの場合は、finalizeInit内で上書きされないよう
-        // ここで確定させ、他の代入処理をバイパスする
         finalizeInit(); 
     } else if (parsedData && parsedData.length > 0) {
         // ストレージにデータがある場合
@@ -1157,7 +1170,6 @@ async function initApp() {
         if (lastSpot.windFilters) {
             targetWindDirections = [...lastSpot.windFilters];
         } else {
-            // 設定がない場合のみ全方位（デフォルト）
             if (typeof jaDirs !== 'undefined') {
                 targetWindDirections = [...jaDirs];
             }
@@ -1169,7 +1181,6 @@ async function initApp() {
         mySpots = [];
         await setApproximateLocation(); 
         
-        // 新規訪問時のみ全方位をデフォルトセット
         if (typeof jaDirs !== 'undefined') {
             targetWindDirections = [...jaDirs];
         }
@@ -2585,6 +2596,29 @@ async function draw() {
         const params = new URLSearchParams(window.location.search);
         const isWidget = params.get('mode') === 'widget';
         
+        // --- 1. ウィジェットモード時のパラメータ反映（確実に最新を反映） ---
+        if (isWidget) {
+            if (params.get('tUnit')) viewConfig.temperatureUnit = params.get('tUnit');
+            if (params.get('wUnit')) viewConfig.windSpeedUnit = params.get('wUnit');
+            if (params.get('thH') !== null) viewConfig.windThresholdHigh = parseFloat(params.get('thH'));
+            if (params.get('thM') !== null) viewConfig.windThresholdMid  = parseFloat(params.get('thM'));
+            if (params.get('thL') !== null) viewConfig.windThresholdLow  = parseFloat(params.get('thL'));
+
+            // ナビ表示制御
+            const nav = document.querySelector('.nav-container') || document.querySelector('nav');
+            if (nav) nav.style.display = 'none';
+        }
+
+        // --- 2. 【重要】反映されない単位テキストの再計算と辞書の更新 ---
+        const currentWUnit = viewConfig.windSpeedUnit === 'ms' ? 'm/s' : (viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : viewConfig.windSpeedUnit);
+        const currentTUnit = viewConfig.temperatureUnit === 'celsius' ? '℃' : '℉';
+
+        // i18n辞書の動的プロパティを現在の設定で上書き（ツールチップ等に反映）
+        if (typeof i18n !== 'undefined' && i18n.dict[i18n._currentLang]) {
+            i18n.dict[i18n._currentLang].speedunit = currentWUnit;
+        }
+        // -----------------------------------------------------------
+        
         console.time("1. Data Fetch (Cache)"); // 【計測】データ取得
         allData = await fetchWithCache(currentLat, currentLon);
         if (allData) {
@@ -2601,13 +2635,11 @@ async function draw() {
 
         console.time("2. Layout Setup"); // 【計測】計算とレイアウト設定
         
-        // 【最適化】地点検索をここで行い、以降使い回す
         const currentSpot = mySpots.find(s => 
             Math.abs(s.lat - currentLat) < 0.0001 && 
             Math.abs(s.lon - currentLon) < 0.0001
         );
         
-        // 地点固有の設定があればそれを使い、なければ共通設定(targetWindDirections)を使う
         const activeWindFilters = (currentSpot && currentSpot.windFilters) 
             ? currentSpot.windFilters 
             : targetWindDirections;
@@ -2626,20 +2658,17 @@ async function draw() {
         let subH = isWidget ? 80 : viewConfig.subHeight;
         let gMargin = viewConfig.graphMargin || 0;
 
-        if (isWidget) {
-            const nav = document.querySelector('.nav-container') || document.querySelector('nav');
-            if (nav) nav.style.display = 'none';
-        }
-        
-        const waveData = allData.data.wave_height ? allData.data.wave_height.slice(startIdx) : [];
-        const tideData = allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl.slice(startIdx) : [];
-        const hasMarineData = waveData.some(v => v !== 0 && v !== null) || tideData.some(v => v !== 0 && v !== null);
-
+        // --- 3. y軸ラベルの動的更新（i18n辞書の固定値を使わず現在のUnit変数を使用） ---
         const titles = document.querySelectorAll('.y-axis-title');
         if (titles.length >= 4) {
             titles[0].innerHTML = i18n.t('yAxisWeather');
-            titles[1].innerHTML = `${baseWindIcon}${i18n.t('yAxisWind')}`;
-            titles[2].innerHTML = i18n.t('yAxisTemp');
+            titles[1].innerHTML = `${baseWindIcon}${i18n.t('windDir')}<br>(${currentWUnit})`;
+            titles[2].innerHTML = `${i18n.t('temp')}(${currentTUnit})<br>${i18n.t('seawater')}(${currentTUnit})`;
+            
+            const waveData = allData.data.wave_height ? allData.data.wave_height.slice(startIdx) : [];
+            const tideData = allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl.slice(startIdx) : [];
+            const hasMarineData = waveData.some(v => v !== 0 && v !== null) || tideData.some(v => v !== 0 && v !== null);
+            
             let marineTitle = hasMarineData ? i18n.t('yAxisMarine') : `<br><span style="color:#FF0000; font-weight:bold; font-size:14px; display:block; margin-top:2px;">No Marine Data</span>`;
             titles[3].innerHTML = marineTitle;
         }
@@ -2663,7 +2692,7 @@ async function draw() {
         }
         console.timeEnd("2. Layout Setup");
 
-        console.time("3. Weather Icon & Rain View"); // 【計測】天気・降水描画
+        // --- 4. Weather Icon & Rain View 以降の描画ロジックを維持 ---
         let wHtml = "";
         const pData = allData.data.precipitation ? allData.data.precipitation.slice(startIdx) : [];
         const pMax = Math.ceil(Math.max(...pData, 1.0) / 5) * 5; 
@@ -2689,44 +2718,25 @@ async function draw() {
         }
 
         svgW.innerHTML = wHtml;
-        console.timeEnd("3. Weather Icon & Rain View");
-
-        console.time("4. Section Rendering (Wind/Temp/Marine)"); // 【計測】各セクション描画
-        const svgWind = document.getElementById("svg-wind");
-        if (svgWind) svgWind.style.height = `${windH}px`; 
         
+        // セクションレンダリング
         renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], windH, 5.0, true, false, true, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, activeWindFilters);
         
-        const svgTemps = document.getElementById("svg-temps");
-        if (svgTemps) svgTemps.style.height = `${subH}px`;
+        const hasMarineData = (allData.data.wave_height && allData.data.wave_height.slice(startIdx).some(v => v !== 0 && v !== null));
         renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], subH, 5.0, false, !hasMarineData, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, null);
         
         if (hasMarineData) {
-            const svgMarine = document.getElementById("svg-marine");
-            if (svgMarine) svgMarine.style.height = `${subH}px`; 
             renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], subH, 0.5, false, true, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, null);
-        } else {
-            const svgM = document.getElementById("svg-marine");
-            if (svgM) svgM.innerHTML = "";
-            const dateM = document.getElementById("date-marine");
-            if (dateM) dateM.innerHTML = "";
-            const valM = document.getElementById("val-svg-marine");
-            if (valM) valM.innerHTML = "";
         }
-        console.timeEnd("4. Section Rendering (Wind/Temp/Marine)");
 
-        console.time("5. Finalize Events"); // 【計測】仕上げのイベント登録
         updateWindLegend();
         resetGraphScroll();
         initScrollEvent(hScale, startIdx);
-        initScrollEvent(hScale, startIdx); // 元コードの重複を維持
         initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime);
-        console.timeEnd("5. Finalize Events");
 
         console.timeEnd("Total Draw Process");
     } catch (e) { 
         console.error("Critical Draw Error:", e);
-        if (typeof initApp === 'function') { initApp(); }
     }
 }
 
@@ -2802,7 +2812,6 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
             const thLow  = viewConfig.windThresholdLow;
 
             // --- 修正箇所：言語に依存しないフィルタ比較用インデックスリストの作成 ---
-            // currentFiltersの中身が "北" でも "N" でも、対応する 0~15 の数値に変換する
             const filterIndices = currentFilters.map(val => {
                 let idx = jaDirs.indexOf(val);
                 if (idx === -1) idx = enDirs.indexOf(val);
@@ -2819,7 +2828,6 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                 const dirText = getWindDirText(deg);
 
                 // --- 修正箇所：インデックスによる一致判定 ---
-                // 現在の風向 dirText が jaDirs/enDirs のどこにあるか探し、filterIndices に含まれるかチェック
                 let currentDirIdx = jaDirs.indexOf(dirText);
                 if (currentDirIdx === -1) currentDirIdx = enDirs.indexOf(dirText);
                 
@@ -3060,10 +3068,6 @@ function hideTooltipUI() {
 
 /**
  * サブルーチン：風速凡例の動的表示更新
- * 【修正点】
- * 1. 内部値を再計算(換算)せず、viewConfig内の数値をそのまま表示に反映させます。
- * 2. 単位ラベルのみ現在の設定に合わせて表示します。
- * 3. 構造とHTMLクラス、色指定を完全に維持します。
  */
 function updateWindLegend() {
     const container = document.querySelector('.legend-wind-container');
@@ -3072,7 +3076,7 @@ function updateWindLegend() {
     // 1. 現在の表示単位（ラベル用）を取得
     const unit = i18n.t('speedunit'); 
 
-    // 2. 設定値をそのまま取得（既に選択単位に応じた整数として保持されているため）
+    // 2. 設定値をそのまま取得
     const thHigh = Math.round(viewConfig.windThresholdHigh);
     const thMid  = Math.round(viewConfig.windThresholdMid);
     const thLow  = Math.round(viewConfig.windThresholdLow);
@@ -3101,7 +3105,6 @@ function updateWindLegend() {
 
 /**
  * 依存サブルーチン：風速の単位変換ヘルパー
- * （既に定義済みであれば重複定義に注意してください）
  */
 function convertWindSpeedValue(value, unit, reverse = false) {
     const factors = {
