@@ -476,7 +476,7 @@ svg { width: 100%; display: block; overflow: visible; }
 body.widget-mode {
     padding-top: 0 !important;
     background: #ffffff !important;
-    overflow: hidden !important;
+    overflow: auto  !important;
     height: auto !important;
 }
 
