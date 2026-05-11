@@ -2957,6 +2957,7 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
             tooltip.style.left = (100 + hs * 3) + "px";
             tooltip.style.top = (rect.bottom - tooltip.offsetHeight) + "px";
             tooltip.style.bottom = "auto";
+            // スクロール時はタイマーを設定せず、スクロール停止イベント側に任せる
         } else {
             // 【マウス移動・クリック時：従前のとおり高さに合わせる】
             const tooltipWidth = tooltip.offsetWidth || 220;
@@ -2971,10 +2972,10 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
                 tooltip.style.top = ty + "px";
                 tooltip.style.bottom = "auto";
             }
+            // タップ・クリック時のみ、ユーザー設定の表示時間を適用
+            const tooltipDur = viewConfig.tooltipDuration * 1000;    
+            tooltipTimer = setTimeout(() => hideTooltipUI(), tooltipDur);
         }
-
-        const tooltipDur = viewConfig.tooltipDuration * 1000;    
-        tooltipTimer = setTimeout(() => hideTooltipUI(), tooltipDur);
     };
 
     stage.onmousemove = (e) => {
@@ -3002,6 +3003,8 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
  */
 function initScrollEvent(hScale, startIdx) {
     const scrollRoot = document.getElementById('scroll-root');
+    let scrollStopTimer = null; // スクロール停止判定用タイマー
+
     if (scrollRoot) {
         scrollRoot.onscroll = () => {
             const sl = Number(scrollRoot.scrollLeft);
@@ -3032,7 +3035,6 @@ function initScrollEvent(hScale, startIdx) {
                 });
             };
 
-            // 上部と下部を分離して計算（NodeListの混線を防止）
             updateStickyGroup('.sticky-date-top');
             updateStickyGroup('.sticky-date-bottom');
 
@@ -3040,8 +3042,15 @@ function initScrollEvent(hScale, startIdx) {
                 const visualOffset = hs * 2; 
                 const targetX = sl + visualOffset; 
                 const hourIdx = (targetX / hs) + sIdx;
-                // isAutoScroll を true として呼び出し
+                
+                // ツールチップを更新（isAutoScroll = true）
                 window.updateTooltipFromScroll(hourIdx, 0, 0, true, sl);
+
+                // スクロール停止判定：一定時間（50ms程度）スクロールがなければ停止とみなして消す
+                if (scrollStopTimer) clearTimeout(scrollStopTimer);
+                scrollStopTimer = setTimeout(() => {
+                    hideTooltipUI();
+                }, 50); 
             }
         };
         scrollRoot.dispatchEvent(new Event('scroll'));
