@@ -6,42 +6,65 @@
 }
 body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: calc(var(--nav-height) + 10px); }
 
-/* ボタン配置とタブ */
+/* ボタン配置とタブの親コンテナ */
 .control-wrapper {
     position: fixed; top: 0; left: 0; right: 0; height: var(--nav-height);
-    background: white; border-bottom: 1px solid #ddd; padding: 0 10px;
-    display: flex; gap: 2px; align-items: center; z-index: 1000;
+    background: transparent; /* 背景色はjs側の環境判定に依存するため透明を維持 */
+    border-bottom: 1px solid rgba(0,0,0,0.1); 
+    padding: 0 4px; /* 左パディングを詰め、📌マークによる空白感を解消 */
+    display: flex; gap: 4px; align-items: center; z-index: 1000;
     overflow: hidden; 
 }
+
+/* スクロール可能なタブエリア */
 .scroll-tabs {
-    display: flex; gap: 4px; overflow-x: auto; white-space: nowrap; padding: 5px 0;
+    display: flex; gap: 6px; overflow-x: auto; white-space: nowrap; padding: 5px 0;
     flex-grow: 1; -webkit-overflow-scrolling: touch;
     align-items: center;
     scroll-behavior: smooth;
 }
 .scroll-tabs::-webkit-scrollbar { display: none; }
 
+/* 共通ボタン基本スタイル */
 .btn {
-    padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
-    font-weight: bold; font-size: 14px; transition: 0.2s; flex-shrink: 0;
+    padding: 6px 12px; 
+    border-radius: 20px; /* モダンなカプセル形状 */
+    border: 1px solid #ced4da; 
+    cursor: pointer;
+    font-weight: 600; font-size: 13px; 
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #ffffff; color: #495057;
 }
 
-/* 配色ルール */
-.btn-gps, .btn-map-view { 
-    background: #e9ecef; color: #495057; border: 1px solid #ced4da; 
+/* 地点タブ固有設定 */
+.btn-location {
+    margin-left: 0; /* 左端の隙間を排除 */
 }
-.btn-location { 
-    background: #ffffff; color: #495057; border: 1px solid #ced4da; 
-}
+
+/* アクティブ状態：視認性を最大化 */
 .btn.active { 
     background: #007bff !important; 
-    color: white !important; 
+    color: #ffffff !important; 
     border: 1px solid #0056b3 !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
-.btn-add { 
-    background: #ffffff; color: #6c757d; border: 1px solid #ced4da;
-    font-size: 18px; padding: 4px 15px; 
+
+/* MySpots＋ボタン：環境色に左右されない視認性確保 */
+.btn-add-tab { 
+    background: rgba(255, 255, 255, 0.7) !important; /* 背景色に左右されないよう半透明の白を敷く */
+    color: #0056b3 !important; /* 濃い青でキャプションを強調 */
+    border: 1px dashed #007bff !important; /* 点線で「追加機能」を明示 */
+    padding: 6px 14px;
+    margin-left: 2px;
+}
+
+/* ホバー時の挙動（デスクトップ環境用） */
+.btn:not(.active):hover {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+    transform: translateY(-1px);
 }
 
 /* サイドバーヘッダーの調整 */
