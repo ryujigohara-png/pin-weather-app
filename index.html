@@ -106,7 +106,6 @@
 <div class="control-wrapper">
     <button class="menu-trigger" onclick="toggleSidebar()">☰</button>
     <div class="scroll-tabs" id="spot-tabs"></div>
-    <button class="btn btn-add" id="add-btn">＋</button>
     <span class="current-pos-label" id="pos-display" style="display:none;"></span>
 </div>
 
@@ -290,9 +289,14 @@
     </div>
 </div>
 
-<button class="nav-summary-btn" onclick="scrollToSummary()">
-    📋 <span id="summary-btn-location"></span> <span data-i18n="condition_summary_btn">コンディション概況</span>
-</button>
+<div class="nav-action-bar" style="display: flex; gap: 2px; align-items: center; white-space: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;">
+    <button id="gps-btn-nav" class="btn-gps-small">GPS</button>
+    <button id="map-btn-nav" class="btn-map-small">Map</button>
+    
+    <button class="nav-summary-btn" onclick="scrollToSummary()" style="flex-shrink: 0;">
+        📋 <span id="summary-btn-location"></span> <span data-i18n="condition_summary_btn">コンディション概況</span>
+    </button>
+</div>
 
 <div class="main-card">
     <div class="scroll-container" id="scroll-root">

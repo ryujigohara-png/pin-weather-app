@@ -1201,10 +1201,12 @@ async function initApp() {
 
 /**
  * サブルーチン：IP Geolocationによる市区町村レベルの推定
+ * 修正内容：ブラウザ言語設定を判定し、日本語なら日本語地名、それ以外なら英語地名を取得。
+ * 「(Approx)」等の識別子を削除。
  */
 async function setApproximateLocation() {
     try {
-        // 無料のIP Geolocation API (ipapi.co) を利用
+        // 1. 無料のIP Geolocation API (ipapi.co) で座標を取得
         const response = await fetch('https://ipapi.co/json/');
         if (!response.ok) throw new Error('API Network Error');
         
@@ -1213,9 +1215,32 @@ async function setApproximateLocation() {
         if (data.latitude && data.longitude) {
             currentLat = data.latitude;
             currentLon = data.longitude;
-            // 市町村名(city)を優先、なければ県名(region)、それもなければ「現在地」
-            const locName = data.city || data.region || "現在地";
-            currentLabel = `${locName}(Approx)`;
+
+            // 2. 言語判定と逆引きジオコーディング
+            try {
+                // ブラウザの言語設定を判定（日本語かどうか）
+                const isJa = i18n._currentLang === 'ja';
+                const targetLang = isJa ? 'ja' : 'en';
+                
+                const revRes = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${currentLat}&lon=${currentLon}&format=json&accept-language=${targetLang}`);
+                
+                if (revRes.ok) {
+                    const revData = await revRes.json();
+                    const addr = revData.address;
+                    
+                    // 優先順位に基づいて地名を抽出
+                    let locName = addr.city || addr.town || addr.village || addr.province || addr.state || data.city || "現在地";
+                    
+                    // 識別記号を付けずに代入
+                    currentLabel = locName;
+                } else {
+                    // 逆引き失敗時はipapi.coのデータを使用（識別記号なし）
+                    currentLabel = data.city || data.region || "現在地";
+                }
+            } catch (revErr) {
+                console.warn("Reverse geocoding failed, using IP city name.", revErr);
+                currentLabel = data.city || data.region || "現在地";
+            }
         } else {
             throw new Error('Data Incomplete');
         }
@@ -1224,7 +1249,7 @@ async function setApproximateLocation() {
         // 最終的なバックアップ（高須沖）
         currentLat = 31.337; 
         currentLon = 130.795;
-        currentLabel = "高須沖(Sample)";
+        currentLabel = "高須沖";
     }
 }
 
@@ -1248,9 +1273,19 @@ function finalizeInit() {
 /**
  * サブルーチン：UIイベントの登録
  * 既存のユーザーデータ「pin_weather_spots」および「pin_weather_wind_filter」を厳守。
- * 「変更して登録」ボタンのクリックイベントが消失する問題を解決した修正版。
+ * 修正内容：新設されたナビゲーションバー内のGPS/Mapボタンへのイベント割り当て。
  */
 function setupGeneralEvents() {
+    // --- 新設：概況ボタン左隣のGPS/Mapボタン (nav-action-bar内) ---
+    const navGpsBtn = document.getElementById('gps-btn-nav');
+    if (navGpsBtn) navGpsBtn.onclick = () => handleGPSClick();
+
+    const navMapBtn = document.getElementById('map-btn-nav');
+    if (navMapBtn) navMapBtn.onclick = () => {
+        openMap(currentLat, currentLon);
+        renderTabs("Map"); // 既存仕様の「Map」タブ表示を維持
+    };
+
     // 1. 地図検索入力欄
     const searchInput = document.getElementById('map-search-input');
     if (searchInput) {
@@ -1279,7 +1314,6 @@ function setupGeneralEvents() {
     // 4. 風向設定モーダル内のボタン群
     const applyWindBtn = document.getElementById('apply-wind-btn');
     if (applyWindBtn) {
-        // 保存・適用処理（既存キー pin_weather_spots を厳守）
         const executeApply = () => {
             const currentSpot = mySpots.find(s => 
                 Math.abs(s.lat - currentLat) < 0.0001 && 
@@ -1287,17 +1321,14 @@ function setupGeneralEvents() {
             );
 
             if (currentSpot) {
-                // 地点固有の設定を保存
                 currentSpot.windFilters = [...targetWindDirections];
-                // 【重要】既存のキー名 pin_weather_spots をそのまま使用
                 localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
             } else {
-                // デフォルト設定用キー
                 localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
             }
 
             closeModal('wind-modal');
-            draw(); // グラフ再描画
+            draw(); 
         };
 
         const footer = applyWindBtn.parentElement;
@@ -1311,7 +1342,6 @@ function setupGeneralEvents() {
 
             const baseBtnStyle = "padding: 8px 4px; border-radius: 6px; font-size: 11px; font-weight: 500; border: none; cursor: pointer; transition: opacity 0.2s; flex: 1; white-space: nowrap;";
 
-            // ボタン1: デフォルトを読込（確認ダイアログ後にメモリ上の値を更新）
             const btnLoadDef = document.createElement('button');
             btnLoadDef.style.cssText = baseBtnStyle + "background: #f1f3f5; color: #495057;";
             btnLoadDef.innerText = i18n.t('btnLoadDefault');
@@ -1336,36 +1366,30 @@ function setupGeneralEvents() {
                 });
             };
 
-            // ボタン2: デフォルトに保存（【修正済】確認ダイアログ表示後に保存を実行）
             const btnSaveDef = document.createElement('button');
             btnSaveDef.style.cssText = baseBtnStyle + "background: #f1f3f5; color: #495057;";
             btnSaveDef.innerText = i18n.t('btnSaveDefault');
             btnSaveDef.onclick = () => {
-                // ここでは保存せず、ダイアログを表示するだけにする
                 showAppDialog({ 
                     title: i18n.t('msgSaveConfirmTitle') || "保存の確認", 
                     message: i18n.t('msgSaveConfirmDesc') || "現在の設定をデフォルトとして保存しますか？", 
                     onSave: () => {
-                        // ダイアログで「更新」が押された時のみ、ストレージを書き換える
                         localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
                     } 
                 });
             };
 
-            // ボタン3: キャンセル
             const cancelBtn = document.createElement('button');
             cancelBtn.id = "btnClose"; 
             cancelBtn.style.cssText = baseBtnStyle + "background: #6c757d; color: white;";
             cancelBtn.innerText = i18n.t('btnClose') || "Cancel";
             cancelBtn.onclick = () => closeModal('wind-modal');
 
-            // ボタン4: 適用（現在の地点に保存して再描画）
             const finalApplyBtn = document.createElement('button');
             finalApplyBtn.style.cssText = baseBtnStyle + "background: #007bff; color: white; flex: 1.2;";
             finalApplyBtn.innerText = i18n.t('btnSaveSettings') || "Apply Changes";
             finalApplyBtn.onclick = executeApply;
 
-            // フッター再構築
             footer.innerHTML = ''; 
             footer.appendChild(btnLoadDef);
             footer.appendChild(btnSaveDef);
@@ -1374,11 +1398,11 @@ function setupGeneralEvents() {
         }
     }
 
-    // 5. GPSボタン
+    // 5. 既存GPSボタン
     const gpsBtn = document.getElementById('gps-btn');
     if (gpsBtn) gpsBtn.onclick = () => handleGPSClick();
     
-    // 6. Mapボタン
+    // 6. 既存Mapボタン
     const mapBtn = document.getElementById('map-btn');
     if (mapBtn) {
         mapBtn.onclick = () => { 
@@ -1662,7 +1686,7 @@ function showAppDialog({ title, message = null, messageKey = null, inputValue = 
         if (onSave) {
             const btnSave = document.createElement('button');
             btnSave.className = "btn btn-save";
-            btnSave.innerText = i18n.t('btnApply') || i18n.t('btnSaveSettings') || "Update";
+            btnSave.innerText = i18n.t('btnSaveSpot') ||i18n.t('btnApply') || i18n.t('btnSaveSettings') || "Update";
             btnSave.onclick = () => {
                 const value = input ? input.value : null;
                 onSave(value);
@@ -1745,6 +1769,7 @@ function confirmDeleteByLabel(label) {
 
 /**
  * サブルーチン：地点タブの描画
+ * 修正内容：GPS/Mapをタブから除外し、末尾に「＋」ボタンを追加。
  */
 function renderTabs(activeOverrideLabel = null) {
     const container = document.getElementById('spot-tabs');
@@ -1766,7 +1791,6 @@ function renderTabs(activeOverrideLabel = null) {
     if (activeIdx > -1) {
         activeSpot = displaySpots.splice(activeIdx, 1)[0];
     } else if (activeLabel && !['gps', 'map', 'GPS', 'Map'].includes(activeLabel)) {
-        // 保存リストにない場合は「未登録地点」として扱う
         isExternalSpot = true;
         activeSpot = { label: activeLabel, lat: currentLat, lon: currentLon };
     }
@@ -1775,14 +1799,14 @@ function renderTabs(activeOverrideLabel = null) {
     if (activeSpot) {
         items.push({ id: activeSpot.label, label: isExternalSpot ? activeSpot.label : `📍 ${activeSpot.label}`, lat: activeSpot.lat, lon: activeSpot.lon, rawLabel: activeSpot.label, isExternal: isExternalSpot });
     }
-    items.push({ id: 'gps', label: 'GPS', isSpecial: true, isExternal: true });
-    items.push({ id: 'map', label: 'Map', isSpecial: true, isExternal: true });
+    
+    // 地点リストのみをタブに追加（GPS/MapはsetupGeneralEventsで別途定義済みのため除外）
     displaySpots.forEach(s => items.push({ id: s.label, label: `📍 ${s.label}`, lat: s.lat, lon: s.lon, rawLabel: s.label, isExternal: false }));
 
     items.forEach((item) => {
         const btn = document.createElement('button');
         const isSelected = (item.id === activeLabel || item.label === activeLabel || item.rawLabel === activeLabel);
-        btn.className = 'btn' + (item.id === 'gps' ? ' btn-gps' : item.id === 'map' ? ' btn-map-view' : ' btn-location');
+        btn.className = 'btn btn-location';
         
         if (isSelected) {
             btn.classList.add('active');
@@ -1796,73 +1820,74 @@ function renderTabs(activeOverrideLabel = null) {
 
         btn.onclick = (e) => {
             if (e) e.stopPropagation();
-            if (item.id === 'gps') {
-                handleGPSClick();
-            } else if (item.id === 'map') {
-                openMap(currentLat, currentLon); 
-            } else {
-                if (!item.isExternal) {
-                    const idx = mySpots.findIndex(s => s.label === item.rawLabel);
-                    if (idx > -1) {
-                        const selectedSpot = mySpots.splice(idx, 1)[0];
-                        mySpots.unshift(selectedSpot);
-                        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-                    }
+            if (!item.isExternal) {
+                const idx = mySpots.findIndex(s => s.label === item.rawLabel);
+                if (idx > -1) {
+                    const selectedSpot = mySpots.splice(idx, 1)[0];
+                    mySpots.unshift(selectedSpot);
+                    localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
                 }
-                updateLocation(item.lat, item.lon, item.rawLabel);
-                renderTabs(item.rawLabel); 
             }
+            updateLocation(item.lat, item.lon, item.rawLabel);
+            renderTabs(item.rawLabel); 
         };
 
-        if (!item.isSpecial) {
-            const openEditor = (e) => {
-                if (e) { e.preventDefault(); e.stopPropagation(); }
-                const currentLabelAtOpen = item.rawLabel;
+        const openEditor = (e) => {
+            if (e) { e.preventDefault(); e.stopPropagation(); }
+            const currentLabelAtOpen = item.rawLabel;
 
-                showAppDialog({
-                    title: currentLabelAtOpen,
-                    messageKey: 'editSpotGuide',
-                    inputValue: currentLabelAtOpen,
-                    onMap: () => { if (typeof openMap === 'function') openMap(item.lat, item.lon); },
-                    onSave: (newName) => {
-                        if (!newName || (typeof checkSpotLimit === 'function' && !checkSpotLimit(newName))) return;
-                        const idx = mySpots.findIndex(s => s.label === currentLabelAtOpen);
-                        if (idx !== -1) {
-                            const targetSpot = mySpots.splice(idx, 1)[0];
-                            targetSpot.label = newName;
-                            mySpots.unshift(targetSpot);
-                        } else {
-                            const filtered = mySpots.filter(s => s.label !== newName);
-                            mySpots = [{ lat: item.lat, lon: item.lon, label: newName }, ...filtered];
-                        }
-                        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-                        updateLocation(item.lat, item.lon, newName);
-                        renderTabs(newName);
-                    },
-                    onDelete: !item.isExternal ? () => {
-                        setTimeout(() => {
-                            confirmDeleteByLabel(currentLabelAtOpen);
-                        }, 50);
-                    } : null
-                });
-            };
-            btn.oncontextmenu = openEditor; 
-            let timer;
-            btn.ontouchstart = (e) => { timer = setTimeout(() => openEditor(e), 800); }; 
-            btn.ontouchend = () => clearTimeout(timer); 
-        }
+            showAppDialog({
+                title: currentLabelAtOpen,
+                messageKey: 'editSpotGuide',
+                inputValue: currentLabelAtOpen,
+                onMap: () => { if (typeof openMap === 'function') openMap(item.lat, item.lon); },
+                onSave: (newName) => {
+                    if (!newName || (typeof checkSpotLimit === 'function' && !checkSpotLimit(newName))) return;
+                    const idx = mySpots.findIndex(s => s.label === currentLabelAtOpen);
+                    if (idx !== -1) {
+                        const targetSpot = mySpots.splice(idx, 1)[0];
+                        targetSpot.label = newName;
+                        mySpots.unshift(targetSpot);
+                    } else {
+                        const filtered = mySpots.filter(s => s.label !== newName);
+                        mySpots = [{ lat: item.lat, lon: item.lon, label: newName }, ...filtered];
+                    }
+                    localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                    updateLocation(item.lat, item.lon, newName);
+                    renderTabs(newName);
+                },
+                onDelete: !item.isExternal ? () => {
+                    setTimeout(() => {
+                        confirmDeleteByLabel(currentLabelAtOpen);
+                    }, 50);
+                } : null
+            });
+        };
+        btn.oncontextmenu = openEditor; 
+        let timer;
+        btn.ontouchstart = (e) => { timer = setTimeout(() => openEditor(e), 800); }; 
+        btn.ontouchend = () => clearTimeout(timer); 
+
         container.appendChild(btn);
     });
+
+    // 末尾に「＋」ボタンを追加
+    const addTabBtn = document.createElement('button');
+    addTabBtn.className = 'btn btn-add-tab';
+    addTabBtn.innerHTML = '＋';
+    addTabBtn.style.minWidth = '40px';
+    addTabBtn.onclick = () => openMap();
+    container.appendChild(addTabBtn);
 }
 
 /**
  * サブルーチン：GPSボタンクリック時の処理
- * 現在地を取得し、逆引きAPIで地名を取得してからupdateLocationを呼び出す。
+ * 修正内容：既存の.btn-gpsに加え、新設された#gps-btn-navの状態も更新。
  */
 function handleGPSClick() {
     if ("geolocation" in navigator) {
-        const gpsBtn = document.querySelector('.btn-gps');
-        if (gpsBtn) gpsBtn.innerText = i18n.t('gpsFetching');
+        const gpsBtns = document.querySelectorAll('.btn-gps, #gps-btn-nav');
+        gpsBtns.forEach(btn => { if(btn) btn.innerText = i18n.t('gpsFetching'); });
 
         navigator.geolocation.getCurrentPosition(async (pos) => {
             const lat = pos.coords.latitude;
@@ -1880,25 +1905,18 @@ function handleGPSClick() {
                 }
             } catch (err) { console.error(err); }
 
-            if (gpsBtn) gpsBtn.innerText = "GPS";
+            gpsBtns.forEach(btn => { if(btn) btn.innerText = "GPS"; });
 
-            // グローバル変数の同期（タブ描画の基準となる値を確定させる）
             currentLat = lat;
             currentLon = lon;
             currentLabel = gpsLabel;
 
-            // グラフの更新
             updateLocation(lat, lon, gpsLabel);
-
-            // 【重要】左端のタブ（1番目ボタン）を、新たに取得したgpsLabelで再描画する
             renderTabs(gpsLabel);
 
         }, (err) => {
-            // エラー時の処理
             console.error(err);
-            if (gpsBtn) gpsBtn.innerText = "GPS";
-            
-            // alert を廃止し、自作ダイアログを表示
+            gpsBtns.forEach(btn => { if(btn) btn.innerText = "GPS"; });
             showAppDialog({
                 title: "GPS Error", 
                 messageKey: 'gpsError' 
@@ -1907,8 +1925,8 @@ function handleGPSClick() {
     }
 }
 
-const addBtn = document.getElementById('add-btn');
-if (addBtn) addBtn.onclick = () => openMap();
+//const addBtn = document.getElementById('add-btn');
+//if (addBtn) addBtn.onclick = () => openMap();
 
 /**
  * サブルーチン：地図モーダルを開く
