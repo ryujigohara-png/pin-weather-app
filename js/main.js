@@ -1871,8 +1871,9 @@ function handleGPSClick() {
 
 /**
  * サブルーチン：地図モーダルを開く
+ * 修正内容：引数を受け取れるようにし、編集中の地点で地図を開けるよう改善。
  */
-function openMap() {
+function openMap(targetLat = currentLat, targetLon = currentLon) {
     // 検索入力欄のクリア
     const searchInput = document.getElementById('map-search-input');
     if (searchInput) searchInput.value = '';
@@ -1887,7 +1888,8 @@ function openMap() {
         const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
         const gsi = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', { attribution: '&copy; 国土地理院' });
         
-        map = L.map('map-canvas', { center: [currentLat, currentLon], zoom: 14, layers: [esri] });
+        // currentLat/Lon ではなく targetLat/Lon を使用
+        map = L.map('map-canvas', { center: [targetLat, targetLon], zoom: 14, layers: [esri] });
         
         const baseMaps = {};
         baseMaps[i18n.t('layerStreet')] = esri;
@@ -1897,14 +1899,14 @@ function openMap() {
         L.control.layers(baseMaps).addTo(map);
         map.on('click', onMapClick);
     } else {
-        // 二回目以降は表示位置を更新
-        map.setView([currentLat, currentLon], 14);
+        // 二回目以降は表示位置を更新（targetLat/Lonを使用）
+        map.setView([targetLat, targetLon], 14);
     }
 
-    // 住所情報の取得とマーカーの再設置
-    fetchAddressInfo(currentLat, currentLon);
+    // 住所情報の取得とマーカーの再設置（targetLat/Lonを使用）
+    fetchAddressInfo(targetLat, targetLon);
     if (tempMarker) map.removeLayer(tempMarker);
-    tempMarker = L.marker([currentLat, currentLon]).addTo(map);
+    tempMarker = L.marker([targetLat, targetLon]).addTo(map);
 
     // モーダル表示後のサイズ崩れ対策
     setTimeout(() => {
