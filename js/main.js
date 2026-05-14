@@ -1226,7 +1226,7 @@ function finalizeInit() {
 /**
  * サブルーチン：UIイベントの登録
  * 既存のユーザーデータ「pin_weather_spots」および「pin_weather_wind_filter」を厳守。
- * 修正内容：新設されたナビゲーションバー内のGPS/Mapボタンへのイベント割り当て。
+ * 修正内容：地図ボタン押下時のrenderTabs("Map")呼び出しを削除。
  */
 function setupGeneralEvents() {
     // --- 新設：概況ボタン左隣のGPS/Mapボタン (nav-action-bar内) ---
@@ -1236,7 +1236,7 @@ function setupGeneralEvents() {
     const navMapBtn = document.getElementById('map-btn-nav');
     if (navMapBtn) navMapBtn.onclick = () => {
         openMap(currentLat, currentLon);
-        renderTabs("Map"); // 既存仕様の「Map」タブ表示を維持
+        // renderTabs("Map") を削除（タブの色が消える不具合対策）
     };
 
     // 1. 地図検索入力欄
@@ -1360,7 +1360,7 @@ function setupGeneralEvents() {
     if (mapBtn) {
         mapBtn.onclick = () => { 
             openMap(); 
-            renderTabs("Map"); 
+            // renderTabs("Map") を削除（タブの色が消える不具合対策）
         };
     }
 
@@ -1868,9 +1868,6 @@ function handleGPSClick() {
         });
     }
 }
-
-//const addBtn = document.getElementById('add-btn');
-//if (addBtn) addBtn.onclick = () => openMap();
 
 /**
  * サブルーチン：地図モーダルを開く
