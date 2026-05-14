@@ -352,30 +352,6 @@ function updateLanguageSelect() {
     }
 }
 
-/**
- * UIの静的テキストを現在の言語で一斉更新する関数
- */
-function updateStaticUI() {
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        
-        // コンディション概況ボタンの場合は現在の地名を合成
-        if (key === 'condition_summary_btn') {
-            const isJa = i18n._currentLang === 'ja';
-            const baseLabel = i18n.t(key).replace("📋 ", "");
-            const icon = "📋 ";
-            if (isJa) {
-                el.innerHTML = `${icon}${currentLabel} ${baseLabel}`;
-            } else {
-                el.innerHTML = `${icon}${baseLabel} for ${currentLabel}`;
-            }
-        } else if (typeof i18n.dict[i18n._currentLang][key] === 'string') {
-            // confirmDelete のような関数型データでない場合のみ text を置換
-            el.innerHTML = i18n.t(key); // HTMLタグを含む場合があるため innerHTML を使用
-        }
-    });
-}
-
 // ==========================================
 // 4. 風向マスターと言語互換ロジック
 // ==========================================
@@ -493,16 +469,6 @@ let currentLon = mySpots[0].lon;
 let currentLabel = mySpots[0].label;
 
 let map, tempMarker;
-
-function updateStaticUI() {
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        // confirmDelete のような関数型データでない場合のみ text を置換
-        if (typeof i18n.dict[i18n._currentLang][key] === 'string') {
-            el.innerHTML = i18n.t(key); // HTMLタグを含む場合があるため innerHTML を使用
-        }
-    });
-}
 
 /**
  * 言語設定に基づいた日付文字列を返す
@@ -2162,18 +2128,6 @@ async function updateLocation(lat, lon, label) {
     currentLat = lat; 
     currentLon = lon; 
     currentLabel = label;
-
-    // --- コンディション概況ボタンの地名部分のみを更新 ---
-    const locationSpan = document.getElementById('summary-btn-location');
-    if (locationSpan) {
-        const isJa = i18n._currentLang === 'ja';
-        // 日本語なら「地名 」、英語なら「for 地名」のように調整可能
-        if (isJa) {
-            locationSpan.innerText = label + " ";
-        } else {
-            locationSpan.innerText = "for " + label;
-        }
-    }
 
     try {
         // 実際の描画処理

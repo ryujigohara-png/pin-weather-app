@@ -558,16 +558,16 @@ body.widget-mode .footer-info {
 }
 
 /* コンディション概況ジャンプボタンのスタイル */
-.nav-summary-btn, .btn-gps-small, .btn-map-small {
+.nav-summary-btn {
     appearance: none;
     -webkit-appearance: none;
-    background-color: #ffffff;
-    border: 1px solid #ddd;
-    border-radius: 10px;
+    background-color: #007bff;
+    border: 1px solid #007bff;
+    border-radius: 20px;
     padding: 6px 10px;
     font-size: 14px;
     font-weight: 500;
-    color: #333;
+    color: #fff;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -580,10 +580,27 @@ body.widget-mode .footer-info {
     white-space: nowrap;
 }
 
-.nav-summary-btn:hover {
-    background-color: #f5f5f5;
-    border-color: #ccc;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+/* コンディション概況ジャンプボタンのスタイル */
+.btn-gps-small, .btn-map-small {
+    appearance: none;
+    -webkit-appearance: none;
+    background-color: #7150cc;
+    border: 1px solid #007bff;
+    border-radius: 20px;
+    padding: 6px 10px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #fff;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin: 2px 0;
+    font-family: inherit;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    transition: all 0.2s ease;
+    vertical-align: middle;
+    white-space: nowrap;
 }
 
 /* ジャンプ時の被り防止 */
