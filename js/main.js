@@ -151,6 +151,8 @@ const i18n = {
             guideBody2: `お気に入りのゲレンデやマリーナを最大10箇所まで保存可能。登録した地点はタブで簡単に切り替え可能。<br><br><strong>登録方法：</strong><br>・GPSボタンで現在地を取得、またはマップ上の任意の地点をタップして📌を立てることで、好きな場所を登録できます。<br>・マップ内の検索ボックスから施設名や地名で検索して登録することも可能です。<br><br><strong>管理・修正：</strong><br>・画面上の地点タブを長押しすると、登録地点の修正や削除が簡単に行えます。<br>・現在表示中のグラフ地点をマップで即座に確認し、再調整することも可能です.`,
             guideLabel3: "自分専用表示カスタマイズ",
             guideBody3: `<strong>風向色付設定</strong>ボタンから色付けする風向を指定可能。<br><strong>表示詳細設定</strong>ボタンから風速の色付けしきい値を変更可能。自分の道具やレベルに合わせた「ベストコンディション」がグラフ上で一目で判別できるようになります。`,
+            guideLabel4: "外部サイトへの埋め込み（ウィジェット機能：無料）",
+            guideBody4: `「ホームページに埋め込む」ボタンから、表示中のグラフを自分のブログやサイトに<strong>完全無料</strong>で共有できます。<br><br><strong>操作手順と特徴：</strong><br>・ボタンを押すと設定画面が開き、<strong>現在の設定（風向色付や風速しきい値）が反映された</strong>プレビューと専用コードが表示されます。<br>・「コードをコピー」ボタンでコピーした内容を、外部サイトのHTMLに貼り付けるだけで簡単に導入可能です。<br>・自分専用に調整した「ベストコンディション」がわかるグラフを、追加費用なしでそのまま外部へ公開・共有できます。`,
 
             // --- メッセージ類 ---
             pwa_install_msg: "「ホーム画面に追加」⇒次からワンクリックで開けます！",
@@ -297,6 +299,8 @@ const i18n = {
             guideBody2: `Save up to 10 favorite spots. Switch easily via tabs.<br><br><strong>Registration:</strong><br>・Use GPS or tap the map to drop a 📌.<br>・Search by name or facility.<br><br><strong>Management:</strong><br>・Long-press tabs to edit or delete.<br>・Verify and adjust current locations on the map instantly.`,
             guideLabel3: "Custom Display Settings",
             guideBody3: `Specify which wind directions to highlight from the <strong>Wind Color Settings</strong> button.<br>Adjust <strong>Wind Speed Thresholds</strong> from the <strong>Display Settings</strong> button to match your gear and skill level.`,
+            guideLabel4: "Embed in External Sites (Widget Feature: Free)",
+            guideBody4: `Share the current chart on your own blog or website using the "Embed in Homepage" button <strong>completely free of charge</strong>.<br><br><strong>How it works:</strong><br>・Clicking the button opens the settings modal, showing a preview and code snippet that <strong>reflects your current settings</strong> (wind direction coloring, wind speed thresholds, etc.).<br>・Simply click "Copy Code" and paste it into the HTML of your website.<br>・You can publish a customized chart tailored to your preferences on external sites at no additional cost.`,
 
             // --- Messages ---
             pwa_install_msg: "Add to Home Screen for instant access!",
