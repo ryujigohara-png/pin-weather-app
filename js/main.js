@@ -2039,7 +2039,7 @@ function onMapClick(e) {
 
 /**
  * サブルーチン：座標から住所情報を取得し、モーダル内のボタンに機能を割り当てる
- * 修正内容：showAppDialog 呼び出し時に saveBtnKey: 'btnSaveSpot' を追加し、ボタン表示を整合させました。
+ * 修正内容：グラフ表示ボタン押下時、100m以内に既存地点があればその地点として扱うロジックを追加。
  */
 async function fetchAddressInfo(lat, lng) {
     console.log(`[DEBUG] fetchAddressInfo started: lat=${lat}, lon=${lng}`);
@@ -2058,7 +2058,7 @@ async function fetchAddressInfo(lat, lng) {
         const district = addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district || "";
         const defaultName = (city + district) || i18n.t('mapNewSpot');
 
-        // --- 「MySpotsに登録」ボタンの制御 (既存ロジックを維持) ---
+        // --- 「MySpotsに登録」ボタンの制御 ---
         const saveSpotBtn = document.getElementById('save-spot-btn');
         if (saveSpotBtn) {
             saveSpotBtn.onclick = () => {
@@ -2066,7 +2066,6 @@ async function fetchAddressInfo(lat, lng) {
                     title: defaultName,
                     messageKey: 'mapSavePrompt',
                     inputValue: defaultName,
-                    // 修正箇所：ボタン名を「MySpotsに登録」に明示的に指定
                     saveBtnKey: 'btnSaveSpot',
                     onSave: (spotName) => {
                         if (!spotName) return;
@@ -2076,7 +2075,6 @@ async function fetchAddressInfo(lat, lng) {
                         mySpots = [{ lat, lon: lng, label: spotName }, ...filtered];
                         localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
                         
-                        // 描画とタブ更新
                         updateLocation(lat, lng, spotName);
                         renderTabs(spotName); 
                         closeModal('map-modal');
@@ -2086,22 +2084,46 @@ async function fetchAddressInfo(lat, lng) {
             saveSpotBtn.disabled = false;
         }
 
-        // --- 「グラフ表示」ボタンの制御 (既存ロジックを維持) ---
+        // --- 「グラフ表示」ボタンの制御 ---
         const tempViewBtn = document.getElementById('temp-view-btn');
         if (tempViewBtn) {
             tempViewBtn.onclick = () => {
                 console.log(`[DEBUG] Temp Graph View: ${defaultName} (lat:${lat}, lon:${lng})`);
                 
-                // 1. 内部変数を📌地点の座標とラベルで更新
-                currentLat = lat;
-                currentLon = lng;
-                currentLabel = defaultName;
+                // --- 近接地点判定ロジック ---
+                // 100mの目安として緯度経度差 0.0009以内を閾値に設定
+                const threshold = 0.0009;
+                const nearIdx = mySpots.findIndex(s => 
+                    Math.abs(s.lat - lat) < threshold && 
+                    Math.abs(s.lon - lng) < threshold
+                );
+
+                let finalLat = lat;
+                let finalLon = lng;
+                let finalLabel = defaultName;
+
+                if (nearIdx > -1) {
+                    // 近接地点が見つかった場合、その地点の情報を優先し、先頭に移動
+                    const foundSpot = mySpots.splice(nearIdx, 1)[0];
+                    mySpots.unshift(foundSpot);
+                    localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                    
+                    finalLat = foundSpot.lat;
+                    finalLon = foundSpot.lon;
+                    finalLabel = foundSpot.label;
+                    console.log(`[DEBUG] Near spot found: ${finalLabel}`);
+                }
+
+                // 1. 内部変数を更新
+                currentLat = finalLat;
+                currentLon = finalLon;
+                currentLabel = finalLabel;
 
                 // 2. 提供された updateLocation を実行（描画処理）
-                updateLocation(lat, lng, defaultName);
+                updateLocation(finalLat, finalLon, finalLabel);
 
                 // 3. 提供された renderTabs を実行
-                renderTabs(defaultName); 
+                renderTabs(finalLabel); 
 
                 // 4. モーダルを閉じる
                 closeModal('map-modal');
