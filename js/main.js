@@ -1997,30 +1997,52 @@ function applyStylesToCSS() {
     root.style.setProperty('--label-font-size', `${viewConfig.fontSize}px`);
 }
 
+/**
+ * サブルーチン：地図検索の実行
+ * 修正内容：検索に使用したキーワードを一時保持し、地点名に反映させる。
+ */
+let lastSearchKeyword = null; // キーワード一時保持用の変数（スコープ：グローバル）
+
 async function executeMapSearch() {
     const input = document.getElementById('map-search-input');
     if (!input) return;
     const query = input.value;
     if (!query) return;
+
     try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&accept-language=ja`);
+        // 多言語対応を考慮し、検索パラメータを構築
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&accept-language=${i18n._currentLang}`);
         const results = await res.json();
+
         if (results.length > 0) {
             const { lat, lon } = results[0];
-            const latlng = [parseFloat(lat), parseFloat(lon)];
+            const latVal = parseFloat(lat);
+            const lonVal = parseFloat(lon);
+            const latlng = [latVal, lonVal];
+            
+            // 【重要】ユーザーが入れた検索ワードを保持
+            lastSearchKeyword = query;
+            
             map.setView(latlng, 15);
             if (tempMarker) map.removeLayer(tempMarker);
             tempMarker = L.marker(latlng).addTo(map);
-            fetchAddressInfo(parseFloat(lat), parseFloat(lon));
+            
+            // fetchAddressInfo 内で lastSearchKeyword が使用されます
+            fetchAddressInfo(latVal, lonVal);
         }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+        console.error("Map Search Error:", err);
+    }
 }
 
+/**
+ * サブルーチン：地図クリック時のイベント
+ */
 function onMapClick(e) {
     const { lat, lng } = e.latlng;
     
-    // 【DEBUG】クリックされた瞬間の座標を記録
-    console.log(`[DEBUG] Map Clicked: lat=${lat}, lon=${lng}`);
+    // 直接クリック時は検索ワードを無効化
+    lastSearchKeyword = null;
 
     currentLat = lat;
     currentLon = lng;
@@ -2031,19 +2053,18 @@ function onMapClick(e) {
         tempMarker = L.marker(e.latlng).addTo(map);
     }
 
-    // 住所取得。この後に currentLabel がどう変わるかが重要
     if (typeof fetchAddressInfo === 'function') {
-        fetchAddressInfo(currentLat, currentLon);
+        fetchAddressInfo(lat, lng);
     }
 }
 
 /**
  * サブルーチン：座標から住所情報を取得し、モーダル内のボタンに機能を割り当てる
- * 修正内容：グラフ表示ボタン押下時、100m以内に既存地点があればその地点として扱うロジックを追加。
+ * 修正内容：
+ * 1. 地図検索経由なら検索ワードを地点名に使用
+ * 2. グラフ表示ボタン押下時、100m以内に既存地点があればその地点として扱う
  */
 async function fetchAddressInfo(lat, lng) {
-    console.log(`[DEBUG] fetchAddressInfo started: lat=${lat}, lon=${lng}`);
-
     const statusEl = document.getElementById('map-status');
     if (statusEl) statusEl.innerText = i18n.t('mapStatusFetching');
     
@@ -2051,14 +2072,22 @@ async function fetchAddressInfo(lat, lng) {
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=${i18n._currentLang}`);
         const data = await res.json();
         
-        console.log(`[DEBUG] Address Data:`, data.address);
-
         const addr = data.address;
         const city = addr.city || addr.town || addr.village || "";
         const district = addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district || "";
-        const defaultName = (city + district) || i18n.t('mapNewSpot');
+        
+        // --- 地点名（defaultName）の決定ロジック ---
+        let defaultName;
+        if (lastSearchKeyword) {
+            // 検索実行後の場合は検索ワードを採用
+            defaultName = lastSearchKeyword;
+            lastSearchKeyword = null; // 一度使用したらクリア
+        } else {
+            // 地図クリック等の場合は住所から生成
+            defaultName = (city + district) || i18n.t('mapNewSpot');
+        }
 
-        // --- 「MySpotsに登録」ボタンの制御 ---
+        // --- 「MySpotsに登録」ボタン ---
         const saveSpotBtn = document.getElementById('save-spot-btn');
         if (saveSpotBtn) {
             saveSpotBtn.onclick = () => {
@@ -2069,7 +2098,7 @@ async function fetchAddressInfo(lat, lng) {
                     saveBtnKey: 'btnSaveSpot',
                     onSave: (spotName) => {
                         if (!spotName) return;
-                        if (!checkSpotLimit(spotName)) return;
+                        if (typeof checkSpotLimit === 'function' && !checkSpotLimit(spotName)) return;
 
                         const filtered = mySpots.filter(s => s.label !== spotName);
                         mySpots = [{ lat, lon: lng, label: spotName }, ...filtered];
@@ -2084,14 +2113,11 @@ async function fetchAddressInfo(lat, lng) {
             saveSpotBtn.disabled = false;
         }
 
-        // --- 「グラフ表示」ボタンの制御 ---
+        // --- 「グラフ表示」ボタン ---
         const tempViewBtn = document.getElementById('temp-view-btn');
         if (tempViewBtn) {
             tempViewBtn.onclick = () => {
-                console.log(`[DEBUG] Temp Graph View: ${defaultName} (lat:${lat}, lon:${lng})`);
-                
-                // --- 近接地点判定ロジック ---
-                // 100mの目安として緯度経度差 0.0009以内を閾値に設定
+                // 近接地点判定（緯度経度差 約0.0009 ≒ 100m）
                 const threshold = 0.0009;
                 const nearIdx = mySpots.findIndex(s => 
                     Math.abs(s.lat - lat) < threshold && 
@@ -2103,7 +2129,7 @@ async function fetchAddressInfo(lat, lng) {
                 let finalLabel = defaultName;
 
                 if (nearIdx > -1) {
-                    // 近接地点が見つかった場合、その地点の情報を優先し、先頭に移動
+                    // 既存地点が近い場合はその地点を1番タブへ
                     const foundSpot = mySpots.splice(nearIdx, 1)[0];
                     mySpots.unshift(foundSpot);
                     localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
@@ -2111,21 +2137,11 @@ async function fetchAddressInfo(lat, lng) {
                     finalLat = foundSpot.lat;
                     finalLon = foundSpot.lon;
                     finalLabel = foundSpot.label;
-                    console.log(`[DEBUG] Near spot found: ${finalLabel}`);
                 }
 
-                // 1. 内部変数を更新
-                currentLat = finalLat;
-                currentLon = finalLon;
-                currentLabel = finalLabel;
-
-                // 2. 提供された updateLocation を実行（描画処理）
+                // 描画とタブ更新
                 updateLocation(finalLat, finalLon, finalLabel);
-
-                // 3. 提供された renderTabs を実行
                 renderTabs(finalLabel); 
-
-                // 4. モーダルを閉じる
                 closeModal('map-modal');
             };
             tempViewBtn.disabled = false;
@@ -2133,7 +2149,7 @@ async function fetchAddressInfo(lat, lng) {
         
         if (statusEl) statusEl.innerText = "📍：" + defaultName;
     } catch (err) {
-        console.error("[DEBUG] fetchAddressInfo Error:", err);
+        console.error("fetchAddressInfo Error:", err);
         if (statusEl) statusEl.innerText = i18n.t('mapStatusFail');
     }
 }
