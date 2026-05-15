@@ -33,20 +33,15 @@ if (!savedConfig.language) {
     }
 }
 
-// ★重要：ここで先に i18n を定義する！！
+// ★重要：i18n 定義の完全版（VBAスタイル語彙追加済み）
 const i18n = {
     _currentLang: viewConfig.language || 'ja',
     setLang(lang) {
         this._currentLang = lang;
-        // 設定を保存
         viewConfig.language = lang;
         localStorage.setItem('pin_weather_view_config', JSON.stringify(viewConfig));
-        
-        // UIの即時更新とセレクトボックス同期
         if (typeof updateStaticUI === 'function') updateStaticUI();
         updateLanguageSelect();
-        
-        // 言語切り替え時はリロードして整合性を確保
         location.reload();
     },
     dict: {
@@ -135,7 +130,12 @@ const i18n = {
             msgSaveComplete: "保存完了",
             msgSaveDesc: "現在の設定をデフォルトとして保存しました。",
 
-            // --- グラフ軸・凡例・その他（動的対応版） ---
+            // --- VBAスタイル追加分 ---
+            btnYes: "はい",
+            btnNo: "いいえ",
+            btnOK: "OK",
+
+            // --- グラフ軸・凡例・その他 ---
             yAxisWeather: "天気<br>降水(mm)",
             yAxisWind: `風向<br>風速(${viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph'})`,
             yAxisTemp: `気温(${viewConfig.temperatureUnit === 'celsius' ? '℃' : '℉'})<br>海水(${viewConfig.temperatureUnit === 'celsius' ? '℃' : '℉'})`,
@@ -148,16 +148,11 @@ const i18n = {
             guideLabel1: "16日間気象予報・8日間海洋気象予報",
             guideBody1: "風速・風向・気温などの気象データは<strong>最大16日間</strong>表示。<br>波高・潮位・海水温などの海洋データは<strong>最大8日間</strong>表示。<br>長期の遠征計画から直近の出艇判断までサポートします。",
             guideLabel2: "MySpots 10箇所登録",
-            guideBody2: `お気に入りのゲレンデやマリーナを最大10箇所まで保存可能。登録した地点はタブで簡単に切り替え可能。各地点の天気をすぐに確認できます。<br><br>
-                        <strong>登録方法：</strong><br>
-                        ・GPSボタンで現在地を取得、またはマップ上の任意の地点をタップして📌を立てることで、好きな場所を登録できます。<br>
-                        ・マップ内の検索ボックスから施設名や地名で検索して登録することも可能です。<br><br>
-                        <strong>管理・修正：</strong><br>
-                        ・画面上の地点タブを長押しすると、登録地点の修正や削除が簡単に行えます。<br>
-                        ・現在表示中のグラフ地点をマップで即座に確認し、再調整することも可能です.`,
+            guideBody2: `お気に入りのゲレンデやマリーナを最大10箇所まで保存可能。登録した地点はタブで簡単に切り替え可能。<br><br><strong>登録方法：</strong><br>・GPSボタンで現在地を取得、またはマップ上の任意の地点をタップして📌を立てることで、好きな場所を登録できます。<br>・マップ内の検索ボックスから施設名や地名で検索して登録することも可能です。<br><br><strong>管理・修正：</strong><br>・画面上の地点タブを長押しすると、登録地点の修正や削除が簡単に行えます。<br>・現在表示中のグラフ地点をマップで即座に確認し、再調整することも可能です.`,
             guideLabel3: "自分専用表示カスタマイズ",
-            guideBody3: `<strong>風向色付設定</strong>ボタンから色付けする風向を指定可能。<br>
-                        <strong>表示詳細設定</strong>ボタンから風速の色付けしきい値を変更可能。自分の道具やレベルに合わせた「ベストコンディション」がグラフ上で一目で判別できるようになります。`,
+            guideBody3: `<strong>風向色付設定</strong>ボタンから色付けする風向を指定可能。<br><strong>表示詳細設定</strong>ボタンから風速の色付けしきい値を変更可能。自分の道具やレベルに合わせた「ベストコンディション」がグラフ上で一目で判別できるようになります。`,
+            guideLabel4: "外部サイトへの埋め込み（ウィジェット機能：無料）",
+            guideBody4: `「ホームページに埋め込む」ボタンから、表示中のグラフを自分のブログやサイトに<strong>完全無料</strong>で共有できます。<br><br><strong>操作手順と特徴：</strong><br>・ボタンを押すと設定画面が開き、<strong>現在の設定（風向色付や風速しきい値）が反映された</strong>プレビューと専用コードが表示されます。<br>・「コードをコピー」ボタンでコピーした内容を、外部サイトのHTMLに貼り付けるだけで簡単に導入可能です。<br>・自分専用に調整した「ベストコンディション」がわかるグラフを、追加費用なしでそのまま外部へ公開・共有できます。`,
 
             // --- メッセージ類 ---
             pwa_install_msg: "「ホーム画面に追加」⇒次からワンクリックで開けます！",
@@ -219,7 +214,7 @@ const i18n = {
             btnWindConfig: "🎐 Wind Color Settings",
             btnDetailSettings: "⚙ Display Settings",
             btnFeedback: "💬 Feedback & Requests",
-            linkAboutAndPrivacy: "About & Privacy Policy",    
+            linkAboutAndPrivacy: "About & Privacy Policy", 
             shareQR: "Share with Mobile",
             btnCopyUrl: "🔗 Copy URL",
             copySuccess: "✅ Copied!",
@@ -283,7 +278,12 @@ const i18n = {
             msgSaveComplete: "Saved",
             msgSaveDesc: "Current settings saved as default.",
 
-            // --- Axes, Legends, etc.（動的対応版） ---
+            // --- VBAスタイル追加分 ---
+            btnYes: "Yes",
+            btnNo: "No",
+            btnOK: "OK",
+
+            // --- Axes, Legends, etc. ---
             yAxisWeather: "Weather<br>Precip(mm)",
             yAxisWind: `Wind Dir<br>Speed(${viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph'})`,
             yAxisTemp: `Temp(${viewConfig.temperatureUnit === 'celsius' ? '°C' : '°F'})<br>Sea(${viewConfig.temperatureUnit === 'celsius' ? '°C' : '°F'})`,
@@ -296,16 +296,11 @@ const i18n = {
             guideLabel1: "16-day Weather & 8-day Marine Forecast",
             guideBody1: "Weather data (wind, temp) is available for up to <strong>16 days</strong>, and marine data (waves, tides) for up to <strong>8 days</strong>.",
             guideLabel2: "Register 10 MySpots",
-            guideBody2: `Save up to 10 favorite spots. Switch easily via tabs.<br><br>
-                        <strong>Registration:</strong><br>
-                        ・Use GPS or tap the map to drop a 📌.<br>
-                        ・Search by name or facility.<br><br>
-                        <strong>Management:</strong><br>
-                        ・Long-press tabs to edit or delete.<br>
-                        ・Verify and adjust current locations on the map instantly.`,
+            guideBody2: `Save up to 10 favorite spots. Switch easily via tabs.<br><br><strong>Registration:</strong><br>・Use GPS or tap the map to drop a 📌.<br>・Search by name or facility.<br><br><strong>Management:</strong><br>・Long-press tabs to edit or delete.<br>・Verify and adjust current locations on the map instantly.`,
             guideLabel3: "Custom Display Settings",
-            guideBody3: `Specify which wind directions to highlight from the <strong>Wind Color Settings</strong> button.<br>
-                        Adjust <strong>Wind Speed Thresholds</strong> from the <strong>Display Settings</strong> button to match your gear and skill level.`,
+            guideBody3: `Specify which wind directions to highlight from the <strong>Wind Color Settings</strong> button.<br>Adjust <strong>Wind Speed Thresholds</strong> from the <strong>Display Settings</strong> button to match your gear and skill level.`,
+            guideLabel4: "Embed in External Sites (Widget Feature: Free)",
+            guideBody4: `Share the current chart on your own blog or website using the "Embed in Homepage" button <strong>completely free of charge</strong>.<br><br><strong>How it works:</strong><br>・Clicking the button opens the settings modal, showing a preview and code snippet that <strong>reflects your current settings</strong> (wind direction coloring, wind speed thresholds, etc.).<br>・Simply click "Copy Code" and paste it into the HTML of your website.<br>・You can publish a customized chart tailored to your preferences on external sites at no additional cost.`,
 
             // --- Messages ---
             pwa_install_msg: "Add to Home Screen for instant access!",
@@ -328,7 +323,6 @@ const i18n = {
             tomorrow: "tomorrow ",
             analyzing: "Analyzing forecast data...",
             weather_now: "Currently {weather}, ",
-            weather_change: "weather is expected to change around {day}{time}:00.",
             weather_change: "{status} is expected around {day}{time}:00.",
             status_clear: "clearer skies",
             status_cloud: "cloudy skies",
@@ -347,7 +341,6 @@ const i18n = {
             wave_stable: "expected to remain stable through tomorrow."
         }
     },
-
     t(key) { 
         return this.dict[this._currentLang][key] || key; 
     }
@@ -361,30 +354,6 @@ function updateLanguageSelect() {
     if (langSelect) {
         langSelect.value = i18n._currentLang; 
     }
-}
-
-/**
- * UIの静的テキストを現在の言語で一斉更新する関数
- */
-function updateStaticUI() {
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        
-        // コンディション概況ボタンの場合は現在の地名を合成
-        if (key === 'condition_summary_btn') {
-            const isJa = i18n._currentLang === 'ja';
-            const baseLabel = i18n.t(key).replace("📋 ", "");
-            const icon = "📋 ";
-            if (isJa) {
-                el.innerHTML = `${icon}${currentLabel} ${baseLabel}`;
-            } else {
-                el.innerHTML = `${icon}${baseLabel} for ${currentLabel}`;
-            }
-        } else if (typeof i18n.dict[i18n._currentLang][key] === 'string') {
-            // confirmDelete のような関数型データでない場合のみ text を置換
-            el.innerHTML = i18n.t(key); // HTMLタグを含む場合があるため innerHTML を使用
-        }
-    });
 }
 
 // ==========================================
@@ -504,16 +473,6 @@ let currentLon = mySpots[0].lon;
 let currentLabel = mySpots[0].label;
 
 let map, tempMarker;
-
-function updateStaticUI() {
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        // confirmDelete のような関数型データでない場合のみ text を置換
-        if (typeof i18n.dict[i18n._currentLang][key] === 'string') {
-            el.innerHTML = i18n.t(key); // HTMLタグを含む場合があるため innerHTML を使用
-        }
-    });
-}
 
 /**
  * 言語設定に基づいた日付文字列を返す
@@ -780,12 +739,15 @@ async function saveViewSettings() {
 
 /**
  * サブルーチン：設定のリセット処理
+ * 修正内容：saveBtnKey に 'btnYes' を指定し、リセット実行ボタンを「はい」に変更しました。
  */
 function resetViewSettings() {
     if (typeof showAppDialog === 'function') {
         showAppDialog({
             title: i18n.t('btnResetAll'),
             messageKey: 'confirmReset',
+            // 整理ポイント：右側のボタンを「はい」に指定
+            saveBtnKey: 'btnYes',
             onSave: () => {
                 const resetData = JSON.parse(JSON.stringify(defaultViewConfig));
                 Object.assign(viewConfig, resetData);
@@ -856,10 +818,9 @@ function initCopyUrlEvent() {
 
 /**
  * サブルーチン：ウィジェットプレビューモーダルを開く
- * * 変更点（厳守事項）:
- * 1. 既存の地点(place), 座標(lat/lon), 風向(wind)の取得ロジックを完全維持。
- * 2. 5つのパラメータ（wUnit, tUnit, thH, thM, thL）をURLSearchParamsに厳密に追加。
- * 3. 構造化プログラミングに基づき、他のサブルーチンや変数への副作用を排除。
+ * 修正点：
+ * 1. 右上「×」ボタンが確実に効くよう、modal.style.display = 'block' の直後にイベントを再設定。
+ * 2. コピーボタンの下に、モーダルを閉じるための「キャンセル」ボタンを追加。
  */
 function openWidgetPreview() {
     console.log("DEBUG: openWidgetPreview [START]");
@@ -871,12 +832,17 @@ function openWidgetPreview() {
     const codeArea = document.getElementById('widget-code-area');
     const copyBtnText = document.getElementById('widget-copy-btn-text');
     const modal = document.getElementById('app-common-modal');
+    const closeBtn = document.getElementById('common-modal-close'); // 右上×ボタン
 
     if (!modal) return;
 
-    // 他のモーダル利用時に影響が出ないよう、一旦初期化（既存ロジックを継承）
+    // 他のモーダル利用時に影響が出ないよう、一旦初期化
     const allModalContents = modal.querySelectorAll('.modal-content-unit'); 
     allModalContents.forEach(el => el.style.display = 'none');
+
+    // フッターはウィジェット設定では使用しない（独自ボタン配置のため）
+    const footer = document.getElementById('common-modal-footer');
+    if (footer) footer.style.display = 'none';
 
     // --- 1. タイトルとメッセージの表示 ---
     if (titleArea) {
@@ -897,42 +863,28 @@ function openWidgetPreview() {
         copyBtnText.innerText = i18n.t('widgetCopy');
     }
 
-    // --- 2. パラメータの構成 ---
+    // --- 2. パラメータの構成 (ロジック完全維持) ---
     const currentUrl = window.location.origin + window.location.pathname;
     const params = new URLSearchParams();
     params.set('mode', 'widget');
 
-    // 地点名と座標のセット
     const placeName = (typeof currentLabel !== 'undefined') ? currentLabel : '';
     if (placeName) params.set('place', placeName);
-
     if (typeof currentLat !== 'undefined' && currentLat !== null) params.set('lat', currentLat);
     if (typeof currentLon !== 'undefined' && currentLon !== null) params.set('lon', currentLon);
 
-    // 現在の色付け風向(targetWindDirections)の追加（既存仕様）
     if (typeof targetWindDirections !== 'undefined' && targetWindDirections.length > 0) {
         params.set('wind', targetWindDirections.join(','));
     }
 
-    // --- 【重要】追加パラメータ：5つの表示設定 (viewConfigから取得) ---
     if (typeof viewConfig !== 'undefined') {
-        // 風速単位・気温単位
         if (viewConfig.windSpeedUnit) params.set('wUnit', viewConfig.windSpeedUnit);
         if (viewConfig.temperatureUnit) params.set('tUnit', viewConfig.temperatureUnit);
-        
-        // 風速しきい値3種（数値の整合性を保つためMath.roundを適用）
-        if (viewConfig.windThresholdHigh !== undefined) {
-            params.set('thH', Math.round(viewConfig.windThresholdHigh));
-        }
-        if (viewConfig.windThresholdMid !== undefined) {
-            params.set('thM', Math.round(viewConfig.windThresholdMid));
-        }
-        if (viewConfig.windThresholdLow !== undefined) {
-            params.set('thL', Math.round(viewConfig.windThresholdLow));
-        }
+        if (viewConfig.windThresholdHigh !== undefined) params.set('thH', Math.round(viewConfig.windThresholdHigh));
+        if (viewConfig.windThresholdMid !== undefined) params.set('thM', Math.round(viewConfig.windThresholdMid));
+        if (viewConfig.windThresholdLow !== undefined) params.set('thL', Math.round(viewConfig.windThresholdLow));
     }
     
-    // URLの生成とiframe埋め込みコードの作成
     const widgetUrl = `${currentUrl}?${params.toString()}`;
     const embedCode = `<iframe src="${widgetUrl}" width="100%" height="660" frameborder="0" style="border:1px solid #eee; border-radius:8px;"></iframe>`;
 
@@ -943,48 +895,53 @@ function openWidgetPreview() {
         widgetArea.style.display = 'block';
         widgetArea.style.height = "auto"; 
     }
-
-    if (iframe) {
-        iframe.src = widgetUrl;
-    }
+    if (iframe) iframe.src = widgetUrl;
 
     const actionArea = document.getElementById('widget-action-area');
     if (actionArea) actionArea.style.display = 'block';
 
-    // --- 4. モーダル本体の表示 ---
+    // --- 4. モーダル本体の表示とボタンイベントの確実な割り当て ---
     modal.style.display = 'block';
+
+    // 右上「×」ボタンを確実に機能させる
+    if (closeBtn) {
+        closeBtn.onclick = () => { modal.style.display = 'none'; };
+    }
+
+    // ウィジェット用キャンセルボタンの取得と設定
+    const widgetCancelBtn = document.getElementById('widget-cancel-btn');
+    if (widgetCancelBtn) {
+        widgetCancelBtn.innerText = i18n.t('btnClose');
+        widgetCancelBtn.onclick = () => { modal.style.display = 'none'; };
+    }
+
     window.history.pushState({ page: 'modal', id: 'app-common-modal' }, "");
-    
     console.log("DEBUG: openWidgetPreview [END]");
 }
 
 /**
  * サブルーチン：ウィジェットコードをコピー
- * ブラウザの標準alertを、汎用モーダル showAppDialog に置き換えています。
+ * 呼び出し元：onOk を使用することでクリーンな引数構成になります。
  */
 function copyWidgetCode() {
     const area = document.getElementById("widget-code-area");
-    if (area) {
-        area.select();
-        try {
-            document.execCommand("copy");
-            const msgTitle = (typeof i18n !== 'undefined') ? i18n.t('msgSaveComplete') : "Complete";
-            const msgBody = (typeof i18n !== 'undefined') ? i18n.t('copySuccess') : "Copied!";
-            
-            // ブラウザ標準 alert(msgBody) から 汎用モーダルへ変更
-            if (typeof showAppDialog === 'function') {
-                showAppDialog({
-                    title: msgTitle,
-                    message: msgBody,
-                    onSave: () => {} // 通知のみのため空関数
-                });
-            } else {
-                alert(msgBody); // 万が一 showAppDialog が未定義の場合のフォールバック
-            }
-            
-        } catch (err) {
-            console.error("Copy failed:", err);
+    if (!area) return;
+
+    area.select();
+    try {
+        document.execCommand("copy");
+        
+        if (typeof showAppDialog === 'function') {
+            showAppDialog({
+                title: i18n.t('msgSaveComplete'),
+                message: i18n.t('copySuccess'),
+                onOk: () => {
+                    console.log("Copy notification closed.");
+                }
+            });
         }
+    } catch (err) {
+        console.error("Copy failed:", err);
     }
 }
 
@@ -1201,10 +1158,12 @@ async function initApp() {
 
 /**
  * サブルーチン：IP Geolocationによる市区町村レベルの推定
+ * 修正内容：ブラウザ言語設定を判定し、日本語なら日本語地名、それ以外なら英語地名を取得。
+ * 「(Approx)」等の識別子を削除。
  */
 async function setApproximateLocation() {
     try {
-        // 無料のIP Geolocation API (ipapi.co) を利用
+        // 1. 無料のIP Geolocation API (ipapi.co) で座標を取得
         const response = await fetch('https://ipapi.co/json/');
         if (!response.ok) throw new Error('API Network Error');
         
@@ -1213,9 +1172,32 @@ async function setApproximateLocation() {
         if (data.latitude && data.longitude) {
             currentLat = data.latitude;
             currentLon = data.longitude;
-            // 市町村名(city)を優先、なければ県名(region)、それもなければ「現在地」
-            const locName = data.city || data.region || "現在地";
-            currentLabel = `${locName}(Approx)`;
+
+            // 2. 言語判定と逆引きジオコーディング
+            try {
+                // ブラウザの言語設定を判定（日本語かどうか）
+                const isJa = i18n._currentLang === 'ja';
+                const targetLang = isJa ? 'ja' : 'en';
+                
+                const revRes = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${currentLat}&lon=${currentLon}&format=json&accept-language=${targetLang}`);
+                
+                if (revRes.ok) {
+                    const revData = await revRes.json();
+                    const addr = revData.address;
+                    
+                    // 優先順位に基づいて地名を抽出
+                    let locName = addr.city || addr.town || addr.village || addr.province || addr.state || data.city || "現在地";
+                    
+                    // 識別記号を付けずに代入
+                    currentLabel = locName;
+                } else {
+                    // 逆引き失敗時はipapi.coのデータを使用（識別記号なし）
+                    currentLabel = data.city || data.region || "現在地";
+                }
+            } catch (revErr) {
+                console.warn("Reverse geocoding failed, using IP city name.", revErr);
+                currentLabel = data.city || data.region || "現在地";
+            }
         } else {
             throw new Error('Data Incomplete');
         }
@@ -1224,7 +1206,7 @@ async function setApproximateLocation() {
         // 最終的なバックアップ（高須沖）
         currentLat = 31.337; 
         currentLon = 130.795;
-        currentLabel = "高須沖(Sample)";
+        currentLabel = "高須沖";
     }
 }
 
@@ -1248,9 +1230,19 @@ function finalizeInit() {
 /**
  * サブルーチン：UIイベントの登録
  * 既存のユーザーデータ「pin_weather_spots」および「pin_weather_wind_filter」を厳守。
- * 「変更して登録」ボタンのクリックイベントが消失する問題を解決した修正版。
+ * 修正内容：地図ボタン押下時のrenderTabs("Map")呼び出しを削除。
  */
 function setupGeneralEvents() {
+    // --- 新設：概況ボタン左隣のGPS/Mapボタン (nav-action-bar内) ---
+    const navGpsBtn = document.getElementById('gps-btn-nav');
+    if (navGpsBtn) navGpsBtn.onclick = () => handleGPSClick();
+
+    const navMapBtn = document.getElementById('map-btn-nav');
+    if (navMapBtn) navMapBtn.onclick = () => {
+        openMap(currentLat, currentLon);
+        // renderTabs("Map") を削除（タブの色が消える不具合対策）
+    };
+
     // 1. 地図検索入力欄
     const searchInput = document.getElementById('map-search-input');
     if (searchInput) {
@@ -1279,7 +1271,6 @@ function setupGeneralEvents() {
     // 4. 風向設定モーダル内のボタン群
     const applyWindBtn = document.getElementById('apply-wind-btn');
     if (applyWindBtn) {
-        // 保存・適用処理（既存キー pin_weather_spots を厳守）
         const executeApply = () => {
             const currentSpot = mySpots.find(s => 
                 Math.abs(s.lat - currentLat) < 0.0001 && 
@@ -1287,17 +1278,14 @@ function setupGeneralEvents() {
             );
 
             if (currentSpot) {
-                // 地点固有の設定を保存
                 currentSpot.windFilters = [...targetWindDirections];
-                // 【重要】既存のキー名 pin_weather_spots をそのまま使用
                 localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
             } else {
-                // デフォルト設定用キー
                 localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
             }
 
             closeModal('wind-modal');
-            draw(); // グラフ再描画
+            draw(); 
         };
 
         const footer = applyWindBtn.parentElement;
@@ -1311,7 +1299,6 @@ function setupGeneralEvents() {
 
             const baseBtnStyle = "padding: 8px 4px; border-radius: 6px; font-size: 11px; font-weight: 500; border: none; cursor: pointer; transition: opacity 0.2s; flex: 1; white-space: nowrap;";
 
-            // ボタン1: デフォルトを読込（確認ダイアログ後にメモリ上の値を更新）
             const btnLoadDef = document.createElement('button');
             btnLoadDef.style.cssText = baseBtnStyle + "background: #f1f3f5; color: #495057;";
             btnLoadDef.innerText = i18n.t('btnLoadDefault');
@@ -1336,36 +1323,30 @@ function setupGeneralEvents() {
                 });
             };
 
-            // ボタン2: デフォルトに保存（【修正済】確認ダイアログ表示後に保存を実行）
             const btnSaveDef = document.createElement('button');
             btnSaveDef.style.cssText = baseBtnStyle + "background: #f1f3f5; color: #495057;";
             btnSaveDef.innerText = i18n.t('btnSaveDefault');
             btnSaveDef.onclick = () => {
-                // ここでは保存せず、ダイアログを表示するだけにする
                 showAppDialog({ 
                     title: i18n.t('msgSaveConfirmTitle') || "保存の確認", 
                     message: i18n.t('msgSaveConfirmDesc') || "現在の設定をデフォルトとして保存しますか？", 
                     onSave: () => {
-                        // ダイアログで「更新」が押された時のみ、ストレージを書き換える
                         localStorage.setItem('pin_weather_wind_filter', JSON.stringify(targetWindDirections));
                     } 
                 });
             };
 
-            // ボタン3: キャンセル
             const cancelBtn = document.createElement('button');
             cancelBtn.id = "btnClose"; 
             cancelBtn.style.cssText = baseBtnStyle + "background: #6c757d; color: white;";
             cancelBtn.innerText = i18n.t('btnClose') || "Cancel";
             cancelBtn.onclick = () => closeModal('wind-modal');
 
-            // ボタン4: 適用（現在の地点に保存して再描画）
             const finalApplyBtn = document.createElement('button');
             finalApplyBtn.style.cssText = baseBtnStyle + "background: #007bff; color: white; flex: 1.2;";
             finalApplyBtn.innerText = i18n.t('btnSaveSettings') || "Apply Changes";
             finalApplyBtn.onclick = executeApply;
 
-            // フッター再構築
             footer.innerHTML = ''; 
             footer.appendChild(btnLoadDef);
             footer.appendChild(btnSaveDef);
@@ -1374,16 +1355,16 @@ function setupGeneralEvents() {
         }
     }
 
-    // 5. GPSボタン
+    // 5. 既存GPSボタン
     const gpsBtn = document.getElementById('gps-btn');
     if (gpsBtn) gpsBtn.onclick = () => handleGPSClick();
     
-    // 6. Mapボタン
+    // 6. 既存Mapボタン
     const mapBtn = document.getElementById('map-btn');
     if (mapBtn) {
         mapBtn.onclick = () => { 
             openMap(); 
-            renderTabs("Map"); 
+            // renderTabs("Map") を削除（タブの色が消える不具合対策）
         };
     }
 
@@ -1555,12 +1536,10 @@ function initCompassUI() {
 }
 
 /**
- * サブルーチン：環境色を反映した汎用ダイアログを表示（多言語・サイズ調整・安全版）
- * 1. ウィジェットプレビュー関連の要素をリセット。
- * 2. ホスト名に応じてヘッダー色を変更。
- * 3. 最後の1地点削除警告など、アクションがない場合でも「閉じる」ボタンを表示するよう修正。
+ * サブルーチン：環境色を反映した汎用ダイアログを表示
+ * 修正内容：通知専用の引数 onOk を追加。これが存在する場合は、他のボタンを排除してOKボタンのみを表示する。
  */
-function showAppDialog({ title, message = null, messageKey = null, inputValue = null, onMap = null, onSave = null, onDelete = null }) {
+function showAppDialog({ title, message = null, messageKey = null, inputValue = null, onMap = null, onSave = null, onDelete = null, saveBtnKey = null, onOk = null }) {
     const modal = document.getElementById('app-common-modal');
     const header = document.getElementById('common-modal-header');
     const titleEl = document.getElementById('common-modal-title');
@@ -1568,110 +1547,96 @@ function showAppDialog({ title, message = null, messageKey = null, inputValue = 
     const inputArea = document.getElementById('common-modal-input-area');
     const input = document.getElementById('common-modal-input');
     const footer = document.getElementById('common-modal-footer');
+    const closeBtn = document.getElementById('common-modal-close');
 
-    // --- ウィジェット関連要素のリセット ---
+    if (!modal || !header || !titleEl || !msgEl || !footer) return;
+
+    // 右上「×」ボタン
+    if (closeBtn) {
+        closeBtn.onclick = () => { modal.style.display = 'none'; };
+    }
+
+    // ウィジェット関連リセット
     const widgetArea = document.getElementById('widget-preview-area');
     const widgetActionArea = document.getElementById('widget-action-area');
     if (widgetArea) widgetArea.style.display = 'none';
     if (widgetActionArea) widgetActionArea.style.display = 'none';
 
-    if (!modal || !header || !titleEl || !msgEl || !footer) return;
-
-    // 1. 環境色の反映
+    // 環境色の反映（既存維持）
     const hostname = window.location.hostname;
     let bgColor = "#007bff"; 
     let textColor = "#ffffff";
-
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.includes("192.168.")) {
-        bgColor = "#b0fbcf"; 
-        textColor = "#333333";
+        bgColor = "#b0fbcf"; textColor = "#333333";
     } else if (hostname.includes("beta")) {
-        bgColor = "#f5dc1b"; 
-        textColor = "#333333";
+        bgColor = "#f5dc1b"; textColor = "#333333";
     }
-
     header.style.backgroundColor = bgColor;
     titleEl.style.color = textColor;
 
-    // 2. コンテンツのセット
+    // コンテンツのセット
     titleEl.innerText = title;
-    if (messageKey) {
-        msgEl.innerText = i18n.t(messageKey);
-    } else if (message) {
-        msgEl.innerText = message;
-    } else {
-        msgEl.innerText = "";
-    }
+    msgEl.innerText = messageKey ? i18n.t(messageKey) : (message || "");
     
     if (inputArea && input) {
-        if (inputValue !== null) {
-            inputArea.style.display = 'block';
-            input.value = inputValue;
-        } else {
-            inputArea.style.display = 'none';
-        }
+        inputArea.style.display = (inputValue !== null) ? 'block' : 'none';
+        if (inputValue !== null) input.value = inputValue;
     }
 
-    // 3. ボタンの生成
+    // ボタンの生成
     footer.innerHTML = "";
-    
-    // 【判定ロジックの修正】
-    // ウィジェット設定画面（メッセージのみでタイトルが「ウィジェット埋め込み設定」）の場合はフッターを隠す。
-    // それ以外（削除警告メッセージなど）は、アクションがなくても「閉じる」ボタンを出す。
-    const isWidgetMode = (!onDelete && !onMap && !onSave && title === i18n.t('widgetTitle'));
+    footer.style.display = 'flex';
 
-    if (isWidgetMode) {
-        footer.style.display = 'none';
-    } else {
-        footer.style.display = 'flex';
-
-        // 削除ボタン
-        if (onDelete) {
-            const btnDelete = document.createElement('button');
-            btnDelete.className = "btn btn-danger-outline";
-            btnDelete.innerText = i18n.t('btnDelete'); 
-            btnDelete.onclick = () => {
-                onDelete();
-                modal.style.display = 'none';
-            };
-            footer.appendChild(btnDelete);
-        }
-
-        // 地図ボタン
-        if (onMap) {
-            const btnMap = document.createElement('button');
-            btnMap.className = "btn btn-map-view";
-            btnMap.innerText = "Map"; 
-            btnMap.onclick = () => {
-                onMap();
-                modal.style.display = 'none';
-            };
-            footer.appendChild(btnMap);
-        }
-
-        // キャンセル（閉じる）ボタン：ウィジェット以外では常に表示
-        const btnCancel = document.createElement('button');
-        btnCancel.className = "btn btn-secondary";
-        btnCancel.innerText = i18n.t('btnClose');
-        btnCancel.onclick = () => {
+    if (onOk) {
+        // --- 通知モード（onOkが渡された場合） ---
+        // 他のボタンは一切作らず、OKボタン1つだけを全幅で生成
+        const btnOk = document.createElement('button');
+        btnOk.className = "btn btn-save"; // 決定を表す青色スタイル
+        btnOk.innerText = i18n.t('btnOK') || "OK";
+        btnOk.onclick = () => {
+            onOk();
             modal.style.display = 'none';
-        };
-        footer.appendChild(btnCancel);
+        };  
+        footer.appendChild(btnOk);
+    } else {
+        // --- 通常モード（既存ロジックを完全維持） ---
+        const isWidgetMode = (!onDelete && !onMap && !onSave && title === i18n.t('widgetTitle'));
+        if (isWidgetMode) {
+            footer.style.display = 'none';
+        } else {
+            if (onDelete) {
+                const btnDelete = document.createElement('button');
+                btnDelete.className = "btn btn-danger-outline";
+                btnDelete.innerText = i18n.t('btnDelete'); 
+                btnDelete.onclick = () => { onDelete(); modal.style.display = 'none'; };
+                footer.appendChild(btnDelete);
+            }
+            if (onMap) {
+                const btnMap = document.createElement('button');
+                btnMap.className = "btn btn-map-view";
+                btnMap.innerText = "Map"; 
+                btnMap.onclick = () => { onMap(); modal.style.display = 'none'; };
+                footer.appendChild(btnMap);
+            }
+            // 通常時は必ずキャンセル（閉じる）を表示
+            const btnCancel = document.createElement('button');
+            btnCancel.className = "btn btn-secondary";
+            btnCancel.innerText = i18n.t('btnClose');
+            btnCancel.onclick = () => { modal.style.display = 'none'; };
+            footer.appendChild(btnCancel);
 
-        // 保存・適用ボタン
-        if (onSave) {
-            const btnSave = document.createElement('button');
-            btnSave.className = "btn btn-save";
-            btnSave.innerText = i18n.t('btnApply') || i18n.t('btnSaveSettings') || "Update";
-            btnSave.onclick = () => {
-                const value = input ? input.value : null;
-                onSave(value);
-                modal.style.display = 'none';
-            };
-            footer.appendChild(btnSave);
+            if (onSave) {
+                const btnSave = document.createElement('button');
+                btnSave.className = "btn btn-save";
+                btnSave.innerText = saveBtnKey ? i18n.t(saveBtnKey) : (i18n.t('btnSaveSpot') || "Update");
+                btnSave.onclick = () => {
+                    onSave(input ? input.value : null);
+                    modal.style.display = 'none';
+                };
+                footer.appendChild(btnSave);
+            }
         }
     }
-
     modal.style.display = 'flex';
 }
 
@@ -1698,6 +1663,7 @@ function checkSpotLimit(newName) {
 
 /**
  * サブルーチン：地点の削除確認（自作ダイアログ版）
+ * 修正内容：saveBtnKey に 'btnYes' を指定し、削除の最終確認ボタンを「はい」に変更しました。
  */
 function confirmDeleteByLabel(label) {
     if (!label) return;
@@ -1710,19 +1676,25 @@ function confirmDeleteByLabel(label) {
         showAppDialog({
             title: label,
             messageKey: 'lastSpotWarning',
-            onSave: null
+            onSave: null // 保存ボタンなし（OKOnly相当）
         });
         return;
     }
 
     // 2. 削除確認
-    const confirmMessage = i18n.t('confirmDelete', { name: label });
+    // 辞書内の confirmDelete 関数を使用してメッセージを生成
+    const confirmMessage = typeof i18n.dict[i18n._currentLang].confirmDelete === 'function' 
+        ? i18n.dict[i18n._currentLang].confirmDelete(label)
+        : i18n.t('confirmDelete');
 
     showAppDialog({
         title: i18n.t('confirmDeletePrefix') + " " + label,
         message: confirmMessage,
         messageKey: null,
+        // 整理ポイント：右側の実行ボタンを「はい」に、キャンセルを「キャンセル（btnClose）」に設定
+        saveBtnKey: 'btnYes', 
         onSave: () => {
+            // 憶測を排除し、提供された削除ロジックを厳密に維持
             const finalIdx = mySpots.findIndex(s => s.label === label);
             if (finalIdx > -1) {
                 // 配列から削除
@@ -1730,7 +1702,7 @@ function confirmDeleteByLabel(label) {
                 localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
                 
                 // 削除した地点を表示し続けると「未登録地点」としてタブに残るため、
-                // 残ったリストの最初の地点に切り替えて再描画します。
+                // 残ったリストの最初の地点に切り替えて再描画。
                 const nextSpot = mySpots[0];
                 if (nextSpot) {
                     updateLocation(nextSpot.lat, nextSpot.lon, nextSpot.label);
@@ -1745,6 +1717,7 @@ function confirmDeleteByLabel(label) {
 
 /**
  * サブルーチン：地点タブの描画
+ * 修正内容：GPS/Mapをタブから除外し、末尾に「＋」ボタンを追加。
  */
 function renderTabs(activeOverrideLabel = null) {
     const container = document.getElementById('spot-tabs');
@@ -1766,7 +1739,6 @@ function renderTabs(activeOverrideLabel = null) {
     if (activeIdx > -1) {
         activeSpot = displaySpots.splice(activeIdx, 1)[0];
     } else if (activeLabel && !['gps', 'map', 'GPS', 'Map'].includes(activeLabel)) {
-        // 保存リストにない場合は「未登録地点」として扱う
         isExternalSpot = true;
         activeSpot = { label: activeLabel, lat: currentLat, lon: currentLon };
     }
@@ -1775,14 +1747,14 @@ function renderTabs(activeOverrideLabel = null) {
     if (activeSpot) {
         items.push({ id: activeSpot.label, label: isExternalSpot ? activeSpot.label : `📍 ${activeSpot.label}`, lat: activeSpot.lat, lon: activeSpot.lon, rawLabel: activeSpot.label, isExternal: isExternalSpot });
     }
-    items.push({ id: 'gps', label: 'GPS', isSpecial: true, isExternal: true });
-    items.push({ id: 'map', label: 'Map', isSpecial: true, isExternal: true });
+    
+    // 地点リストのみをタブに追加（GPS/MapはsetupGeneralEventsで別途定義済みのため除外）
     displaySpots.forEach(s => items.push({ id: s.label, label: `📍 ${s.label}`, lat: s.lat, lon: s.lon, rawLabel: s.label, isExternal: false }));
 
     items.forEach((item) => {
         const btn = document.createElement('button');
         const isSelected = (item.id === activeLabel || item.label === activeLabel || item.rawLabel === activeLabel);
-        btn.className = 'btn' + (item.id === 'gps' ? ' btn-gps' : item.id === 'map' ? ' btn-map-view' : ' btn-location');
+        btn.className = 'btn btn-location';
         
         if (isSelected) {
             btn.classList.add('active');
@@ -1796,73 +1768,74 @@ function renderTabs(activeOverrideLabel = null) {
 
         btn.onclick = (e) => {
             if (e) e.stopPropagation();
-            if (item.id === 'gps') {
-                handleGPSClick();
-            } else if (item.id === 'map') {
-                openMap(currentLat, currentLon); 
-            } else {
-                if (!item.isExternal) {
-                    const idx = mySpots.findIndex(s => s.label === item.rawLabel);
-                    if (idx > -1) {
-                        const selectedSpot = mySpots.splice(idx, 1)[0];
-                        mySpots.unshift(selectedSpot);
-                        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-                    }
+            if (!item.isExternal) {
+                const idx = mySpots.findIndex(s => s.label === item.rawLabel);
+                if (idx > -1) {
+                    const selectedSpot = mySpots.splice(idx, 1)[0];
+                    mySpots.unshift(selectedSpot);
+                    localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
                 }
-                updateLocation(item.lat, item.lon, item.rawLabel);
-                renderTabs(item.rawLabel); 
             }
+            updateLocation(item.lat, item.lon, item.rawLabel);
+            renderTabs(item.rawLabel); 
         };
 
-        if (!item.isSpecial) {
-            const openEditor = (e) => {
-                if (e) { e.preventDefault(); e.stopPropagation(); }
-                const currentLabelAtOpen = item.rawLabel;
+        const openEditor = (e) => {
+            if (e) { e.preventDefault(); e.stopPropagation(); }
+            const currentLabelAtOpen = item.rawLabel;
 
-                showAppDialog({
-                    title: currentLabelAtOpen,
-                    messageKey: 'editSpotGuide',
-                    inputValue: currentLabelAtOpen,
-                    onMap: () => { if (typeof openMap === 'function') openMap(item.lat, item.lon); },
-                    onSave: (newName) => {
-                        if (!newName || (typeof checkSpotLimit === 'function' && !checkSpotLimit(newName))) return;
-                        const idx = mySpots.findIndex(s => s.label === currentLabelAtOpen);
-                        if (idx !== -1) {
-                            const targetSpot = mySpots.splice(idx, 1)[0];
-                            targetSpot.label = newName;
-                            mySpots.unshift(targetSpot);
-                        } else {
-                            const filtered = mySpots.filter(s => s.label !== newName);
-                            mySpots = [{ lat: item.lat, lon: item.lon, label: newName }, ...filtered];
-                        }
-                        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
-                        updateLocation(item.lat, item.lon, newName);
-                        renderTabs(newName);
-                    },
-                    onDelete: !item.isExternal ? () => {
-                        setTimeout(() => {
-                            confirmDeleteByLabel(currentLabelAtOpen);
-                        }, 50);
-                    } : null
-                });
-            };
-            btn.oncontextmenu = openEditor; 
-            let timer;
-            btn.ontouchstart = (e) => { timer = setTimeout(() => openEditor(e), 800); }; 
-            btn.ontouchend = () => clearTimeout(timer); 
-        }
+            showAppDialog({
+                title: currentLabelAtOpen,
+                messageKey: 'editSpotGuide',
+                inputValue: currentLabelAtOpen,
+                onMap: () => { if (typeof openMap === 'function') openMap(item.lat, item.lon); },
+                onSave: (newName) => {
+                    if (!newName || (typeof checkSpotLimit === 'function' && !checkSpotLimit(newName))) return;
+                    const idx = mySpots.findIndex(s => s.label === currentLabelAtOpen);
+                    if (idx !== -1) {
+                        const targetSpot = mySpots.splice(idx, 1)[0];
+                        targetSpot.label = newName;
+                        mySpots.unshift(targetSpot);
+                    } else {
+                        const filtered = mySpots.filter(s => s.label !== newName);
+                        mySpots = [{ lat: item.lat, lon: item.lon, label: newName }, ...filtered];
+                    }
+                    localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                    updateLocation(item.lat, item.lon, newName);
+                    renderTabs(newName);
+                },
+                onDelete: !item.isExternal ? () => {
+                    setTimeout(() => {
+                        confirmDeleteByLabel(currentLabelAtOpen);
+                    }, 50);
+                } : null
+            });
+        };
+        btn.oncontextmenu = openEditor; 
+        let timer;
+        btn.ontouchstart = (e) => { timer = setTimeout(() => openEditor(e), 800); }; 
+        btn.ontouchend = () => clearTimeout(timer); 
+
         container.appendChild(btn);
     });
+
+    // 末尾に「＋」ボタンを追加
+    const addTabBtn = document.createElement('button');
+    addTabBtn.className = 'btn btn-add-tab';
+    addTabBtn.innerHTML = '<span>＋</span> MySpots';
+    addTabBtn.style.minWidth = '40px';
+    addTabBtn.onclick = () => openMap();
+    container.appendChild(addTabBtn);
 }
 
 /**
  * サブルーチン：GPSボタンクリック時の処理
- * 現在地を取得し、逆引きAPIで地名を取得してからupdateLocationを呼び出す。
+ * 修正内容：既存の.btn-gpsに加え、新設された#gps-btn-navの状態も更新。
  */
 function handleGPSClick() {
     if ("geolocation" in navigator) {
-        const gpsBtn = document.querySelector('.btn-gps');
-        if (gpsBtn) gpsBtn.innerText = i18n.t('gpsFetching');
+        const gpsBtns = document.querySelectorAll('.btn-gps, #gps-btn-nav');
+        gpsBtns.forEach(btn => { if(btn) btn.innerText = i18n.t('gpsFetching'); });
 
         navigator.geolocation.getCurrentPosition(async (pos) => {
             const lat = pos.coords.latitude;
@@ -1880,25 +1853,18 @@ function handleGPSClick() {
                 }
             } catch (err) { console.error(err); }
 
-            if (gpsBtn) gpsBtn.innerText = "GPS";
+            gpsBtns.forEach(btn => { if(btn) btn.innerText = "GPS"; });
 
-            // グローバル変数の同期（タブ描画の基準となる値を確定させる）
             currentLat = lat;
             currentLon = lon;
             currentLabel = gpsLabel;
 
-            // グラフの更新
             updateLocation(lat, lon, gpsLabel);
-
-            // 【重要】左端のタブ（1番目ボタン）を、新たに取得したgpsLabelで再描画する
             renderTabs(gpsLabel);
 
         }, (err) => {
-            // エラー時の処理
             console.error(err);
-            if (gpsBtn) gpsBtn.innerText = "GPS";
-            
-            // alert を廃止し、自作ダイアログを表示
+            gpsBtns.forEach(btn => { if(btn) btn.innerText = "GPS"; });
             showAppDialog({
                 title: "GPS Error", 
                 messageKey: 'gpsError' 
@@ -1907,13 +1873,11 @@ function handleGPSClick() {
     }
 }
 
-const addBtn = document.getElementById('add-btn');
-if (addBtn) addBtn.onclick = () => openMap();
-
 /**
  * サブルーチン：地図モーダルを開く
+ * 修正内容：引数を受け取れるようにし、編集中の地点で地図を開けるよう改善。
  */
-function openMap() {
+function openMap(targetLat = currentLat, targetLon = currentLon) {
     // 検索入力欄のクリア
     const searchInput = document.getElementById('map-search-input');
     if (searchInput) searchInput.value = '';
@@ -1928,7 +1892,8 @@ function openMap() {
         const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
         const gsi = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', { attribution: '&copy; 国土地理院' });
         
-        map = L.map('map-canvas', { center: [currentLat, currentLon], zoom: 14, layers: [esri] });
+        // currentLat/Lon ではなく targetLat/Lon を使用
+        map = L.map('map-canvas', { center: [targetLat, targetLon], zoom: 14, layers: [esri] });
         
         const baseMaps = {};
         baseMaps[i18n.t('layerStreet')] = esri;
@@ -1938,14 +1903,14 @@ function openMap() {
         L.control.layers(baseMaps).addTo(map);
         map.on('click', onMapClick);
     } else {
-        // 二回目以降は表示位置を更新
-        map.setView([currentLat, currentLon], 14);
+        // 二回目以降は表示位置を更新（targetLat/Lonを使用）
+        map.setView([targetLat, targetLon], 14);
     }
 
-    // 住所情報の取得とマーカーの再設置
-    fetchAddressInfo(currentLat, currentLon);
+    // 住所情報の取得とマーカーの再設置（targetLat/Lonを使用）
+    fetchAddressInfo(targetLat, targetLon);
     if (tempMarker) map.removeLayer(tempMarker);
-    tempMarker = L.marker([currentLat, currentLon]).addTo(map);
+    tempMarker = L.marker([targetLat, targetLon]).addTo(map);
 
     // モーダル表示後のサイズ崩れ対策
     setTimeout(() => {
@@ -2036,30 +2001,52 @@ function applyStylesToCSS() {
     root.style.setProperty('--label-font-size', `${viewConfig.fontSize}px`);
 }
 
+/**
+ * サブルーチン：地図検索の実行
+ * 修正内容：検索に使用したキーワードを一時保持し、地点名に反映させる。
+ */
+let lastSearchKeyword = null; // キーワード一時保持用の変数（スコープ：グローバル）
+
 async function executeMapSearch() {
     const input = document.getElementById('map-search-input');
     if (!input) return;
     const query = input.value;
     if (!query) return;
+
     try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&accept-language=ja`);
+        // 多言語対応を考慮し、検索パラメータを構築
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&accept-language=${i18n._currentLang}`);
         const results = await res.json();
+
         if (results.length > 0) {
             const { lat, lon } = results[0];
-            const latlng = [parseFloat(lat), parseFloat(lon)];
+            const latVal = parseFloat(lat);
+            const lonVal = parseFloat(lon);
+            const latlng = [latVal, lonVal];
+            
+            // 【重要】ユーザーが入れた検索ワードを保持
+            lastSearchKeyword = query;
+            
             map.setView(latlng, 15);
             if (tempMarker) map.removeLayer(tempMarker);
             tempMarker = L.marker(latlng).addTo(map);
-            fetchAddressInfo(parseFloat(lat), parseFloat(lon));
+            
+            // fetchAddressInfo 内で lastSearchKeyword が使用されます
+            fetchAddressInfo(latVal, lonVal);
         }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+        console.error("Map Search Error:", err);
+    }
 }
 
+/**
+ * サブルーチン：地図クリック時のイベント
+ */
 function onMapClick(e) {
     const { lat, lng } = e.latlng;
     
-    // 【DEBUG】クリックされた瞬間の座標を記録
-    console.log(`[DEBUG] Map Clicked: lat=${lat}, lon=${lng}`);
+    // 直接クリック時は検索ワードを無効化
+    lastSearchKeyword = null;
 
     currentLat = lat;
     currentLon = lng;
@@ -2070,19 +2057,18 @@ function onMapClick(e) {
         tempMarker = L.marker(e.latlng).addTo(map);
     }
 
-    // 住所取得。この後に currentLabel がどう変わるかが重要
     if (typeof fetchAddressInfo === 'function') {
-        fetchAddressInfo(currentLat, currentLon);
+        fetchAddressInfo(lat, lng);
     }
 }
 
 /**
  * サブルーチン：座標から住所情報を取得し、モーダル内のボタンに機能を割り当てる
- * グラフ表示時は1番目タブに地名を挿入し、内部座標(currentLat/Lon)を同期させます。
+ * 修正内容：
+ * 1. 地図検索経由なら検索ワードを地点名に使用
+ * 2. グラフ表示ボタン押下時、100m以内に既存地点があればその地点として扱う
  */
 async function fetchAddressInfo(lat, lng) {
-    console.log(`[DEBUG] fetchAddressInfo started: lat=${lat}, lon=${lng}`);
-
     const statusEl = document.getElementById('map-status');
     if (statusEl) statusEl.innerText = i18n.t('mapStatusFetching');
     
@@ -2090,14 +2076,22 @@ async function fetchAddressInfo(lat, lng) {
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=${i18n._currentLang}`);
         const data = await res.json();
         
-        console.log(`[DEBUG] Address Data:`, data.address);
-
         const addr = data.address;
         const city = addr.city || addr.town || addr.village || "";
         const district = addr.suburb || addr.neighbourhood || addr.quarter || addr.city_district || "";
-        const defaultName = (city + district) || i18n.t('mapNewSpot');
+        
+        // --- 地点名（defaultName）の決定ロジック ---
+        let defaultName;
+        if (lastSearchKeyword) {
+            // 検索実行後の場合は検索ワードを採用
+            defaultName = lastSearchKeyword;
+            lastSearchKeyword = null; // 一度使用したらクリア
+        } else {
+            // 地図クリック等の場合は住所から生成
+            defaultName = (city + district) || i18n.t('mapNewSpot');
+        }
 
-        // --- 「MySpotsに登録」ボタンの制御 (既存ロジックを維持) ---
+        // --- 「MySpotsに登録」ボタン ---
         const saveSpotBtn = document.getElementById('save-spot-btn');
         if (saveSpotBtn) {
             saveSpotBtn.onclick = () => {
@@ -2105,15 +2099,15 @@ async function fetchAddressInfo(lat, lng) {
                     title: defaultName,
                     messageKey: 'mapSavePrompt',
                     inputValue: defaultName,
+                    saveBtnKey: 'btnSaveSpot',
                     onSave: (spotName) => {
                         if (!spotName) return;
-                        if (!checkSpotLimit(spotName)) return;
+                        if (typeof checkSpotLimit === 'function' && !checkSpotLimit(spotName)) return;
 
                         const filtered = mySpots.filter(s => s.label !== spotName);
                         mySpots = [{ lat, lon: lng, label: spotName }, ...filtered];
                         localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
                         
-                        // 描画とタブ更新
                         updateLocation(lat, lng, spotName);
                         renderTabs(spotName); 
                         closeModal('map-modal');
@@ -2123,27 +2117,35 @@ async function fetchAddressInfo(lat, lng) {
             saveSpotBtn.disabled = false;
         }
 
-        // --- 「グラフ表示」ボタンの制御 (要件に基づき新規実装) ---
+        // --- 「グラフ表示」ボタン ---
         const tempViewBtn = document.getElementById('temp-view-btn');
         if (tempViewBtn) {
             tempViewBtn.onclick = () => {
-                console.log(`[DEBUG] Temp Graph View: ${defaultName} (lat:${lat}, lon:${lng})`);
-                
-                // 1. 内部変数を📌地点の座標とラベルで更新
-                // これにより Map ボタンを押した際もこの地点が開かれるようになります
-                currentLat = lat;
-                currentLon = lng;
-                currentLabel = defaultName;
+                // 近接地点判定（緯度経度差 約0.0009 ≒ 100m）
+                const threshold = 0.0009;
+                const nearIdx = mySpots.findIndex(s => 
+                    Math.abs(s.lat - lat) < threshold && 
+                    Math.abs(s.lon - lng) < threshold
+                );
 
-                // 2. 提供された updateLocation を実行（描画処理）
-                updateLocation(lat, lng, defaultName);
+                let finalLat = lat;
+                let finalLon = lng;
+                let finalLabel = defaultName;
 
-                // 3. 提供された renderTabs を実行
-                // activeOverrideLabel として defaultName を渡すことで、
-                // mySpotsには保存せず「1番目のタブ」にこの地名を挿入・表示させます
-                renderTabs(defaultName); 
+                if (nearIdx > -1) {
+                    // 既存地点が近い場合はその地点を1番タブへ
+                    const foundSpot = mySpots.splice(nearIdx, 1)[0];
+                    mySpots.unshift(foundSpot);
+                    localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+                    
+                    finalLat = foundSpot.lat;
+                    finalLon = foundSpot.lon;
+                    finalLabel = foundSpot.label;
+                }
 
-                // 4. モーダルを閉じる
+                // 描画とタブ更新
+                updateLocation(finalLat, finalLon, finalLabel);
+                renderTabs(finalLabel); 
                 closeModal('map-modal');
             };
             tempViewBtn.disabled = false;
@@ -2151,7 +2153,7 @@ async function fetchAddressInfo(lat, lng) {
         
         if (statusEl) statusEl.innerText = "📍：" + defaultName;
     } catch (err) {
-        console.error("[DEBUG] fetchAddressInfo Error:", err);
+        console.error("fetchAddressInfo Error:", err);
         if (statusEl) statusEl.innerText = i18n.t('mapStatusFail');
     }
 }
@@ -2167,18 +2169,6 @@ async function updateLocation(lat, lon, label) {
     currentLat = lat; 
     currentLon = lon; 
     currentLabel = label;
-
-    // --- コンディション概況ボタンの地名部分のみを更新 ---
-    const locationSpan = document.getElementById('summary-btn-location');
-    if (locationSpan) {
-        const isJa = i18n._currentLang === 'ja';
-        // 日本語なら「地名 」、英語なら「for 地名」のように調整可能
-        if (isJa) {
-            locationSpan.innerText = label + " ";
-        } else {
-            locationSpan.innerText = "for " + label;
-        }
-    }
 
     try {
         // 実際の描画処理
@@ -2957,6 +2947,7 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
             tooltip.style.left = (100 + hs * 3) + "px";
             tooltip.style.top = (rect.bottom - tooltip.offsetHeight) + "px";
             tooltip.style.bottom = "auto";
+            // スクロール時はタイマーを設定せず、スクロール停止イベント側に任せる
         } else {
             // 【マウス移動・クリック時：従前のとおり高さに合わせる】
             const tooltipWidth = tooltip.offsetWidth || 220;
@@ -2971,10 +2962,10 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
                 tooltip.style.top = ty + "px";
                 tooltip.style.bottom = "auto";
             }
+            // タップ・クリック時のみ、ユーザー設定の表示時間を適用
+            const tooltipDur = viewConfig.tooltipDuration * 1000;    
+            tooltipTimer = setTimeout(() => hideTooltipUI(), tooltipDur);
         }
-
-        const tooltipDur = viewConfig.tooltipDuration * 1000;    
-        tooltipTimer = setTimeout(() => hideTooltipUI(), tooltipDur);
     };
 
     stage.onmousemove = (e) => {
@@ -3002,6 +2993,8 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
  */
 function initScrollEvent(hScale, startIdx) {
     const scrollRoot = document.getElementById('scroll-root');
+    let scrollStopTimer = null; // スクロール停止判定用タイマー
+
     if (scrollRoot) {
         scrollRoot.onscroll = () => {
             const sl = Number(scrollRoot.scrollLeft);
@@ -3032,7 +3025,6 @@ function initScrollEvent(hScale, startIdx) {
                 });
             };
 
-            // 上部と下部を分離して計算（NodeListの混線を防止）
             updateStickyGroup('.sticky-date-top');
             updateStickyGroup('.sticky-date-bottom');
 
@@ -3040,8 +3032,15 @@ function initScrollEvent(hScale, startIdx) {
                 const visualOffset = hs * 2; 
                 const targetX = sl + visualOffset; 
                 const hourIdx = (targetX / hs) + sIdx;
-                // isAutoScroll を true として呼び出し
+                
+                // ツールチップを更新（isAutoScroll = true）
                 window.updateTooltipFromScroll(hourIdx, 0, 0, true, sl);
+
+                // スクロール停止判定：一定時間（50ms程度）スクロールがなければ停止とみなして消す
+                if (scrollStopTimer) clearTimeout(scrollStopTimer);
+                scrollStopTimer = setTimeout(() => {
+                    hideTooltipUI();
+                }, 50); 
             }
         };
         scrollRoot.dispatchEvent(new Event('scroll'));
