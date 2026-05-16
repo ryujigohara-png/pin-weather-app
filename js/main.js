@@ -1751,18 +1751,24 @@ function renderTabs(activeOverrideLabel = null) {
     // 地点リストのみをタブに追加（GPS/MapはsetupGeneralEventsで別途定義済みのため除外）
     displaySpots.forEach(s => items.push({ id: s.label, label: `📍 ${s.label}`, lat: s.lat, lon: s.lon, rawLabel: s.label, isExternal: false }));
 
-    items.forEach((item) => {
+    // ループ処理内でインデックス（引数 i）を受け取るように変更
+    items.forEach((item, i) => {
         const btn = document.createElement('button');
         const isSelected = (item.id === activeLabel || item.label === activeLabel || item.rawLabel === activeLabel);
         btn.className = 'btn btn-location';
         
         if (isSelected) {
             btn.classList.add('active');
-            setTimeout(() => {
-                if (btn.classList.contains('active')) {
-                    btn.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
-                }
-            }, 150);
+            
+            // ★修正箇所：アクティブなボタンが「先頭（0番目）」にある時は、左端リセットで既に画面内に入っているため、
+            // 後からスクロール位置を破壊する 150ms タイマーの登録自体を完全にスキップさせる。
+            if (i > 0) {
+                setTimeout(() => {
+                    if (btn.classList.contains('active')) {
+                        btn.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+                    }
+                }, 150);
+            }
         }
         btn.innerText = item.label;
 
@@ -1826,6 +1832,12 @@ function renderTabs(activeOverrideLabel = null) {
     addTabBtn.style.minWidth = '40px';
     addTabBtn.onclick = () => openMap();
     container.appendChild(addTabBtn);
+
+    // 配置リセットコマンドを実行し、文字数変化による新しいボタン幅をその場で即座に確定
+    container.offsetHeight; 
+
+    // パッと瞬時にスクロール位置を左端（0）にリセットする
+    container.scrollTo({ left: 0 });
 }
 
 /**
