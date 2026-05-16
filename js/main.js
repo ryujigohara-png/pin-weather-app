@@ -1613,7 +1613,7 @@ function showAppDialog({ title, message = null, messageKey = null, inputValue = 
             }
             if (onMap) {
                 const btnMap = document.createElement('button');
-                btnMap.className = "btn btn-map-view";
+                btnMap.className = "btn btn-map-small";
                 btnMap.innerText = "Map"; 
                 btnMap.onclick = () => { onMap(); modal.style.display = 'none'; };
                 footer.appendChild(btnMap);
