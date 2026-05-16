@@ -215,10 +215,19 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     text-align: center;
 }
 
-/* グラフ（余白修正版） */
+/* ============================================================
+   メインカード（グラフコンテナ）の上部調整
+   ============================================================ */
 .main-card { 
-    max-width: 1500px; margin: auto; background: white; 
-    border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+    max-width: 1500px; 
+    margin: auto; 
+    background: white; 
+    border-radius: 12px; 
+    
+    /* 修正箇所：ボタンエリアから滑らかにつなげるため、上部の角丸と不要なシャドウの干渉をリセット */
+    border-top-left-radius: 0px !important;
+    border-top-right-radius: 0px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
     overflow: hidden;
 }
 .scroll-container { overflow-x: auto; position: relative; }
@@ -568,6 +577,40 @@ body.widget-mode .footer-info {
     position: relative !important;
     clear: both !important;
     padding-bottom: 0px !important;
+}
+
+/* ============================================================
+   ナビゲーションアクションバー（隙間・水平線解消版完全版）
+   ============================================================ */
+.nav-action-bar {
+    position: sticky !important;
+    top: var(--nav-height) !important; 
+    background-color: #ffffff !important; 
+    z-index: 900 !important; 
+    
+    /* 修正箇所：下部に発生していた水平線（影）を完全に排除 */
+    box-shadow: none !important;
+    border-bottom: none !important;
+
+    /* 既存スタイルと横スクロールの完全維持 */
+    display: flex; 
+    gap: 2px; 
+    align-items: center; 
+    white-space: nowrap; 
+    overflow-x: auto; 
+    -webkit-overflow-scrolling: touch; 
+    scrollbar-width: none;
+    
+    /* 修正箇所：下部のパディングを0にし、下のカード（.main-card）にぴったり密着させる */
+    padding: 4px 8px 0px 8px; 
+    
+    /* 修正箇所：念のため下部マージンを排除 */
+    margin-bottom: 0 !important;
+}
+
+/* Chrome, Safari 用のスクロールバー非表示設定の維持 */
+.nav-action-bar::-webkit-scrollbar {
+    display: none !important;
 }
 
 /* コンディション概況ジャンプボタンのスタイル */
