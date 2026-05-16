@@ -16,14 +16,40 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     overflow: hidden; 
 }
 
-/* スクロール可能なタブエリア */
+/* スクロール可能なタブエリア（修正） */
 .scroll-tabs {
     display: flex; gap: 6px; overflow-x: auto; white-space: nowrap; padding: 5px 0;
     flex-grow: 1; -webkit-overflow-scrolling: touch;
     align-items: center;
     scroll-behavior: smooth;
+    /* 親要素に重なり順の基準を作る */
+    position: relative; 
 }
 .scroll-tabs::-webkit-scrollbar { display: none; }
+
+/* 1番目のタブ（地点タブ）を左端に固定 */
+.scroll-tabs > .btn-location:first-child {
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 100 !important;
+    /* 重なり時に下が透けないよう背景色を指定 */
+    /* 背景色はjs側の環境判定に依存とのことですが、
+       潜り込むタブを隠すために不透明な色（白など）が必須となります */
+    background-color: #ffffff; 
+    /* 固定されている境目をわかりやすくする影（右側のみ） */
+    box-shadow: 4px 0 6px -2px rgba(0,0,0,0.15);
+}
+
+/* 1番目のタブがアクティブな場合の色の維持 */
+.scroll-tabs > .btn-location:first-child.active {
+    background: #007bff !important;
+    color: #ffffff !important;
+}
+
+/* 2番目以降のタブが固定タブの下に潜り込む際の余白調整（任意） */
+.scroll-tabs > .btn-location:nth-child(2) {
+    margin-left: 4px;
+}
 
 /* 共通ボタン基本スタイル */
 .btn {
@@ -36,19 +62,6 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     background: #ffffff; color: #495057;
-}
-
-/* 地点タブ固有設定 */
-.btn-location {
-    margin-left: 0; /* 左端の隙間を排除 */
-}
-
-/* アクティブ状態：視認性を最大化 */
-.btn.active { 
-    background: #007bff !important; 
-    color: #ffffff !important; 
-    border: 1px solid #0056b3 !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
 /* MySpots＋ボタン：環境色に左右されない視認性確保 */
@@ -202,10 +215,19 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     text-align: center;
 }
 
-/* グラフ（余白修正版） */
+/* ============================================================
+   メインカード（グラフコンテナ）の上部調整
+   ============================================================ */
 .main-card { 
-    max-width: 1500px; margin: auto; background: white; 
-    border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+    max-width: 1500px; 
+    margin: auto; 
+    background: white; 
+    border-radius: 12px; 
+    
+    /* 修正箇所：ボタンエリアから滑らかにつなげるため、上部の角丸と不要なシャドウの干渉をリセット */
+    border-top-left-radius: 0px !important;
+    border-top-right-radius: 0px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
     overflow: hidden;
 }
 .scroll-container { overflow-x: auto; position: relative; }
@@ -557,12 +579,46 @@ body.widget-mode .footer-info {
     padding-bottom: 0px !important;
 }
 
+/* ============================================================
+   ナビゲーションアクションバー（隙間・水平線解消版完全版）
+   ============================================================ */
+.nav-action-bar {
+    position: sticky !important;
+    top: var(--nav-height) !important; 
+    background-color: #ffffff !important; 
+    z-index: 900 !important; 
+    
+    /* 修正箇所：下部に発生していた水平線（影）を完全に排除 */
+    box-shadow: none !important;
+    border-bottom: none !important;
+
+    /* 既存スタイルと横スクロールの完全維持 */
+    display: flex; 
+    gap: 2px; 
+    align-items: center; 
+    white-space: nowrap; 
+    overflow-x: auto; 
+    -webkit-overflow-scrolling: touch; 
+    scrollbar-width: none;
+    
+    /* 修正箇所：下部のパディングを0にし、下のカード（.main-card）にぴったり密着させる */
+    padding: 4px 8px 0px 8px; 
+    
+    /* 修正箇所：念のため下部マージンを排除 */
+    margin-bottom: 0 !important;
+}
+
+/* Chrome, Safari 用のスクロールバー非表示設定の維持 */
+.nav-action-bar::-webkit-scrollbar {
+    display: none !important;
+}
+
 /* コンディション概況ジャンプボタンのスタイル */
 .nav-summary-btn {
     appearance: none;
     -webkit-appearance: none;
     background-color: #007bff;
-    border: 1px solid #007bff;
+    border: 1px solid #ced4da;
     border-radius: 20px;
     padding: 6px 10px;
     font-size: 14px;
@@ -585,7 +641,7 @@ body.widget-mode .footer-info {
     appearance: none;
     -webkit-appearance: none;
     background-color: #7150cc;
-    border: 1px solid #007bff;
+    border: 1px solid #ced4da;
     border-radius: 20px;
     padding: 6px 10px;
     font-size: 14px;
