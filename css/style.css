@@ -575,7 +575,7 @@ body.widget-mode .footer-info {
     appearance: none;
     -webkit-appearance: none;
     background-color: #007bff;
-    border: 1px solid #007bff;
+    border: 1px solid #ced4da;
     border-radius: 20px;
     padding: 6px 10px;
     font-size: 14px;
@@ -598,7 +598,7 @@ body.widget-mode .footer-info {
     appearance: none;
     -webkit-appearance: none;
     background-color: #7150cc;
-    border: 1px solid #007bff;
+    border: 1px solid #ced4da;
     border-radius: 20px;
     padding: 6px 10px;
     font-size: 14px;
