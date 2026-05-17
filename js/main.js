@@ -744,7 +744,7 @@ async function saveViewSettings() {
 function resetViewSettings() {
     if (typeof showAppDialog === 'function') {
         showAppDialog({
-            title: i18n.t('btnResetAll'),
+            title: i18n.t('btnRestoreDefault'),
             messageKey: 'confirmReset',
             // 整理ポイント：右側のボタンを「はい」に指定
             saveBtnKey: 'btnYes',
