@@ -2806,6 +2806,13 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
     const nowX = (drawReferenceTime.getTime() - startTime) / 3600000 * hScale;
     if (nowX >= 0 && nowX <= totalW) html += `<line x1="${nowX}" y1="0" x2="${nowX}" y2="${plotHeight}" stroke="#0000FF" stroke-width="2.5" stroke-dasharray="4 3" />`;
 
+    // データ取得時刻線（ツールチップ内の fetchTime と同様に allData.timestamp を基準に描画）
+    if (allData && allData.timestamp) {
+        const fetchTime = new Date(allData.timestamp).getTime();
+        const fetchX = (fetchTime - startTime) / 3600000 * hScale;
+        if (fetchX >= 0 && fetchX <= totalW) html += `<line x1="${fetchX}" y1="0" x2="${fetchX}" y2="${plotHeight}" stroke="#228b22" stroke-width="2.5" stroke-dasharray="4 3" />`;
+    }
+
     datasets.forEach(ds => {
         if (ds.type === 'bar') {
             const currentFilters = activeWindFilters || targetWindDirections;
