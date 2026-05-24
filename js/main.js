@@ -52,6 +52,7 @@ const i18n = {
             precip: "降水量",
             windDir: "風向",
             windSpeed: "風速",
+            gust: '最大瞬間風速', // 【追加】ガスト日本語表記
             temp: "気温",
             seawater: "海水温",
             wave: "波高",
@@ -200,6 +201,7 @@ const i18n = {
             precip: "Precip",
             windDir: "Wind",
             windSpeed: "Speed",
+            gust: 'Gust', // 【追加】ガスト英語表記
             temp: "Temp",
             seawater: "Sea Temp",
             wave: "Wave",
@@ -2239,7 +2241,8 @@ async function fetchWithCache(lat, lon) {
     console.timeEnd("  => Sub: Cache Check/Read"); // キャッシュミスまたは無効で終了
 
     // API取得（forecast_days, temperature_unit, wind_speed_unit を動的に設定）
-    const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,weather_code,precipitation&timezone=auto&forecast_days=${fDays}&temperature_unit=${tUnit}&wind_speed_unit=${wUnit}`;
+    // hourlyパラメータに wind_gusts_10m を追加
+    const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code,precipitation&timezone=auto&forecast_days=${fDays}&temperature_unit=${tUnit}&wind_speed_unit=${wUnit}`;
     const mUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto&forecast_days=${fDays}&temperature_unit=${tUnit}&cell_selection=sea`;
 
     console.time("  => Sub: Total API Fetch Time"); // 【計測】並列処理全体の開始
@@ -2721,8 +2724,11 @@ async function draw() {
 
         svgW.innerHTML = wHtml;
         
-        // セクションレンダリング
-        renderSection("svg-wind", "date-wind", [{ data: allData.data.wind_speed_10m, type: 'bar' }], windH, 5.0, true, false, true, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, activeWindFilters);
+        // セクションレンダリング（風速データセットの配列にガストの折れ線データを追加）
+        renderSection("svg-wind", "date-wind", [
+            { data: allData.data.wind_speed_10m, type: 'bar' },
+            { data: allData.data.wind_gusts_10m, type: 'line', cls: 'line-wind-gust' }
+        ], windH, 5.0, true, false, true, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, activeWindFilters);
         
         const hasMarineData = (allData.data.wave_height && allData.data.wave_height.slice(startIdx).some(v => v !== 0 && v !== null));
         renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], subH, 5.0, false, !hasMarineData, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, null);
@@ -2857,17 +2863,31 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                     html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-25}) rotate(${(deg+180)%360}) scale(${1.6 * iScale})" class="wind-arrow" />`;
                 }
             }
-        } else {
+        } else if (ds.type === 'line') {
             let points = [];
             for(let i = startIdx; i < totalDataCount; i++){
                 const v = ds.data[i];
                 if (v === null) {
-                    if (points.length > 1) html += `<polyline class="${ds.cls}" points="${points.join(' ')}" />`;
+                    if (points.length > 1) {
+                        if (ds.cls === 'line-wind-gust') {
+                            // stroke-dasharrayを 2 2 から 6 4（破線）へ修正
+                            html += `<polyline class="${ds.cls}" points="${points.join(' ')}" fill="none" stroke="#ff4500" stroke-width="2" stroke-dasharray="6 4" />`;
+                        } else {
+                            html += `<polyline class="${ds.cls}" points="${points.join(' ')}" />`;
+                        }
+                    }
                     points = []; continue;
                 }
                 points.push(`${(i - startIdx) * hScale},${plotHeight - (((v - min) / range) * plotHeight)}`);
             }
-            if (points.length > 1) html += `<polyline class="${ds.cls}" points="${points.join(' ')}" />`;
+            if (points.length > 1) {
+                if (ds.cls === 'line-wind-gust') {
+                    // stroke-dasharrayを 2 2 から 6 4（破線）へ修正
+                    html += `<polyline class="${ds.cls}" points="${points.join(' ')}" fill="none" stroke="#ff4500" stroke-width="2" stroke-dasharray="6 4" />`;
+                } else {
+                    html += `<polyline class="${ds.cls}" points="${points.join(' ')}" />`;
+                }
+            }
         }
     });
 
@@ -2921,6 +2941,8 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
 
         const precipVal = getVal(allData.data.precipitation ? allData.data.precipitation[validIdx] : null, "mm");
         const windVal = getVal(allData.data.wind_speed_10m ? allData.data.wind_speed_10m[validIdx] : null, wUnit);
+        // ガストデータの取得
+        const gustVal = getVal(allData.data.wind_gusts_10m ? allData.data.wind_gusts_10m[validIdx] : null, wUnit);
         const tempVal = getVal(allData.data.temperature_2m ? allData.data.temperature_2m[validIdx] : null, tUnit);
         const seaTempVal = getVal(allData.data.sea_surface_temperature ? allData.data.sea_surface_temperature[validIdx] : null, tUnit);
         const waveVal = getVal(allData.data.wave_height ? allData.data.wave_height[validIdx] : null, "m", 2);
@@ -2947,6 +2969,7 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
             <div class="icon-box"><span class="legend-bar" style="background:#0000FF; margin-right:0;"></span></div>${i18n.t('precip')}: ${precipVal}<br>
             <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${rotateDeg})"/></svg></div>${i18n.t('windDir')}: ${deg !== null && !isNaN(deg) ? getWindDirText(deg) + ' (' + deg + '°)' : '---'}<br>
             <div class="icon-box">🚩</div>${i18n.t('windSpeed')}: ${windVal}<br>
+            <div class="icon-box"><span class="legend-line" style="background: linear-gradient(to right, #ff4500 50%, transparent 50%); background-size: 8px 100%; height: 2px; margin-right: 0; display: inline-block; vertical-align: middle; width: 14px;"></span></div>${i18n.t('gust')}: ${gustVal}<br>
             <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>${i18n.t('temp')}: ${tempVal}<br>
             <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>${i18n.t('seawater')}: ${seaTempVal}<br>
             <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>${i18n.t('wave')}: ${waveVal}<br>
