@@ -2969,7 +2969,7 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
             <div class="icon-box"><span class="legend-bar" style="background:#0000FF; margin-right:0;"></span></div>${i18n.t('precip')}: ${precipVal}<br>
             <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${rotateDeg})"/></svg></div>${i18n.t('windDir')}: ${deg !== null && !isNaN(deg) ? getWindDirText(deg) + ' (' + deg + '°)' : '---'}<br>
             <div class="icon-box">🚩</div>${i18n.t('windSpeed')}: ${windVal}<br>
-            <div class="icon-box"><span class="legend-line" style="border-top:2px dashed #ff4500; height:0; background:none; margin-right:0; display:inline-block; vertical-align:middle; width:12px;"></span></div>${i18n.t('gust')}: ${gustVal}<br>
+            <div class="icon-box"><span class="legend-line" style="background: linear-gradient(to right, #ff4500 50%, transparent 50%); background-size: 8px 100%; height: 2px; margin-right: 0; display: inline-block; vertical-align: middle; width: 14px;"></span></div>${i18n.t('gust')}: ${gustVal}<br>
             <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>${i18n.t('temp')}: ${tempVal}<br>
             <div class="icon-box"><span class="legend-line" style="background:#00ced1; margin-right:0;"></span></div>${i18n.t('seawater')}: ${seaTempVal}<br>
             <div class="icon-box"><span class="legend-line" style="background:#2ca02c; margin-right:0;"></span></div>${i18n.t('wave')}: ${waveVal}<br>
