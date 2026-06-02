@@ -67,12 +67,12 @@ const i18n = {
             fetchTime: "データ取得(端末)",
             
             // --- 設定ダイアログ用（新設） ---
-            cfgTooltipVisibility: "詳細情報のポップアップ",
+            cfgTooltipVisibility: "詳細情報のポップアップ（ツールチップ）",
             cfgGraphValuesVisibility: "グラフ内への数値表示",
             optShow: "表示する",
             optHide: "表示しない",
             optDefaultShow: "表示する（デフォルト）",
-            optDefaultHide: "表示しない（デフォルト）",
+            optDefaultHide: "表示する（デフォルト）",
 
             // --- サイドバー・基本UI ---
             btnPwaInstall: "📲 アプリをインストール",
@@ -229,7 +229,7 @@ const i18n = {
             optShow: "Show",
             optHide: "Hide",
             optDefaultShow: "Show (Default)",
-            optDefaultHide: "Hide (Default)",
+            optDefaultHide: "Show (Default)",
 
             // --- Sidebar & Base UI ---
             btnPwaInstall: "📲 Install App",
@@ -2640,7 +2640,7 @@ async function draw() {
             viewConfig.tooltipVisibility = 'hide';
             viewConfig.graphValuesVisibility = 'show';
 
-            // ナビ表示制御
+            // ナび表示制御
             const nav = document.querySelector('.nav-container') || document.querySelector('nav');
             if (nav) nav.style.display = 'none';
         }
@@ -2736,6 +2736,14 @@ async function draw() {
         const pPlotH = 40; 
         const pBaseY = 100; 
 
+        // 【配置修正】天気アイコンの高さによるズレを完全に排除。
+        // 下端（y-min）の0mm位置はそのまま維持し、上端値（y-max）のみを降水量グリッド上端の高さ（60px）の位置まで正確に押し下げて完全に一致させます。
+        const valContWeather = document.getElementById('val-svg-weather');
+        if (valContWeather) {
+            valContWeather.innerHTML = `<div class="y-max" style="padding-top: 50px;">${pMax.toFixed(0)}</div><div class="y-min">0</div>`;
+        }
+
+        // 降水量の横線グリッド生成ループ
         for (let v = 0; v <= pMax; v += 5) {
             const gy = pBaseY - (v / pRange) * pPlotH;
             wHtml += `<line x1="0" y1="${gy}" x2="${totalW}" y2="${gy}" class="grid-y-sub" />`;
@@ -2752,7 +2760,9 @@ async function draw() {
                 
                 // 【制御の組み込み】graphValuesVisibility が 'hide' でない場合のみ、グラフ上の数値テキストを描画する
                 if (viewConfig.graphValuesVisibility !== 'hide') {
-                    wHtml += `<text x="${x}" y="${pBaseY - barH - 2}" font-size="${labelFS - 2}" font-weight="bold" fill="#0000FF" text-anchor="middle">${p.toFixed(1)}</text>`;
+                    // 【追加修正】降水量の数値テキストも風速と同様に45度左回りに回転させ、綺麗に中心で整列させる
+                    const targetY = pBaseY - barH - 2;
+                    wHtml += `<text x="${x}" y="${targetY}" font-size="${labelFS - 2}" font-weight="bold" fill="#0000FF" text-anchor="middle" transform="rotate(-45, ${x}, ${targetY})">${p.toFixed(1)}</text>`;
                 }
             }
         }
@@ -2786,6 +2796,7 @@ async function draw() {
 /**
  * サブルーチン：セクション（グラフエリア）のレンダリング
  * 言語設定に関わらず、保存された風向フィルタを正しく適用する修正版。
+ * Y軸ラベルの目盛（気温・海水温・風速など）は整数表示に修正。
  */
 function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLast, isFirst, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, activeWindFilters) {
     const svg = document.getElementById(svgId);
@@ -2804,8 +2815,10 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
     let min = Math.floor(Math.min(...allVals) / stepY) * stepY;
     if (isWind) min = 0;
 
+    // Y軸目盛の数値を整数（.toFixed(0)）で表示するよう修正（波高・潮位等のマリンデータ以外）
     if (valCont) {
-        valCont.innerHTML = `<div class="y-max">${max.toFixed(isWind ? 0 : 1)}</div><div class="y-min">${min.toFixed(isWind ? 0 : 1)}</div>`;
+        const isMarine = svgId === 'svg-marine';
+        valCont.innerHTML = `<div class="y-max">${max.toFixed(isMarine ? 1 : 0)}</div><div class="y-min">${min.toFixed(isMarine ? 1 : 0)}</div>`;
     }
     const range = (max - min) || 1;
     const plotHeight = height - 20; 
@@ -2902,11 +2915,13 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                 if (isWind) {
                     html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-25}) rotate(${(deg+180)%360}) scale(${1.6 * iScale})" class="wind-arrow" />`;
                     
-                    // 【風速：棒の外部（上側）に配置し、重なり回避用の上下ずらしをわずか（2px差）にする修正】
+                    // 【風速：数値を45度左回りで傾け、アンカー位置を調整して等間隔に並べる修正】
                     if (viewConfig.graphValuesVisibility !== 'hide') {
-                        // 棒の先端（-h）よりも完全に上の位置をベースとし、わずかに高さを交互に変えて干渉を逃がします
-                        const yOffset = (i % 2 === 0) ? -3 : -8;
-                        html += `<text x="${x}" y="${plotHeight - h + yOffset}" font-size="${labelFS - 2}" font-weight="bold" fill="#333333" text-anchor="middle">${val.toFixed(1)}</text>`;
+                        // 棒の先端から5px上に一律配置（上下の交互ずらしは廃止）
+                        const targetY = plotHeight - h - 5;
+                        // 左回りに45度回転させるため、rotate の角度を -45 に設定。基準点を (x, targetY) に指定することで、その場を中心に綺麗に回転します。
+                        // text-anchor="middle" から "start" もしくは重心を意識した配置を維持（middleのままでも傾き回転軸が中心なら綺麗に配置されます）
+                        html += `<text x="${x}" y="${targetY}" font-size="${labelFS - 2}" font-weight="bold" fill="#333333" text-anchor="middle" transform="rotate(-45, ${x}, ${targetY})">${val.toFixed(1)}</text>`;
                     }
                 }
             }
