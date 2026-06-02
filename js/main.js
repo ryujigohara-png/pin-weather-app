@@ -2913,7 +2913,7 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
 
                 html += `<rect x="${x - (hScale*0.4)}" y="${plotHeight-h}" width="${hScale*0.8}" height="${h}" fill="${color}" />`;
                 if (isWind) {
-                    html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-28}) rotate(${(deg+180)%360}) scale(${1.4 * iScale})" class="wind-arrow" />`;
+                    html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-30}) rotate(${(deg+180)%360}) scale(${1.4 * iScale})" class="wind-arrow" />`;
                     
                     // 【風速：数値を45度左回りで傾け、アンカー位置を調整して等間隔に並べる修正】
                     if (viewConfig.graphValuesVisibility !== 'hide') {
