@@ -2761,7 +2761,7 @@ async function draw() {
                 // 【制御の組み込み】graphValuesVisibility が 'hide' でない場合のみ、グラフ上の数値テキストを描画する
                 if (viewConfig.graphValuesVisibility !== 'hide') {
                     // 【追加修正】降水量の数値テキストも風速と同様に45度左回りに回転させ、綺麗に中心で整列させる
-                    const targetY = pBaseY - barH - 2;
+                    const targetY = pBaseY - barH - 7;
                     wHtml += `<text x="${x}" y="${targetY}" font-size="${labelFS - 2}" font-weight="bold" fill="#0000FF" text-anchor="middle" transform="rotate(-45, ${x}, ${targetY})">${p.toFixed(1)}</text>`;
                 }
             }
@@ -2913,12 +2913,12 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
 
                 html += `<rect x="${x - (hScale*0.4)}" y="${plotHeight-h}" width="${hScale*0.8}" height="${h}" fill="${color}" />`;
                 if (isWind) {
-                    html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-25}) rotate(${(deg+180)%360}) scale(${1.6 * iScale})" class="wind-arrow" />`;
+                    html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-28}) rotate(${(deg+180)%360}) scale(${1.4 * iScale})" class="wind-arrow" />`;
                     
                     // 【風速：数値を45度左回りで傾け、アンカー位置を調整して等間隔に並べる修正】
                     if (viewConfig.graphValuesVisibility !== 'hide') {
                         // 棒の先端から5px上に一律配置（上下の交互ずらしは廃止）
-                        const targetY = plotHeight - h - 5;
+                        const targetY = plotHeight - h - 7;
                         // 左回りに45度回転させるため、rotate の角度を -45 に設定。基準点を (x, targetY) に指定することで、その場を中心に綺麗に回転します。
                         // text-anchor="middle" から "start" もしくは重心を意識した配置を維持（middleのままでも傾き回転軸が中心なら綺麗に配置されます）
                         html += `<text x="${x}" y="${targetY}" font-size="${labelFS - 2}" font-weight="bold" fill="#333333" text-anchor="middle" transform="rotate(-45, ${x}, ${targetY})">${val.toFixed(1)}</text>`;
