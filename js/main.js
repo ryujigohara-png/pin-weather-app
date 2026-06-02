@@ -2636,6 +2636,10 @@ async function draw() {
             if (params.get('thM') !== null) viewConfig.windThresholdMid  = parseFloat(params.get('thM'));
             if (params.get('thL') !== null) viewConfig.windThresholdLow  = parseFloat(params.get('thL'));
 
+            // 【追加仕様】widget表示の時はツールチップ非表示、グラフ内数値表示設定にする
+            viewConfig.tooltipVisibility = 'hide';
+            viewConfig.graphValuesVisibility = 'show';
+
             // ナビ表示制御
             const nav = document.querySelector('.nav-container') || document.querySelector('nav');
             if (nav) nav.style.display = 'none';
