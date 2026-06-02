@@ -177,7 +177,27 @@
 
             <div class="config-group">
                 <div class="config-label-area">
-                    <span class="config-title" data-i18n="cfgTooltipDuration">詳細情報の表示時間</span>
+                    <span class="config-title" data-i18n="cfgGraphValuesVisibility">グラフ内への数値表示</span>
+                </div>
+                <select id="input-graphValuesVisibility" class="config-select">
+                    <option value="show" data-i18n="optGraphValuesShow">表示する（デフォルト）</option>
+                    <option value="hide" data-i18n="optGraphValuesHide">表示しない</option>
+                </select>
+            </div>
+
+            <div class="config-group">
+                <div class="config-label-area">
+                    <span class="config-title" data-i18n="cfgTooltipVisibility">詳細情報（ツールチップ）のポップアップ</span>
+                </div>
+                <select id="input-tooltipVisibility" class="config-select">
+                    <option value="show" data-i18n="optTooltipShow">表示する（デフォルト）</option>
+                    <option value="hide" data-i18n="optTooltipHide">表示しない</option>
+                </select>
+            </div>
+
+            <div class="config-group">
+                <div class="config-label-area">
+                    <span class="config-title" data-i18n="cfgTooltipDuration">詳細情報（ツールチップ）の表示時間</span>
                     <span id="val-tooltipDuration" class="config-value">3s</span>
                 </div>
                 <input type="range" id="input-tooltipDuration" class="config-slider" min="1" max="10" step="1" value="3">
@@ -202,26 +222,6 @@
                     <option value="kmh">km/h</option>
                     <option value="kn" data-i18n="optKnots">kn (ノット)</option>
                     <option value="mph">mph</option>
-                </select>
-            </div>
-
-            <div class="config-group">
-                <div class="config-label-area">
-                    <span class="config-title" data-i18n="cfgTooltipVisibility">詳細情報のポップアップ（ツールチップ）</span>
-                </div>
-                <select id="input-tooltipVisibility" class="config-select">
-                    <option value="show" data-i18n="optTooltipShow">表示する（デフォルト）</option>
-                    <option value="hide" data-i18n="optTooltipHide">表示しない</option>
-                </select>
-            </div>
-
-            <div class="config-group">
-                <div class="config-label-area">
-                    <span class="config-title" data-i18n="cfgGraphValuesVisibility">グラフ内への数値表示</span>
-                </div>
-                <select id="input-graphValuesVisibility" class="config-select">
-                    <option value="show" data-i18n="optGraphValuesShow">表示する（デフォルト）</option>
-                    <option value="hide" data-i18n="optGraphValuesHide">表示しない</option>
                 </select>
             </div>
 

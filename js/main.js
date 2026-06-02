@@ -66,14 +66,6 @@ const i18n = {
             nowTime: "描画時刻(端末)",
             fetchTime: "データ取得(端末)",
             
-            // --- 設定ダイアログ用（新設） ---
-            cfgTooltipVisibility: "詳細情報のポップアップ（ツールチップ）",
-            cfgGraphValuesVisibility: "グラフ内への数値表示",
-            optShow: "表示する",
-            optHide: "表示しない",
-            optDefaultShow: "表示する（デフォルト）",
-            optDefaultHide: "表示する（デフォルト）",
-
             // --- サイドバー・基本UI ---
             btnPwaInstall: "📲 アプリをインストール",
             iosInstallTitle: "iPhoneをご利用の方へ",
@@ -124,7 +116,13 @@ const i18n = {
             cfgMargin: "グラフ間の余白",
             cfgFontSize: "ラベル文字サイズ",
             cfgIconScale: "風向アイコン倍率",
-            cfgTooltipDuration: "詳細情報の表示時間", 
+            cfgGraphValuesVisibility: "グラフ内への数値表示",
+            cfgTooltipVisibility: "詳細情報（ツールチップ）のポップアップ",
+            cfgTooltipDuration: "詳細情報（ツールチップ）の表示時間", 
+            optShow: "表示する",
+            optHide: "表示しない",
+            optDefaultShow: "表示する（デフォルト）",
+            optDefaultHide: "表示する（デフォルト）",
             cfgTempUnit: "温度単位",
             cfgWindUnit: "風速単位",
             cfgWindThresholds: "風速色付しきい値",
@@ -223,14 +221,6 @@ const i18n = {
             nowTime: "Render(Device)",
             fetchTime: "Fetched(Device)",
             
-            // --- For Settings Modal ---
-            cfgTooltipVisibility: "Tooltip Popup",
-            cfgGraphValuesVisibility: "Show Values in Graph",
-            optShow: "Show",
-            optHide: "Hide",
-            optDefaultShow: "Show (Default)",
-            optDefaultHide: "Show (Default)",
-
             // --- Sidebar & Base UI ---
             btnPwaInstall: "📲 Install App",
             iosInstallTitle: "For iPhone Users",
@@ -281,7 +271,13 @@ const i18n = {
             cfgMargin: "Graph Margin",
             cfgFontSize: "Font Size",
             cfgIconScale: "Icon Scale",
+            cfgGraphValuesVisibility: "Show Values in Graph",
+            cfgTooltipVisibility: "Tooltip Popup",
             cfgTooltipDuration: "Info Display Duration",
+            optShow: "Show",
+            optHide: "Hide",
+            optDefaultShow: "Show (Default)",
+            optDefaultHide: "Show (Default)",
             cfgTempUnit: "Temperature Unit",
             cfgWindUnit: "Wind Speed Unit",
             cfgWindThresholds: "Wind Coloring Thresholds",
