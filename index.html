@@ -188,8 +188,8 @@
                     <span class="config-title" data-i18n="cfgTempUnit">温度単位</span>
                 </div>
                 <select id="input-tempUnit" class="config-select">
-                    <option value="celsius">°C (摂氏)</option>
-                    <option value="fahrenheit">°F (華氏)</option>
+                    <option value="celsius" data-i18n="optCelsius">°C (摂氏)</option>
+                    <option value="fahrenheit" data-i18n="optFahrenheit">°F (華氏)</option>
                 </select>
             </div>
 
@@ -200,8 +200,28 @@
                 <select id="input-windUnit" class="config-select">
                     <option value="ms">m/s</option>
                     <option value="kmh">km/h</option>
-                    <option value="kn">kn (ノット)</option>
+                    <option value="kn" data-i18n="optKnots">kn (ノット)</option>
                     <option value="mph">mph</option>
+                </select>
+            </div>
+
+            <div class="config-group">
+                <div class="config-label-area">
+                    <span class="config-title" data-i18n="cfgTooltipVisibility">詳細情報のポップアップ（ツールチップ）</span>
+                </div>
+                <select id="input-tooltipVisibility" class="config-select">
+                    <option value="show" data-i18n="optTooltipShow">表示する（デフォルト）</option>
+                    <option value="hide" data-i18n="optTooltipHide">表示しない</option>
+                </select>
+            </div>
+
+            <div class="config-group">
+                <div class="config-label-area">
+                    <span class="config-title" data-i18n="cfgGraphValuesVisibility">グラフ内への数値表示</span>
+                </div>
+                <select id="input-graphValuesVisibility" class="config-select">
+                    <option value="hide" data-i18n="optGraphValuesHide">表示しない（デフォルト）</option>
+                    <option value="show" data-i18n="optGraphValuesShow">表示する</option>
                 </select>
             </div>
 
@@ -220,14 +240,12 @@
                 </div>
             </div>
 
-            <!-- オプション切り替えボタン -->
             <div style="margin: 10px 0; border-top: 1px solid #eee; padding-top: 10px; text-align: center;">
-                <button id="toggle-optional-settings" class="btn" style="background-color: #f8f8f8; color: #666; font-size: 12px; width: 100%; border: 1px dashed #ccc;">
+                <button id="toggle-optional-settings" class="btn" style="background-color: #f8f8f8; color: #666; font-size: 12px; width: 100%; border: 1px dashed #ccc;" data-i18n="btnOptionalSettings">
                     オプション設定 (表示倍率・サイズ等) ▼
                 </button>
             </div>
 
-            <!-- 折りたたむ対象のグループ -->
             <div id="optional-settings" style="display: none; border: 1px solid #f0f0f0; padding: 10px; border-radius: 5px; background: #fafafa;">
                 <div class="config-group">
                     <div class="config-label-area">
