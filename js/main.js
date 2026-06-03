@@ -7,6 +7,12 @@ const defaultViewConfig = {
     tooltipDuration: 3,         // ツールチップ表示時間（s）
     temperatureUnit: 'celsius', // 気温単位
     windSpeedUnit: 'ms',        // 風速単位
+    
+    // --- 新設：表示フラグの既定値（デフォルトに戻すボタンとも連動） ---
+    tooltipVisibility: 'show',     // ツールチップ表示設定 ('show' or 'hide')
+    graphValuesVisibility: 'show', // グラフ内数値表示設定 ('show' or 'hide')
+    // ----------------------------------------------------------
+
     // --- 風速色付け閾値（初期値） ---
     windThresholdHigh: 10.0,
     windThresholdMid: 5.0,
@@ -59,7 +65,7 @@ const i18n = {
             tide: "潮位",
             nowTime: "描画時刻(端末)",
             fetchTime: "データ取得(端末)",
-
+            
             // --- サイドバー・基本UI ---
             btnPwaInstall: "📲 アプリをインストール",
             iosInstallTitle: "iPhoneをご利用の方へ",
@@ -110,7 +116,13 @@ const i18n = {
             cfgMargin: "グラフ間の余白",
             cfgFontSize: "ラベル文字サイズ",
             cfgIconScale: "風向アイコン倍率",
-            cfgTooltipDuration: "詳細情報の表示時間", 
+            cfgGraphValuesVisibility: "グラフ内への数値表示",
+            cfgTooltipVisibility: "詳細情報（ツールチップ）のポップアップ",
+            cfgTooltipDuration: "詳細情報（ツールチップ）の表示時間", 
+            optShow: "表示する",
+            optHide: "表示しない",
+            optDefaultShow: "表示する（デフォルト）",
+            optDefaultHide: "表示する（デフォルト）",
             cfgTempUnit: "温度単位",
             cfgWindUnit: "風速単位",
             cfgWindThresholds: "風速色付しきい値",
@@ -208,7 +220,7 @@ const i18n = {
             tide: "Tide",
             nowTime: "Render(Device)",
             fetchTime: "Fetched(Device)",
-
+            
             // --- Sidebar & Base UI ---
             btnPwaInstall: "📲 Install App",
             iosInstallTitle: "For iPhone Users",
@@ -259,7 +271,13 @@ const i18n = {
             cfgMargin: "Graph Margin",
             cfgFontSize: "Font Size",
             cfgIconScale: "Icon Scale",
+            cfgGraphValuesVisibility: "Show Values in Graph",
+            cfgTooltipVisibility: "Tooltip Popup",
             cfgTooltipDuration: "Info Display Duration",
+            optShow: "Show",
+            optHide: "Hide",
+            optDefaultShow: "Show (Default)",
+            optDefaultHide: "Show (Default)",
             cfgTempUnit: "Temperature Unit",
             cfgWindUnit: "Wind Speed Unit",
             cfgWindThresholds: "Wind Coloring Thresholds",
@@ -660,7 +678,8 @@ function syncSliderValues() {
     const configIds = [
         'hourWidth', 'windHeight', 'subHeight', 'margin', 'fontSize', 
         'iconScale', 'tooltipDuration', 'forecastDays', 'tempUnit', 'windUnit',
-        'windThresholdHigh', 'windThresholdMid', 'windThresholdLow'
+        'windThresholdHigh', 'windThresholdMid', 'windThresholdLow',
+        'tooltipVisibility', 'graphValuesVisibility' // 【追加】新設セレクトボックスのキー
     ];
 
     const windUnitInput = document.getElementById('input-windUnit');
@@ -717,6 +736,10 @@ async function saveViewSettings() {
     
     viewConfig.temperatureUnit = document.getElementById('input-tempUnit').value;
     viewConfig.windSpeedUnit = document.getElementById('input-windUnit').value;
+
+    // 【追加】新設セレクトボックスの選択状態を viewConfig へ保存
+    viewConfig.tooltipVisibility = document.getElementById('input-tooltipVisibility').value;
+    viewConfig.graphValuesVisibility = document.getElementById('input-graphValuesVisibility').value;
 
     viewConfig.windThresholdHigh = Math.round(parseFloat(document.getElementById('input-windThresholdHigh').value));
     viewConfig.windThresholdMid = Math.round(parseFloat(document.getElementById('input-windThresholdMid').value));
@@ -2609,7 +2632,11 @@ async function draw() {
             if (params.get('thM') !== null) viewConfig.windThresholdMid  = parseFloat(params.get('thM'));
             if (params.get('thL') !== null) viewConfig.windThresholdLow  = parseFloat(params.get('thL'));
 
-            // ナビ表示制御
+            // 【追加仕様】widget表示の時はツールチップ非表示、グラフ内数値表示設定にする
+            viewConfig.tooltipVisibility = 'hide';
+            viewConfig.graphValuesVisibility = 'show';
+
+            // ナび表示制御
             const nav = document.querySelector('.nav-container') || document.querySelector('nav');
             if (nav) nav.style.display = 'none';
         }
@@ -2705,6 +2732,14 @@ async function draw() {
         const pPlotH = 40; 
         const pBaseY = 100; 
 
+        // 【配置修正】天気アイコンの高さによるズレを完全に排除。
+        // 下端（y-min）の0mm位置はそのまま維持し、上端値（y-max）のみを降水量グリッド上端の高さ（60px）の位置まで正確に押し下げて完全に一致させます。
+        const valContWeather = document.getElementById('val-svg-weather');
+        if (valContWeather) {
+            valContWeather.innerHTML = `<div class="y-max" style="padding-top: 50px;">${pMax.toFixed(0)}</div><div class="y-min">0</div>`;
+        }
+
+        // 降水量の横線グリッド生成ループ
         for (let v = 0; v <= pMax; v += 5) {
             const gy = pBaseY - (v / pRange) * pPlotH;
             wHtml += `<line x1="0" y1="${gy}" x2="${totalW}" y2="${gy}" class="grid-y-sub" />`;
@@ -2718,7 +2753,13 @@ async function draw() {
             if (p > 0) {
                 const barH = (p / pRange) * pPlotH;
                 wHtml += `<rect x="${x - (hScale*0.3)}" y="${pBaseY - barH}" width="${hScale*0.6}" height="${barH}" fill="#0059ff" opacity="0.7" />`;
-                wHtml += `<text x="${x}" y="${pBaseY - barH - 2}" font-size="${labelFS - 2}" font-weight="bold" fill="#0000FF" text-anchor="middle">${p.toFixed(1)}</text>`;
+                
+                // 【制御の組み込み】graphValuesVisibility が 'hide' でない場合のみ、グラフ上の数値テキストを描画する
+                if (viewConfig.graphValuesVisibility !== 'hide') {
+                    // 【追加修正】降水量の数値テキストも風速と同様に45度左回りに回転させ、綺麗に中心で整列させる
+                    const targetY = pBaseY - barH - 7;
+                    wHtml += `<text x="${x}" y="${targetY}" font-size="${labelFS - 1}" font-weight="bold" fill="#0000FF" text-anchor="middle" transform="rotate(-45, ${x}, ${targetY})">${p.toFixed(1)}</text>`;
+                }
             }
         }
 
@@ -2751,6 +2792,7 @@ async function draw() {
 /**
  * サブルーチン：セクション（グラフエリア）のレンダリング
  * 言語設定に関わらず、保存された風向フィルタを正しく適用する修正版。
+ * Y軸ラベルの目盛（気温・海水温・風速など）は整数表示に修正。
  */
 function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLast, isFirst, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, activeWindFilters) {
     const svg = document.getElementById(svgId);
@@ -2769,8 +2811,10 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
     let min = Math.floor(Math.min(...allVals) / stepY) * stepY;
     if (isWind) min = 0;
 
+    // Y軸目盛の数値を整数（.toFixed(0)）で表示するよう修正（波高・潮位等のマリンデータ以外）
     if (valCont) {
-        valCont.innerHTML = `<div class="y-max">${max.toFixed(isWind ? 0 : 1)}</div><div class="y-min">${min.toFixed(isWind ? 0 : 1)}</div>`;
+        const isMarine = svgId === 'svg-marine';
+        valCont.innerHTML = `<div class="y-max">${max.toFixed(isMarine ? 1 : 0)}</div><div class="y-min">${min.toFixed(isMarine ? 1 : 0)}</div>`;
     }
     const range = (max - min) || 1;
     const plotHeight = height - 20; 
@@ -2819,14 +2863,20 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
         if (fetchX >= 0 && fetchX <= totalW) html += `<line x1="${fetchX}" y1="0" x2="${fetchX}" y2="${plotHeight}" stroke="#228b22" stroke-width="2.5" stroke-dasharray="4 3" />`;
     }
 
-    datasets.forEach(ds => {
+    // --- 気温（line-temp-air）が必ず海水温（line-temp-sea）の上に描画されるようデータセットの順序をソート ---
+    const sortedDatasets = [...datasets].sort((a, b) => {
+        if (a.cls === 'line-temp-air' && b.cls === 'line-temp-sea') return 1;
+        if (a.cls === 'line-temp-sea' && b.cls === 'line-temp-air') return -1;
+        return 0;
+    });
+
+    sortedDatasets.forEach(ds => {
         if (ds.type === 'bar') {
             const currentFilters = activeWindFilters || targetWindDirections;
             const thHigh = viewConfig.windThresholdHigh;
             const thMid  = viewConfig.windThresholdMid;
             const thLow  = viewConfig.windThresholdLow;
 
-            // --- 修正箇所：言語に依存しないフィルタ比較用インデックスリストの作成 ---
             const filterIndices = currentFilters.map(val => {
                 let idx = jaDirs.indexOf(val);
                 if (idx === -1) idx = enDirs.indexOf(val);
@@ -2842,7 +2892,6 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                 const deg = allData.data.wind_direction_10m[i];
                 const dirText = getWindDirText(deg);
 
-                // --- 修正箇所：インデックスによる一致判定 ---
                 let currentDirIdx = jaDirs.indexOf(dirText);
                 if (currentDirIdx === -1) currentDirIdx = enDirs.indexOf(dirText);
                 
@@ -2860,17 +2909,57 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
 
                 html += `<rect x="${x - (hScale*0.4)}" y="${plotHeight-h}" width="${hScale*0.8}" height="${h}" fill="${color}" />`;
                 if (isWind) {
-                    html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-25}) rotate(${(deg+180)%360}) scale(${1.6 * iScale})" class="wind-arrow" />`;
+                    html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-30}) rotate(${(deg+180)%360}) scale(${1.4 * iScale})" class="wind-arrow" />`;
+                    
+                    // 【風速：数値を45度左回りで傾け、アンカー位置を調整して等間隔に並べる修正】
+                    if (viewConfig.graphValuesVisibility !== 'hide') {
+                        // 棒の先端から5px上に一律配置（上下の交互ずらしは廃止）
+                        const targetY = plotHeight - h - 7;
+                        // 左回りに45度回転させるため、rotate の角度を -45 に設定。基準点を (x, targetY) に指定することで、その場を中心に綺麗に回転します。
+                        // text-anchor="middle" から "start" もしくは重心を意識した配置を維持（middleのままでも傾き回転軸が中心なら綺麗に配置されます）
+                        html += `<text x="${x}" y="${targetY}" font-size="${labelFS - 1}" font-weight="bold" fill="#333333" text-anchor="middle" transform="rotate(-45, ${x}, ${targetY})">${val.toFixed(1)}</text>`;
+                    }
                 }
             }
         } else if (ds.type === 'line') {
             let points = [];
+            
+            const isGust = (ds.cls === 'line-wind-gust');
+            const isAirTemp = (ds.cls === 'line-temp-air');
+            const isSeaTemp = (ds.cls === 'line-temp-sea');
+            const isWave = (ds.cls === 'line-wave');
+            const isTide = (ds.cls === 'line-tide');
+
+            let dailyAirExtremes = {};
+
+            if (viewConfig.graphValuesVisibility !== 'hide' && !isGust) {
+                if (isAirTemp) {
+                    for (let i = startIdx; i < totalDataCount; i++) {
+                        const v = ds.data[i];
+                        if (v === null || typeof v === 'number' && isNaN(v)) continue;
+                        
+                        const dateStr = allData.data.time[i].split('T')[0];
+                        if (!dailyAirExtremes[dateStr]) {
+                            dailyAirExtremes[dateStr] = { maxIdx: i, maxVal: v, minIdx: i, minVal: v };
+                        } else {
+                            if (v > dailyAirExtremes[dateStr].maxVal) {
+                                dailyAirExtremes[dateStr].maxVal = v;
+                                dailyAirExtremes[dateStr].maxIdx = i;
+                            }
+                            if (v < dailyAirExtremes[dateStr].minVal) {
+                                dailyAirExtremes[dateStr].minVal = v;
+                                dailyAirExtremes[dateStr].minIdx = i;
+                            }
+                        }
+                    }
+                }
+            }
+
             for(let i = startIdx; i < totalDataCount; i++){
                 const v = ds.data[i];
                 if (v === null) {
                     if (points.length > 1) {
                         if (ds.cls === 'line-wind-gust') {
-                            // stroke-dasharrayを 2 2 から 6 4（破線）へ修正
                             html += `<polyline class="${ds.cls}" points="${points.join(' ')}" fill="none" stroke="#ff4500" stroke-width="2" stroke-dasharray="6 4" />`;
                         } else {
                             html += `<polyline class="${ds.cls}" points="${points.join(' ')}" />`;
@@ -2878,11 +2967,76 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                     }
                     points = []; continue;
                 }
-                points.push(`${(i - startIdx) * hScale},${plotHeight - (((v - min) / range) * plotHeight)}`);
+                
+                const px = (i - startIdx) * hScale;
+                const py = plotHeight - (((v - min) / range) * plotHeight);
+                points.push(`${px},${py}`);
+
+                if (viewConfig.graphValuesVisibility !== 'hide' && !isGust) {
+                    let shouldShowValue = false;
+                    let formattedVal = "";
+                    let txtColor = "#333333";
+
+                    let prevVal = null;
+                    for (let p = i - 1; p >= startIdx; p--) {
+                        if (ds.data[p] !== null && typeof ds.data[p] === 'number' && !isNaN(ds.data[p])) { prevVal = ds.data[p]; break; }
+                    }
+                    let nextVal = null;
+                    for (let n = i + 1; n < totalDataCount; n++) {
+                        if (ds.data[n] !== null && typeof ds.data[n] === 'number' && !isNaN(ds.data[n])) { nextVal = ds.data[n]; break; }
+                    }
+
+                    if (isAirTemp) {
+                        const dateStr = allData.data.time[i].split('T')[0];
+                        if (dailyAirExtremes[dateStr] && (i === dailyAirExtremes[dateStr].maxIdx || i === dailyAirExtremes[dateStr].minIdx)) {
+                            shouldShowValue = true;
+                            formattedVal = v.toFixed(1);
+                            txtColor = "#ff4500";
+                        }
+                    } else if (isSeaTemp) {
+                        // 【海水温：1日のうち12時（正午）のデータ点のみ数値を表示する修正】
+                        const currentHour = new Date(allData.data.time[i]).getHours();
+                        if (currentHour === 12) {
+                            shouldShowValue = true;
+                            formattedVal = v.toFixed(1);
+                            txtColor = "#00ced1";
+                        }
+                    } else if (isWave || isTide) {
+                        const isPeak = (prevVal === null || v >= prevVal) && (nextVal === null || v >= nextVal);
+                        const isBottom = (prevVal === null || v <= prevVal) && (nextVal === null || v <= nextVal);
+
+                        if (isWave) {
+                            if (isPeak && v > 0.5 && !(prevVal === null && nextVal === null)) {
+                                if (prevVal === null || v !== prevVal) {
+                                    shouldShowValue = true;
+                                    formattedVal = v.toFixed(2);
+                                    txtColor = "#2ca02c";
+                                }
+                            }
+                        } else if (isTide) {
+                            if (isPeak && v > 0 && !(prevVal === null && nextVal === null)) {
+                                if (prevVal === null || v !== prevVal) {
+                                    shouldShowValue = true;
+                                    formattedVal = v.toFixed(2);
+                                    txtColor = "#1e90ff";
+                                }
+                            } else if (isBottom && v < 0 && !(prevVal === null && nextVal === null)) {
+                                if (prevVal === null || v !== prevVal) {
+                                    shouldShowValue = true;
+                                    formattedVal = v.toFixed(2);
+                                    txtColor = "#1e90ff";
+                                }
+                            }
+                        }
+                    }
+
+                    if (shouldShowValue) {
+                        html += `<text x="${px}" y="${py - 5}" font-size="${labelFS - 1}" font-weight="bold" fill="${txtColor}" text-anchor="middle">${formattedVal}</text>`;
+                    }
+                }
             }
             if (points.length > 1) {
                 if (ds.cls === 'line-wind-gust') {
-                    // stroke-dasharrayを 2 2 から 6 4（破線）へ修正
                     html += `<polyline class="${ds.cls}" points="${points.join(' ')}" fill="none" stroke="#ff4500" stroke-width="2" stroke-dasharray="6 4" />`;
                 } else {
                     html += `<polyline class="${ds.cls}" points="${points.join(' ')}" />`;
@@ -2912,6 +3066,12 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
     const isDateObject = (drawReferenceTime instanceof Date);
 
     const updateTooltipContent = (hourIdx, clientX, clientY, isAutoScroll = false, currentScrollLeft = 0) => {
+        // 【制御の組み込み】tooltipVisibility が 'hide' の場合は、ツールチップおよびガイドを表示せず、非表示を確定させる
+        if (viewConfig.tooltipVisibility === 'hide') {
+            hideTooltipUI();
+            return;
+        }
+
         if (!allData || !allData.data || !allData.data.time) return;
         
         const sIdx = Number(startIdx);
@@ -3011,6 +3171,11 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
     };
 
     stage.onmousemove = (e) => {
+        // 【制御の組み込み】tooltipVisibility が 'hide' の場合はイベントをバイパスして非表示を維持
+        if (viewConfig.tooltipVisibility === 'hide') {
+            hideTooltipUI();
+            return;
+        }
         const rect = stage.getBoundingClientRect();
         const graphX = (e.clientX - rect.left) - 100;
         if (graphX < 0 || graphX > totalW) { hideTooltipUI(); return; }
@@ -3019,6 +3184,11 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
     };
 
     stage.onclick = (e) => {
+        // 【制御の組み込み】tooltipVisibility が 'hide' の場合はイベントをバイパスして非表示を維持
+        if (viewConfig.tooltipVisibility === 'hide') {
+            hideTooltipUI();
+            return;
+        }
         const rect = stage.getBoundingClientRect();
         const graphX = (e.clientX - rect.left) - 100;
         if (graphX < 0 || graphX > totalW) return;
@@ -3075,8 +3245,13 @@ function initScrollEvent(hScale, startIdx) {
                 const targetX = sl + visualOffset; 
                 const hourIdx = (targetX / hs) + sIdx;
                 
-                // ツールチップを更新（isAutoScroll = true）
-                window.updateTooltipFromScroll(hourIdx, 0, 0, true, sl);
+                // 【制御の組み込み】tooltipVisibility が 'hide' の場合はUIを非表示にしてガードする
+                if (viewConfig.tooltipVisibility === 'hide') {
+                    hideTooltipUI();
+                } else {
+                    // ツールチップを更新（isAutoScroll = true）
+                    window.updateTooltipFromScroll(hourIdx, 0, 0, true, sl);
+                }
 
                 // スクロール停止判定：一定時間（50ms程度）スクロールがなければ停止とみなして消す
                 if (scrollStopTimer) clearTimeout(scrollStopTimer);
