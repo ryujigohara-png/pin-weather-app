@@ -459,8 +459,8 @@ const defaultSpots = [
 // 初回表示の判定と表示処理
 document.addEventListener('DOMContentLoaded', () => {
     // localStorageに 'welcome_bar_hidden' がなければ表示
-    // if (!localStorage.getItem('welcome_bar_hidden')) {
-    if (true) {
+    if (!localStorage.getItem('welcome_bar_hidden')) {
+    // if (true) {
         const bar = document.getElementById('welcome-bar');
         if (bar) bar.style.display = 'block';
     }
