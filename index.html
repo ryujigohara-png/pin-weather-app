@@ -53,6 +53,13 @@
 </head>
 <body>
 
+<div id="welcome-bar" style="display: none; background: #e3f2fd; padding: 12px; border-bottom: 1px solid #bbdefb; text-align: center; font-size: 0.9em; z-index: 1000; position: relative;">
+  <span data-i18n="welcomeMsg">現在地の16日間・海上気象予報を表示中。地点追加やグラフのドラッグで未来の状況を確認できます。</span>
+  <button id="close-welcome" onclick="hideWelcomeBar()" style="margin-left: 15px; padding: 4px 12px; cursor: pointer; border: 1px solid #007bff; border-radius: 4px; background: white; color: #007bff;">
+    <span data-i18n="btnHide">閉じる</span>
+  </button>
+</div>
+
 <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
 
 <div id="sidebar" class="sidebar">

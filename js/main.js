@@ -52,6 +52,9 @@ const i18n = {
     },
     dict: {
         'ja': {
+            welcomeMsg: "現在地付近の7日間の天気・海上気象予報を表示中。地点追加やグラフのドラッグで未来（最大16日間）の状況を確認できます。",
+            btnHide: "閉じる",
+
             // --- グラフ・ツールチップ用 ---
             days: ["日", "月", "火", "水", "木", "金", "土"],
             months: ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"],
@@ -207,6 +210,9 @@ const i18n = {
             wave_stable: "明日まで大きな変化はなく、概ね安定した海面コンディションが続くでしょう。"
         },
         'en': {
+            welcomeMsg: "Displaying 7-day weather and marine forecast for your area. You can add spots or drag the graphs to check the future forecast (up to 16 days).",
+            btnHide: "Close",
+
             // --- Graph & Tooltip ---
             days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
             months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
@@ -449,6 +455,27 @@ const defaultSpots = [
 //    {lat: 31.337, lon: 130.795, label: "高須沖(鹿児島県)"},
     {lat: 35.30, lon: 139.48, label: "江の島沖(神奈川県)"}
 ];
+
+// 初回表示の判定と表示処理
+document.addEventListener('DOMContentLoaded', () => {
+    // localStorageに 'welcome_bar_hidden' がなければ表示
+    // if (!localStorage.getItem('welcome_bar_hidden')) {
+    if (true) {
+        const bar = document.getElementById('welcome-bar');
+        if (bar) bar.style.display = 'block';
+    }
+});
+
+// 閉じるボタンが押された時の処理
+function hideWelcomeBar() {
+    const bar = document.getElementById('welcome-bar');
+    if (bar) {
+        bar.style.display = 'none';
+        // 「閉じた」という記録をブラウザに保存（2回目以降非表示になる）
+        localStorage.setItem('welcome_bar_hidden', 'true');
+    }
+}
+
 
 /**
  * ブラウザを閉じる、またはタブを離れる際に古いキャッシュを一括掃除
