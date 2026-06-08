@@ -1838,6 +1838,12 @@ function renderTabs(activeOverrideLabel = null) {
             renderTabs(item.rawLabel); 
         };
 
+
+        //
+        /**
+         * サブルーチン：地点タブの編集エディタ（修正版）
+         * 修正内容：保存時に、地名一致または座標近接判定を行い、条件に応じて「上書き更新」または「新規追加」を行うロジックへ変更。
+         */
         const openEditor = (e) => {
             if (e) { e.preventDefault(); e.stopPropagation(); }
             const currentLabelAtOpen = item.rawLabel;
@@ -1849,15 +1855,29 @@ function renderTabs(activeOverrideLabel = null) {
                 onMap: () => { if (typeof openMap === 'function') openMap(item.lat, item.lon); },
                 onSave: (newName) => {
                     if (!newName || (typeof checkSpotLimit === 'function' && !checkSpotLimit(newName))) return;
-                    const idx = mySpots.findIndex(s => s.label === currentLabelAtOpen);
-                    if (idx !== -1) {
-                        const targetSpot = mySpots.splice(idx, 1)[0];
-                        targetSpot.label = newName;
-                        mySpots.unshift(targetSpot);
+
+                    // 1. 判定基準の準備（閾値100m）
+                    const threshold = 0.0009;
+                    const sameLabelIdx = mySpots.findIndex(s => s.label === newName);
+                    const sameLocationIdx = mySpots.findIndex(s => 
+                        Math.abs(s.lat - item.lat) < threshold && Math.abs(s.lon - item.lon) < threshold
+                    );
+
+                    // 2. 更新条件：地名一致のみ、または座標一致のみの場合（片方修正）
+                    const isUpdate = (sameLabelIdx > -1 && sameLocationIdx === -1) || 
+                                    (sameLabelIdx === -1 && sameLocationIdx > -1);
+
+                    if (isUpdate) {
+                        // 更新：一致した方を上書き（既存インデックスの特定）
+                        const targetIdx = (sameLabelIdx > -1) ? sameLabelIdx : sameLocationIdx;
+                        mySpots[targetIdx] = { lat: item.lat, lon: item.lon, label: newName };
                     } else {
-                        const filtered = mySpots.filter(s => s.label !== newName);
-                        mySpots = [{ lat: item.lat, lon: item.lon, label: newName }, ...filtered];
+                        // 新規追加：両方一致していない場合、または両方一致している（＝修正なし）場合は追加扱い
+                        // ※この場合、既存と重複しないように既存の古い項目を削除してから追加する
+                        mySpots = mySpots.filter(s => s.label !== currentLabelAtOpen);
+                        mySpots.unshift({ lat: item.lat, lon: item.lon, label: newName });
                     }
+
                     localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
                     updateLocation(item.lat, item.lon, newName);
                     renderTabs(newName);
@@ -1869,6 +1889,7 @@ function renderTabs(activeOverrideLabel = null) {
                 } : null
             });
         };
+
         btn.oncontextmenu = openEditor; 
         let timer;
         btn.ontouchstart = (e) => { timer = setTimeout(() => openEditor(e), 800); }; 
@@ -1938,26 +1959,32 @@ function handleGPSClick() {
 }
 
 /**
- * サブルーチン：地図モーダルを開く
- * 修正内容：引数を受け取れるようにし、編集中の地点で地図を開けるよう改善。
+ * サブルーチン：地図モーダルを開く（完全版）
+ * 修正内容：リセットを廃止し、引数で渡された座標へピンを強制再配置するロジックへ変更
  */
 function openMap(targetLat = currentLat, targetLon = currentLon) {
-    // 検索入力欄のクリア
-    const searchInput = document.getElementById('map-search-input');
-    if (searchInput) searchInput.value = '';
-
-    // 【重要】共通サブルーチンでモーダルを開く（履歴が積まれる）
+    // 座標を退避
+    latBeforeOpen = currentLat;
+    lonBeforeOpen = currentLon;
+    
+    // 1. モーダルを表示
     openModal('map-modal');
 
-    // --- 以下、地図の描画・更新ロジック ---
+    // 2. 地図の初期化（初回のみ）
     if (!map) {
         // 初回のみ地図オブジェクトを作成
         const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
         const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
         const gsi = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', { attribution: '&copy; 国土地理院' });
         
-        // currentLat/Lon ではなく targetLat/Lon を使用
+        // 地図の初期化
         map = L.map('map-canvas', { center: [targetLat, targetLon], zoom: 14, layers: [esri] });
+        
+        // ★ここを追加：スケールバーの表示
+        L.control.scale({
+            imperial: false, // メートル法のみ表示
+            maxWidth: 200    // 最大幅
+        }).addTo(map);
         
         const baseMaps = {};
         baseMaps[i18n.t('layerStreet')] = esri;
@@ -1967,19 +1994,29 @@ function openMap(targetLat = currentLat, targetLon = currentLon) {
         L.control.layers(baseMaps).addTo(map);
         map.on('click', onMapClick);
     } else {
-        // 二回目以降は表示位置を更新（targetLat/Lonを使用）
+        // 二回目以降は表示位置を更新
         map.setView([targetLat, targetLon], 14);
     }
 
-    // 住所情報の取得とマーカーの再設置（targetLat/Lonを使用）
+    // 住所情報の取得とマーカーの再設置
     fetchAddressInfo(targetLat, targetLon);
     if (tempMarker) map.removeLayer(tempMarker);
     tempMarker = L.marker([targetLat, targetLon]).addTo(map);
-
+    
     // モーダル表示後のサイズ崩れ対策
     setTimeout(() => {
         if (map) map.invalidateSize();
     }, 300);
+}
+
+// キャンセルボタン等の「閉じる」処理内
+function cancelMap() {
+    if (latBeforeOpen !== null && lonBeforeOpen !== null) {
+        currentLat = latBeforeOpen;
+        currentLon = lonBeforeOpen;
+        console.log("DEBUG: Restored coordinates:", currentLat, currentLon);
+    }
+    closeModal('map-modal');
 }
 
 // ① 起動時の基点設定（一度だけ）
