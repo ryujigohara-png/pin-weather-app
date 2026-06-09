@@ -446,10 +446,19 @@ const hScale = viewConfig.hourWidth;
 const CACHE_DURATION = 4 * 60 * 60 * 1000; 
 
 window.addEventListener('DOMContentLoaded', () => {
+    // 1. まず画面全体の静的UIを一斉に多言語化（ここで%SPOT%入りの生文章が一度流し込まれます）
     updateStaticUI();
     updateLanguageSelect();
+    
     const langSelect = document.getElementById('config-language');
     if (langSelect) { langSelect.value = i18n._currentLang; }
+
+    // 2. 【タイミング問題の完全解消】静的UIの翻訳が完了した「直後」のタイミングで、
+    //    手元にある確定情報を使ってウェルカムバーのプレースホルダーを最終上書きする
+    if (typeof updateWelcomeBarText === 'function' && typeof currentLabel !== 'undefined') {
+        const currentDays = (typeof viewConfig !== 'undefined' && viewConfig.forecastDays) ? viewConfig.forecastDays : 9;
+        updateWelcomeBarText(currentLabel, currentDays);
+    }
 });
 
 const defaultSpots = [
