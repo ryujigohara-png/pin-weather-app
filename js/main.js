@@ -11,6 +11,7 @@ const defaultViewConfig = {
     // --- 新設：表示フラグの既定値（デフォルトに戻すボタンとも連動） ---
     tooltipVisibility: 'show',     // ツールチップ表示設定 ('show' or 'hide')
     graphValuesVisibility: 'show', // グラフ内数値表示設定 ('show' or 'hide')
+    welcomeBarVisibility: 'show',  // 【追加】ウェルカムバー表示設定 ('show' or 'hide')
     // ----------------------------------------------------------
 
     // --- 風速色付け閾値（初期値） ---
@@ -52,7 +53,7 @@ const i18n = {
     },
     dict: {
         'ja': {
-            welcomeMsg: "現在地付近の7日間の天気・海上気象予報を表示中。地点追加やグラフのドラッグで未来（最大16日間）の状況を確認できます。",
+            welcomeMsg: "%SPOT% の %DAYS%日間の天気・海上気象予報を表示中。+MySpots、GPS、Mapで好きな地点を最大10箇所登録できます。グラフで最大16日間の予報を確認できます。",
             btnHide: "閉じる",
 
             // --- グラフ・ツールチップ用 ---
@@ -210,7 +211,7 @@ const i18n = {
             wave_stable: "明日まで大きな変化はなく、概ね安定した海面コンディションが続くでしょう。"
         },
         'en': {
-            welcomeMsg: "Displaying 7-day weather and marine forecast for your area. You can add spots or drag the graphs to check the future forecast (up to 16 days).",
+            welcomeMsg: "Displaying %DAYS%-day weather and marine forecast for %SPOT%. You can register up to 10 favorite spots using +MySpots, GPS, and Map. Drag the chart to check forecasts up to 16 days.",
             btnHide: "Close",
 
             // --- Graph & Tooltip ---
@@ -456,26 +457,42 @@ const defaultSpots = [
     {lat: 35.30, lon: 139.48, label: "江の島沖(神奈川県)"}
 ];
 
-// 初回表示の判定と表示処理
+// 初回表示の判定と表示処理（古いキーを無視し、viewConfig基準を徹底）
 document.addEventListener('DOMContentLoaded', () => {
-    // localStorageに 'welcome_bar_hidden' がなければ表示
-    if (!localStorage.getItem('welcome_bar_hidden')) {
-    // if (true) {
+    // 共通設定 viewConfig の状態を確認（未定義ならデフォルトの 'show' として扱う）
+    const visibility = viewConfig.welcomeBarVisibility || 'show';
+    
+    if (visibility === 'show') {
         const bar = document.getElementById('welcome-bar');
         if (bar) bar.style.display = 'block';
+    } else {
+        const bar = document.getElementById('welcome-bar');
+        if (bar) bar.style.display = 'none';
     }
 });
 
-// 閉じるボタンが押された時の処理
+// 閉じるボタンが押された時の処理（共通設定・モーダルと完全連動＋過去ログクリーンアップ版）
 function hideWelcomeBar() {
     const bar = document.getElementById('welcome-bar');
     if (bar) {
         bar.style.display = 'none';
-        // 「閉じた」という記録をブラウザに保存（2回目以降非表示になる）
-        localStorage.setItem('welcome_bar_hidden', 'true');
+        
+        // 1. 共通設定オブジェクトの値を 'hide'（非表示）に更新
+        viewConfig.welcomeBarVisibility = 'hide';
+        
+        // 2. 設定画面（モーダル）を開いたときにも整合性が保たれるよう、セレクトボックスの表示も同期
+        const inputSelect = document.getElementById('input-welcomeBarVisibility');
+        if (inputSelect) {
+            inputSelect.value = 'hide';
+        }
+        
+        // 3. localStorage へ設定一式を上書き保存して永続化
+        localStorage.setItem('pin_weather_view_config', JSON.stringify(viewConfig));
+
+        // 4. 【古いキーのクリーンアップ】残っている古い個別フラグを完全に削除する
+        localStorage.removeItem('welcome_bar_hidden');
     }
 }
-
 
 /**
  * ブラウザを閉じる、またはタブを離れる際に古いキャッシュを一括掃除
@@ -706,7 +723,7 @@ function syncSliderValues() {
         'hourWidth', 'windHeight', 'subHeight', 'margin', 'fontSize', 
         'iconScale', 'tooltipDuration', 'forecastDays', 'tempUnit', 'windUnit',
         'windThresholdHigh', 'windThresholdMid', 'windThresholdLow',
-        'tooltipVisibility', 'graphValuesVisibility' // 【追加】新設セレクトボックスのキー
+        'tooltipVisibility', 'graphValuesVisibility', 'welcomeBarVisibility' // 【追加】新設セレクトボックスのキー
     ];
 
     const windUnitInput = document.getElementById('input-windUnit');
@@ -726,6 +743,8 @@ function syncSliderValues() {
         if (id === 'windUnit') configKey = 'windSpeedUnit';
 
         let val = viewConfig[configKey];
+        // 【追加】ウェルカムバーのデフォルト値（未定義時）の考慮
+        if (id === 'welcomeBarVisibility' && val === undefined) val = 'show';
         if (id === 'forecastDays' && val === undefined) val = 9;
 
         const input = document.getElementById(`input-${id}`);
@@ -767,6 +786,7 @@ async function saveViewSettings() {
     // 【追加】新設セレクトボックスの選択状態を viewConfig へ保存
     viewConfig.tooltipVisibility = document.getElementById('input-tooltipVisibility').value;
     viewConfig.graphValuesVisibility = document.getElementById('input-graphValuesVisibility').value;
+    viewConfig.welcomeBarVisibility = document.getElementById('input-welcomeBarVisibility').value; // 【追加】ウェルカムバーの表示状態を保存
 
     viewConfig.windThresholdHigh = Math.round(parseFloat(document.getElementById('input-windThresholdHigh').value));
     viewConfig.windThresholdMid = Math.round(parseFloat(document.getElementById('input-windThresholdMid').value));
@@ -1768,6 +1788,29 @@ function confirmDeleteByLabel(label) {
 }
 
 /**
+ * サブルーチン：ウェルカムバーのテキスト動的更新
+ * 現在の地点名、予報日数、言語設定に合わせて文章を置換し反映する
+ */
+function updateWelcomeBarText(label, days) {
+    // 1. ウェルカムバーのテキスト表示用要素（既存のID）を取得
+    const textEl = document.getElementById('welcome-text');
+    if (!textEl) return;
+
+    // 2. 辞書から現在の言語のテンプレート文字列を取得（多言語対応ライブラリ i18n の仕様に依存）
+    // ※i18n.t() が使えない、または該当キーがない場合の安全なデフォルト（日本語）を定義
+    let template = "";
+    if (typeof i18n !== 'undefined' && typeof i18n.t === 'function') {
+        template = i18n.t('welcomeMsg');
+    }
+    
+    // 3. プレースホルダー（%SPOT%, %DAYS%）を実際の値に正確に置換
+    let updatedText = template.replace('%SPOT%', label).replace('%DAYS%', days);
+
+    // 4. 要素にテキストを反映
+    textEl.textContent = updatedText;
+}
+
+/**
  * サブルーチン：地点タブの描画
  * 修正内容：GPS/Mapをタブから除外し、末尾に「＋」ボタンを追加。
  */
@@ -2717,6 +2760,8 @@ async function draw() {
         
         console.time("1. Data Fetch (Cache)"); // 【計測】データ取得
         allData = await fetchWithCache(currentLat, currentLon);
+        // 【draw内の適切な場所に追記】データ確定後にウェルカムバーのテキストを動的更新
+        updateWelcomeBarText(currentLabel, viewConfig.forecastDays || 9);
         if (allData) {
             const summaryText = generateWeatherSummary(allData.data, currentLabel);
             const el = document.getElementById('weather-summary');
