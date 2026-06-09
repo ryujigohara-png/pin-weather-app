@@ -11,6 +11,7 @@ const defaultViewConfig = {
     // --- 新設：表示フラグの既定値（デフォルトに戻すボタンとも連動） ---
     tooltipVisibility: 'show',     // ツールチップ表示設定 ('show' or 'hide')
     graphValuesVisibility: 'show', // グラフ内数値表示設定 ('show' or 'hide')
+    welcomeBarVisibility: 'show',  // 【追加】ウェルカムバー表示設定 ('show' or 'hide')
     // ----------------------------------------------------------
 
     // --- 風速色付け閾値（初期値） ---
@@ -52,7 +53,7 @@ const i18n = {
     },
     dict: {
         'ja': {
-            welcomeMsg: "現在地付近の7日間の天気・海上気象予報を表示中。地点追加やグラフのドラッグで未来（最大16日間）の状況を確認できます。",
+            welcomeMsg: "%SPOT% の %DAYS%日間の天気・海上気象予報を表示中。+MySpots、GPS、Mapで好きな地点を最大10箇所登録できます。グラフで最大16日間の予報を確認できます。",
             btnHide: "閉じる",
 
             // --- グラフ・ツールチップ用 ---
@@ -210,7 +211,7 @@ const i18n = {
             wave_stable: "明日まで大きな変化はなく、概ね安定した海面コンディションが続くでしょう。"
         },
         'en': {
-            welcomeMsg: "Displaying 7-day weather and marine forecast for your area. You can add spots or drag the graphs to check the future forecast (up to 16 days).",
+            welcomeMsg: "Displaying %DAYS%-day weather and marine forecast for %SPOT%. You can register up to 10 favorite spots using +MySpots, GPS, and Map. Drag the chart to check forecasts up to 16 days.",
             btnHide: "Close",
 
             // --- Graph & Tooltip ---
@@ -445,10 +446,19 @@ const hScale = viewConfig.hourWidth;
 const CACHE_DURATION = 4 * 60 * 60 * 1000; 
 
 window.addEventListener('DOMContentLoaded', () => {
+    // 1. まず画面全体の静的UIを一斉に多言語化（ここで%SPOT%入りの生文章が一度流し込まれます）
     updateStaticUI();
     updateLanguageSelect();
+    
     const langSelect = document.getElementById('config-language');
     if (langSelect) { langSelect.value = i18n._currentLang; }
+
+    // 2. 【タイミング問題の完全解消】静的UIの翻訳が完了した「直後」のタイミングで、
+    //    手元にある確定情報を使ってウェルカムバーのプレースホルダーを最終上書きする
+    if (typeof updateWelcomeBarText === 'function' && typeof currentLabel !== 'undefined') {
+        const currentDays = (typeof viewConfig !== 'undefined' && viewConfig.forecastDays) ? viewConfig.forecastDays : 9;
+        updateWelcomeBarText(currentLabel, currentDays);
+    }
 });
 
 const defaultSpots = [
@@ -456,26 +466,42 @@ const defaultSpots = [
     {lat: 35.30, lon: 139.48, label: "江の島沖(神奈川県)"}
 ];
 
-// 初回表示の判定と表示処理
+// 初回表示の判定と表示処理（古いキーを無視し、viewConfig基準を徹底）
 document.addEventListener('DOMContentLoaded', () => {
-    // localStorageに 'welcome_bar_hidden' がなければ表示
-    if (!localStorage.getItem('welcome_bar_hidden')) {
-    // if (true) {
+    // 共通設定 viewConfig の状態を確認（未定義ならデフォルトの 'show' として扱う）
+    const visibility = viewConfig.welcomeBarVisibility || 'show';
+    
+    if (visibility === 'show') {
         const bar = document.getElementById('welcome-bar');
         if (bar) bar.style.display = 'block';
+    } else {
+        const bar = document.getElementById('welcome-bar');
+        if (bar) bar.style.display = 'none';
     }
 });
 
-// 閉じるボタンが押された時の処理
+// 閉じるボタンが押された時の処理（共通設定・モーダルと完全連動＋過去ログクリーンアップ版）
 function hideWelcomeBar() {
     const bar = document.getElementById('welcome-bar');
     if (bar) {
         bar.style.display = 'none';
-        // 「閉じた」という記録をブラウザに保存（2回目以降非表示になる）
-        localStorage.setItem('welcome_bar_hidden', 'true');
+        
+        // 1. 共通設定オブジェクトの値を 'hide'（非表示）に更新
+        viewConfig.welcomeBarVisibility = 'hide';
+        
+        // 2. 設定画面（モーダル）を開いたときにも整合性が保たれるよう、セレクトボックスの表示も同期
+        const inputSelect = document.getElementById('input-welcomeBarVisibility');
+        if (inputSelect) {
+            inputSelect.value = 'hide';
+        }
+        
+        // 3. localStorage へ設定一式を上書き保存して永続化
+        localStorage.setItem('pin_weather_view_config', JSON.stringify(viewConfig));
+
+        // 4. 【古いキーのクリーンアップ】残っている古い個別フラグを完全に削除する
+        localStorage.removeItem('welcome_bar_hidden');
     }
 }
-
 
 /**
  * ブラウザを閉じる、またはタブを離れる際に古いキャッシュを一括掃除
@@ -706,7 +732,7 @@ function syncSliderValues() {
         'hourWidth', 'windHeight', 'subHeight', 'margin', 'fontSize', 
         'iconScale', 'tooltipDuration', 'forecastDays', 'tempUnit', 'windUnit',
         'windThresholdHigh', 'windThresholdMid', 'windThresholdLow',
-        'tooltipVisibility', 'graphValuesVisibility' // 【追加】新設セレクトボックスのキー
+        'tooltipVisibility', 'graphValuesVisibility', 'welcomeBarVisibility' // 【追加】新設セレクトボックスのキー
     ];
 
     const windUnitInput = document.getElementById('input-windUnit');
@@ -726,6 +752,8 @@ function syncSliderValues() {
         if (id === 'windUnit') configKey = 'windSpeedUnit';
 
         let val = viewConfig[configKey];
+        // 【追加】ウェルカムバーのデフォルト値（未定義時）の考慮
+        if (id === 'welcomeBarVisibility' && val === undefined) val = 'show';
         if (id === 'forecastDays' && val === undefined) val = 9;
 
         const input = document.getElementById(`input-${id}`);
@@ -767,6 +795,7 @@ async function saveViewSettings() {
     // 【追加】新設セレクトボックスの選択状態を viewConfig へ保存
     viewConfig.tooltipVisibility = document.getElementById('input-tooltipVisibility').value;
     viewConfig.graphValuesVisibility = document.getElementById('input-graphValuesVisibility').value;
+    viewConfig.welcomeBarVisibility = document.getElementById('input-welcomeBarVisibility').value; // 【追加】ウェルカムバーの表示状態を保存
 
     viewConfig.windThresholdHigh = Math.round(parseFloat(document.getElementById('input-windThresholdHigh').value));
     viewConfig.windThresholdMid = Math.round(parseFloat(document.getElementById('input-windThresholdMid').value));
@@ -1768,6 +1797,29 @@ function confirmDeleteByLabel(label) {
 }
 
 /**
+ * サブルーチン：ウェルカムバーのテキスト動的更新
+ * 現在の地点名、予報日数、言語設定に合わせて文章を置換し反映する
+ */
+function updateWelcomeBarText(label, days) {
+    // 1. ウェルカムバーのテキスト表示用要素（既存のID）を取得
+    const textEl = document.getElementById('welcome-text');
+    if (!textEl) return;
+
+    // 2. 辞書から現在の言語のテンプレート文字列を取得（多言語対応ライブラリ i18n の仕様に依存）
+    // ※i18n.t() が使えない、または該当キーがない場合の安全なデフォルト（日本語）を定義
+    let template = "";
+    if (typeof i18n !== 'undefined' && typeof i18n.t === 'function') {
+        template = i18n.t('welcomeMsg');
+    }
+    
+    // 3. プレースホルダー（%SPOT%, %DAYS%）を実際の値に正確に置換
+    let updatedText = template.replace('%SPOT%', label).replace('%DAYS%', days);
+
+    // 4. 要素にテキストを反映
+    textEl.textContent = updatedText;
+}
+
+/**
  * サブルーチン：地点タブの描画
  * 修正内容：GPS/Mapをタブから除外し、末尾に「＋」ボタンを追加。
  */
@@ -1838,6 +1890,12 @@ function renderTabs(activeOverrideLabel = null) {
             renderTabs(item.rawLabel); 
         };
 
+
+        //
+        /**
+         * サブルーチン：地点タブの編集エディタ（修正版）
+         * 修正内容：保存時に、地名一致または座標近接判定を行い、条件に応じて「上書き更新」または「新規追加」を行うロジックへ変更。
+         */
         const openEditor = (e) => {
             if (e) { e.preventDefault(); e.stopPropagation(); }
             const currentLabelAtOpen = item.rawLabel;
@@ -1849,15 +1907,29 @@ function renderTabs(activeOverrideLabel = null) {
                 onMap: () => { if (typeof openMap === 'function') openMap(item.lat, item.lon); },
                 onSave: (newName) => {
                     if (!newName || (typeof checkSpotLimit === 'function' && !checkSpotLimit(newName))) return;
-                    const idx = mySpots.findIndex(s => s.label === currentLabelAtOpen);
-                    if (idx !== -1) {
-                        const targetSpot = mySpots.splice(idx, 1)[0];
-                        targetSpot.label = newName;
-                        mySpots.unshift(targetSpot);
+
+                    // 1. 判定基準の準備（閾値100m）
+                    const threshold = 0.0009;
+                    const sameLabelIdx = mySpots.findIndex(s => s.label === newName);
+                    const sameLocationIdx = mySpots.findIndex(s => 
+                        Math.abs(s.lat - item.lat) < threshold && Math.abs(s.lon - item.lon) < threshold
+                    );
+
+                    // 2. 更新条件：地名一致のみ、または座標一致のみの場合（片方修正）
+                    const isUpdate = (sameLabelIdx > -1 && sameLocationIdx === -1) || 
+                                    (sameLabelIdx === -1 && sameLocationIdx > -1);
+
+                    if (isUpdate) {
+                        // 更新：一致した方を上書き（既存インデックスの特定）
+                        const targetIdx = (sameLabelIdx > -1) ? sameLabelIdx : sameLocationIdx;
+                        mySpots[targetIdx] = { lat: item.lat, lon: item.lon, label: newName };
                     } else {
-                        const filtered = mySpots.filter(s => s.label !== newName);
-                        mySpots = [{ lat: item.lat, lon: item.lon, label: newName }, ...filtered];
+                        // 新規追加：両方一致していない場合、または両方一致している（＝修正なし）場合は追加扱い
+                        // ※この場合、既存と重複しないように既存の古い項目を削除してから追加する
+                        mySpots = mySpots.filter(s => s.label !== currentLabelAtOpen);
+                        mySpots.unshift({ lat: item.lat, lon: item.lon, label: newName });
                     }
+
                     localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
                     updateLocation(item.lat, item.lon, newName);
                     renderTabs(newName);
@@ -1869,6 +1941,7 @@ function renderTabs(activeOverrideLabel = null) {
                 } : null
             });
         };
+
         btn.oncontextmenu = openEditor; 
         let timer;
         btn.ontouchstart = (e) => { timer = setTimeout(() => openEditor(e), 800); }; 
@@ -1938,26 +2011,32 @@ function handleGPSClick() {
 }
 
 /**
- * サブルーチン：地図モーダルを開く
- * 修正内容：引数を受け取れるようにし、編集中の地点で地図を開けるよう改善。
+ * サブルーチン：地図モーダルを開く（完全版）
+ * 修正内容：リセットを廃止し、引数で渡された座標へピンを強制再配置するロジックへ変更
  */
 function openMap(targetLat = currentLat, targetLon = currentLon) {
-    // 検索入力欄のクリア
-    const searchInput = document.getElementById('map-search-input');
-    if (searchInput) searchInput.value = '';
-
-    // 【重要】共通サブルーチンでモーダルを開く（履歴が積まれる）
+    // 座標を退避
+    latBeforeOpen = currentLat;
+    lonBeforeOpen = currentLon;
+    
+    // 1. モーダルを表示
     openModal('map-modal');
 
-    // --- 以下、地図の描画・更新ロジック ---
+    // 2. 地図の初期化（初回のみ）
     if (!map) {
         // 初回のみ地図オブジェクトを作成
         const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
         const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' });
         const gsi = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', { attribution: '&copy; 国土地理院' });
         
-        // currentLat/Lon ではなく targetLat/Lon を使用
+        // 地図の初期化
         map = L.map('map-canvas', { center: [targetLat, targetLon], zoom: 14, layers: [esri] });
+        
+        // ★ここを追加：スケールバーの表示
+        L.control.scale({
+            imperial: false, // メートル法のみ表示
+            maxWidth: 200    // 最大幅
+        }).addTo(map);
         
         const baseMaps = {};
         baseMaps[i18n.t('layerStreet')] = esri;
@@ -1967,19 +2046,29 @@ function openMap(targetLat = currentLat, targetLon = currentLon) {
         L.control.layers(baseMaps).addTo(map);
         map.on('click', onMapClick);
     } else {
-        // 二回目以降は表示位置を更新（targetLat/Lonを使用）
+        // 二回目以降は表示位置を更新
         map.setView([targetLat, targetLon], 14);
     }
 
-    // 住所情報の取得とマーカーの再設置（targetLat/Lonを使用）
+    // 住所情報の取得とマーカーの再設置
     fetchAddressInfo(targetLat, targetLon);
     if (tempMarker) map.removeLayer(tempMarker);
     tempMarker = L.marker([targetLat, targetLon]).addTo(map);
-
+    
     // モーダル表示後のサイズ崩れ対策
     setTimeout(() => {
         if (map) map.invalidateSize();
     }, 300);
+}
+
+// キャンセルボタン等の「閉じる」処理内
+function cancelMap() {
+    if (latBeforeOpen !== null && lonBeforeOpen !== null) {
+        currentLat = latBeforeOpen;
+        currentLon = lonBeforeOpen;
+        console.log("DEBUG: Restored coordinates:", currentLat, currentLon);
+    }
+    closeModal('map-modal');
 }
 
 // ① 起動時の基点設定（一度だけ）
@@ -2680,6 +2769,8 @@ async function draw() {
         
         console.time("1. Data Fetch (Cache)"); // 【計測】データ取得
         allData = await fetchWithCache(currentLat, currentLon);
+        // 【draw内の適切な場所に追記】データ確定後にウェルカムバーのテキストを動的更新
+        updateWelcomeBarText(currentLabel, viewConfig.forecastDays || 9);
         if (allData) {
             const summaryText = generateWeatherSummary(allData.data, currentLabel);
             const el = document.getElementById('weather-summary');
