@@ -219,7 +219,7 @@ const i18n = {
             temp_stable: "落ち着いた推移となるでしょう。",
             wind_summary_calm: "風は現在、{current_dir}の風が{current_speed}{unit}ですが、{tomorrow}{calm_start_slot}から{calm_end_slot}にかけては無風に近くなり、その後は再び{next_dir}の風が吹く見込みです。",
             wind_summary_shift: "風は現在、{current_dir}の風が{current_speed}{unit}ですが、{tomorrow}{shift_slot}からは次第に{next_dir}の風に変わるでしょう。",
-            wind_summary_stable: "風は今後24時間にかけて、{current_dir}の風が{current_speed}{unit}前後の概ね穏やかな状態で安定する見込みです。",
+            wind_summary_stable: "風は今後24時間、{current_dir}の風が{current_speed}{unit}前後の概ね穏やかな状態で安定する見込みです。",
             wave_current: "波高は現在{current}mですが、",
             wave_rise: "今後は{future}mまで高まる見込みです。",
             wave_fall: "今後は{future}mまで落ち着く見込みです。",
