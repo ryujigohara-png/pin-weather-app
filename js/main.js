@@ -186,7 +186,7 @@ const i18n = {
             btnDelete: "削除",
             confirmDeletePrefix: "本当に削除しますか：",
 
-            summary_title: "【概況】",
+            summary_title: "【24時間概況】",
             as_of: "現在",
             analyzing: "解析中...",
             tomorrow: "明日",
@@ -217,9 +217,11 @@ const i18n = {
             temp_info: "気温は最高{max}{unit}、最低は{min}{unit}で、",
             temp_diff_warn: "一日の寒暖差が大きくなるため体調管理にご注意ください。",
             temp_stable: "落ち着いた推移となるでしょう。",
-            wind_summary_calm: "風は現在、{current_dir}の風が{current_speed}{unit}ですが、{tomorrow}{calm_start_slot}から{calm_end_slot}にかけては無風に近くなり、その後は再び{next_dir}の風が吹く見込みです。",
-            wind_summary_shift: "風は現在、{current_dir}の風が{current_speed}{unit}ですが、{tomorrow}{shift_slot}からは次第に{next_dir}の風に変わるでしょう。",
-            wind_summary_stable: "風は今後24時間、{current_dir}の風が{current_speed}{unit}前後の概ね穏やかな状態で安定する見込みです。",
+            wind_summary_peak: "風は現在、{current_dir}{current_speed}{unit}ですが、{max_time_label}は{peak_dir}が吹き、{min_time_label}は風は弱く風向は定まらない見込みです。その後は{after_dir}が吹く見込みです。",
+            wind_summary_variable: "風は現在、{current_dir}{current_speed}{unit}です。今後24時間、風は弱く風向は定まらない見込みです。",
+            wind_summary_calm: "風は現在、{current_dir}{current_speed}{unit}ですが、{tomorrow}{calm_start_slot}から風は弱く風向は定まらない見込みです。その後は{next_dir}が吹く見込みです。",
+            wind_summary_shift: "風は現在、{current_dir}{current_speed}{unit}ですが、{pre_peak}{tomorrow}{shift_slot}頃からは{next_dir}に変わる見込みです。",
+            wind_summary_shift_pre_peak: "しばらくは{pre_peak_dir}が強く吹き、",
             wave_current: "波高は現在{current}mですが、",
             wave_rise: "今後は{future}mまで高まる見込みです。",
             wave_fall: "今後は{future}mまで落ち着く見込みです。",
@@ -359,7 +361,7 @@ const i18n = {
             btnDelete: "Delete",
             confirmDeletePrefix: "Are you sure you want to delete:",
 
-            summary_title: "[Summary]", 
+            summary_title: "[24-Hour Summary]", 
             as_of: "As of",
             analyzing: "Analyzing...",
             tomorrow: "tomorrow",
@@ -373,6 +375,7 @@ const i18n = {
             EARLY_EVENING: "early evening",
             LATE_NIGHT: "night",
             weather_now: "Currently {weather}, but ",
+            weather_change: "it will change to {status} around {day} {time}:00",
             stable_weather: "relatively stable weather is expected ahead.",
             weather_unstable: "the weather will be unsettled.",
             status_clear: "clearing up",
@@ -390,9 +393,12 @@ const i18n = {
             temp_info: "Temperatures will reach a high of {max}{unit} and a low of {min}{unit}. It will be ",
             temp_diff_warn: "a day with large temperature swings.",
             temp_stable: "relatively calm transitions.",
-            wind_summary_calm: "Winds are currently {current_dir} at {current_speed} {unit}, but will become nearly calm from {calm_start_slot} to {calm_end_slot} {tomorrow}, followed by {next_dir} winds picking up again.",
-            wind_summary_shift: "Winds are currently {current_dir} at {current_speed} {unit}, but will gradually shift to {next_dir} winds from {shift_slot} {tomorrow}.",
-            wind_summary_stable: "Winds are expected to remain stable and gentle from the {current_dir} around {current_speed} {unit} over the next 24 hours.",
+            wind_summary_peak: "The wind is currently {current_dir} at {current_speed} {unit}, but it will blow from the {peak_dir} in the {max_time_label}, and will become light and variable {min_time_label}. After that, it is expected to blow from the {after_dir}.",
+            wind_summary_variable: "The wind is currently {current_dir} at {current_speed} {unit}. It is expected to be light and variable for the next 24 hours.",
+            wind_summary_calm: "The wind is currently {current_dir} at {current_speed} {unit}, but it will become light and variable {tomorrow} {calm_start_slot}. After that, it is expected to blow from the {next_dir}.",
+            wind_summary_shift: "The wind is currently {current_dir} at {current_speed} {unit}, but {pre_peak}it is expected to shift to the {next_dir} around {tomorrow} {shift_slot}.",
+            wind_summary_shift_pre_peak: "the wind will blow strongly from the {pre_peak_dir} for a while, and ",
+            wind_summary_stable: "The wind is currently {current_dir} at {current_speed} {unit}. It is expected to continue blowing from the {trend_dir} for the next 24 hours.",
             wave_current: "Wave height is currently {current}m, ",
             wave_rise: "and is expected to rise to {future}m.",
             wave_fall: "and is expected to fall to {future}m.",
@@ -2616,26 +2622,56 @@ function getTemperatureTermId(maxTemp, minTemp, nightMinTemp) {
 }
 
 /**
- * 風速の変化イベントを整数階級(Math.floor)ベースで抽出するサブルーチン
- * 3m/s未満は一律で無風（階級0）として扱う
+ * 与えられた風速値が、ユーザーの選択している単位において「無風・風向不定」であるかを判定する共通サブルーチン
+ * 基準値を1箇所変更するだけで、すべての単位の閾値計算が自動的に連動します。
+ * @param {number} rawSpeed - APIから取得した生の風速値 (m/s)
+ * @param {string} wUnit - ユーザーが選択している風速単位 ('m/s', 'km/h', 'kn', 'mph')
+ * @returns {boolean} 無風（しきい値未満）であればtrue、それ以上ならfalse
  */
-function extractWindSpeedEvents(data, nowIdx, endIdx) {
+function isCalmWind(rawSpeed, wUnit) {
+    // 【しきい値の一元管理箇所】 変更時はこの数値を直すだけで、すべての単位の計算が完全に連動します。
+    let calmThresholdRaw = 1.5; 
+    
+    // すべての単位（m/sを含む）において変数自体を割る計算式を網羅
+    if (wUnit === 'm/s') {
+        calmThresholdRaw = calmThresholdRaw / 1.0;       // 1.5 m/s 未満
+    } else if (wUnit === 'km/h') {
+        calmThresholdRaw = calmThresholdRaw / 3.6;       // 1.5 km/h 未満相当の m/s 値を算出
+    } else if (wUnit === 'kn') {
+        calmThresholdRaw = calmThresholdRaw / 1.94384;   // 1.5 kn 未満相当の m/s 値を算出
+    } else if (wUnit === 'mph') {
+        calmThresholdRaw = calmThresholdRaw / 2.23694;   // 1.5 mph 未満相当の m/s 値を算出
+    }
+    
+    return rawSpeed < calmThresholdRaw;
+}
+
+/**
+ * 風速の変化イベントを整数階級(Math.floor)ベースで抽出するサブルーチン
+ * 1.5m/s未満相当は一律で無風（階級0）として扱う（共通サブルーチン isCalmWind で一元管理）
+ */
+function extractWindSpeedEvents(data, nowIdx, endIdx, wUnit) {
     let speedEvents = [];
     let currentSpeedFloor = Math.floor(data.wind_speed_10m[nowIdx]);
-    let currentTier = currentSpeedFloor < 3 ? 0 : currentSpeedFloor;
+    
+    // 共通サブルーチンによる一元判定（1.5m/s未満相当なら階級0、それ以上なら換算後の整数値）
+    let currentTier = isCalmWind(data.wind_speed_10m[nowIdx], wUnit) ? 0 : currentSpeedFloor;
     
     let i = nowIdx + 1;
     while (i <= endIdx) {
         let tSpeed = data.wind_speed_10m[i];
         let tFloor = Math.floor(tSpeed);
-        let tTier = tFloor < 3 ? 0 : tFloor;
+        
+        // 共通サブルーチンによる一元判定
+        let tTier = isCalmWind(tSpeed, wUnit) ? 0 : tFloor;
         
         if (tTier !== currentTier) {
             // だまし対応：3時間先まで一貫しているか確認（3時間中2時間以上一致）
             let confirmIdx = Math.min(i + 2, endIdx);
             let matchCount = 0;
             for (let j = i; j <= confirmIdx; j++) {
-                let jTier = Math.floor(data.wind_speed_10m[j]) < 3 ? 0 : Math.floor(data.wind_speed_10m[j]);
+                // 各ループ内でも共通サブルーチンを使って階級を算出
+                let jTier = isCalmWind(data.wind_speed_10m[j], wUnit) ? 0 : Math.floor(data.wind_speed_10m[j]);
                 if (jTier === tTier) matchCount++;
             }
             if (matchCount >= 2) {
@@ -2657,17 +2693,19 @@ function extractWindSpeedEvents(data, nowIdx, endIdx) {
 
 /**
  * 風向の変化イベントを抽出するサブルーチン
- * 3m/s未満の無風帯は風向を無視し、無風帯の前後で風向を比較する
+ * 1.5m/s未満相当の無風帯は風向を無視し、無風帯の前後で風向を比較する（共通サブルーチン isCalmWind で一元管理）
  */
-function extractWindDirEvents(data, nowIdx, endIdx) {
+function extractWindDirEvents(data, nowIdx, endIdx, wUnit) {
     let dirEvents = [];
     let currentBaseDir = data.wind_direction_10m[nowIdx];
-    let hasValidBase = data.wind_speed_10m[nowIdx] >= 3.0;
     
-    // 最初に有効な基準風向（3m/s以上）を検索
+    // 共通サブルーチンによる一元判定（無風でなければ有効な基準風向とする）
+    let hasValidBase = !isCalmWind(data.wind_speed_10m[nowIdx], wUnit);
+    
+    // 最初に有効な基準風向（無風ではない時間帯）を検索
     if (!hasValidBase) {
         for (let j = nowIdx + 1; j <= endIdx; j++) {
-            if (data.wind_speed_10m[j] >= 3.0) {
+            if (!isCalmWind(data.wind_speed_10m[j], wUnit)) {
                 currentBaseDir = data.wind_direction_10m[j];
                 hasValidBase = true;
                 break;
@@ -2680,8 +2718,8 @@ function extractWindDirEvents(data, nowIdx, endIdx) {
         let tSpeed = data.wind_speed_10m[i];
         let tDir = data.wind_direction_10m[i];
         
-        // 3.0m/s未満の無風帯のデータは、風向の前後比較から除外（無視してスキップ）
-        if (tSpeed < 3.0) {
+        // 1.5m/s未満相当の無風帯のデータは、風向の前後比較から除外（無視してスキップ）
+        if (isCalmWind(tSpeed, wUnit)) {
             i++;
             continue;
         }
@@ -2693,7 +2731,8 @@ function extractWindDirEvents(data, nowIdx, endIdx) {
             let confirmIdx = Math.min(i + 2, endIdx);
             let matchCount = 0;
             for (let j = i; j <= confirmIdx; j++) {
-                if (data.wind_speed_10m[j] >= 3.0 && getAngleDiff(data.wind_direction_10m[j], tDir) < 90) {
+                // 有意な風速があり、かつ風向変化が90度未満（同方向を維持）しているかチェック
+                if (!isCalmWind(data.wind_speed_10m[j], wUnit) && getAngleDiff(data.wind_direction_10m[j], tDir) < 90) {
                     matchCount++;
                 }
             }
@@ -2716,61 +2755,212 @@ function extractWindDirEvents(data, nowIdx, endIdx) {
 
 /**
  * 独立解析した結果から多言語用共通パラメータオブジェクトを生成し、一発で翻訳文章を組み立てるサブルーチン
- * 日付重複（明日、明日）やぶつ切り記述を完全に排除する
+ * 風向の大転換（90度以上）が発生する場合、その転換が起こる前の時間帯から最大のピークを自動抽出し、文章に融合させる
  */
 function generateWindSummaryMultiLang(data, nowIdx, endIdx, now, wUnit) {
-    let speedEvents = extractWindSpeedEvents(data, nowIdx, endIdx);
-    let dirEvents = extractWindDirEvents(data, nowIdx, endIdx);
+    const isJa = typeof i18n !== 'undefined' && i18n._currentLang === 'ja';
     
+    // 現在の実況状態
     let currentDir = getAzimuth(data.wind_direction_10m[nowIdx]);
-    let currentSpeed = data.wind_speed_10m[nowIdx].toFixed(1);
+    let currentSpeed = data.wind_speed_10m[nowIdx];
+    let currentSpeedStr = currentSpeed.toFixed(1);
 
-    // 1. 無風帯（Tier 0）のイベントが期間内に存在するか確認（最優先）
+    // --- 1. 整数ベースでの最大風速（ピーク）の探索 ---
+    let maxSpeedFloor = -1;
+    let maxSpeedActual = -1;
+    let maxSpeedIdx = nowIdx;
+
+    for (let i = nowIdx; i <= endIdx; i++) {
+        let rawSpd = data.wind_speed_10m[i];
+        
+        // 現在の単位に換算
+        let convertedSpd = rawSpd;
+        if (wUnit === 'km/h') convertedSpd = rawSpd * 3.6;
+        else if (wUnit === 'kn') convertedSpd = rawSpd * 1.94384;
+        else if (wUnit === 'mph') convertedSpd = rawSpd * 2.23694;
+
+        let spdFloor = Math.floor(convertedSpd); // 小数点以下を無視した整数値
+        if (spdFloor > maxSpeedFloor) {
+            maxSpeedFloor = spdFloor;
+            maxSpeedActual = rawSpd;
+            maxSpeedIdx = i;
+        } else if (spdFloor === maxSpeedFloor && rawSpd > maxSpeedActual) {
+            maxSpeedActual = rawSpd;
+            maxSpeedIdx = i;
+        }
+    }
+
+    // --- 2. ピーク以降の「風速の低下」および「風向の大きな変化」の追跡 ---
+    let isDroppedAfterPeak = false;
+    let minSpeedAfterPeak = Infinity;
+    let minSpeedIdxAfterPeak = maxSpeedIdx;
+
+    for (let i = maxSpeedIdx; i <= endIdx; i++) {
+        let spd = data.wind_speed_10m[i];
+        if (spd < minSpeedAfterPeak) {
+            minSpeedAfterPeak = spd;
+            minSpeedIdxAfterPeak = i;
+        }
+    }
+
+    // 換算後のピーク整数値が4以上（そこそかの山）であり、その後「1.5ms未満相当の無風」まで落ちているかを判定
+    if (maxSpeedFloor >= 4 && isCalmWind(minSpeedAfterPeak, wUnit)) {
+        isDroppedAfterPeak = true;
+    }
+
+    // 方位を正確な「8方位（北、北東、東、南東、南、南西、西、北西）」に落とし込むヘルパー
+    const get8Dir = (dirStr) => {
+        if (!dirStr) return "";
+        if (isJa) {
+            // 2文字の方位（北東、南東、南西、北西）を最優先でそのまま抽出
+            if (dirStr.includes('北東')) return '北東';
+            if (dirStr.includes('南東')) return '南東';
+            if (dirStr.includes('南西')) return '南西';
+            if (dirStr.includes('北西')) return '北西';
+            // 残りの1文字方位をそのまま抽出
+            if (dirStr.includes('北')) return '北';
+            if (dirStr.includes('南')) return '南';
+            if (dirStr.includes('東')) return '東';
+            if (dirStr.includes('西')) return '西';
+            return dirStr;
+        } else {
+            // 英語テンプレートの "from the {next_dir}" 構造に完璧に適合させるため、
+            // 16方位（SSWなど）をシンプルな8方位（SWなど）の記号文字に丸めてそのまま返します。
+            if (dirStr.length > 2) return dirStr.slice(-2);
+            return dirStr;
+        }
+    };
+
+    // --- 3. 条件判定とテンプレート適用 ---
+
+    // 1. wind_summary_variable の判定（明治神宮ケース）
+    // 24時間を通じて最大風速自体がそもそも「1.5ms未満相当」の極めて弱い風の場合
+    if (isCalmWind(maxSpeedActual, wUnit)) {
+        return i18n.t('wind_summary_variable')
+            .replace('{current_dir}', isJa ? get8Dir(currentDir) : currentDir)
+            .replace('{current_speed}', currentSpeedStr)
+            .replace('{unit}', wUnit);
+    }
+
+    // 2. wind_summary_peak の判定（ニューヨーク旧ケース）
+    // 明確なピークが存在し、その後「完全に1.5ms未満の無風」まで風が落ちて風向が定まらなくなる場合
+    if (isDroppedAfterPeak && maxSpeedIdx > nowIdx && maxSpeedIdx < endIdx) {
+        let maxTime = new Date(data.time[maxSpeedIdx]);
+        let minTime = new Date(data.time[minSpeedIdxAfterPeak]);
+
+        let maxTimeLabel = "";
+        let minTimeLabel = "";
+
+        if (isJa) {
+            maxTimeLabel = maxTime.getDate() !== now.getDate() ? "明日" : (maxTime.getHours() >= 12 ? "午後" : "午前");
+            minTimeLabel = minTime.getDate() !== now.getDate() ? "明日夜中から朝にかけて" : "夜にかけて";
+        } else {
+            maxTimeLabel = maxTime.getDate() !== now.getDate() ? "tomorrow" : (maxTime.getHours() >= 12 ? "afternoon" : "morning");
+            minTimeLabel = minTime.getDate() !== now.getDate() ? "from tomorrow midnight to morning" : "in the evening";
+        }
+        
+        let peakDir = get8Dir(getAzimuth(data.wind_direction_10m[maxSpeedIdx]));
+        let afterDir = get8Dir(getAzimuth(data.wind_direction_10m[endIdx]));
+
+        if (afterDir === peakDir && isJa) {
+            afterDir = "再び" + afterDir;
+        }
+
+        // お預かりしたキー構造へ完璧にマッピング
+        return i18n.t('wind_summary_peak')
+            .replace('{current_dir}', isJa ? get8Dir(currentDir) : currentDir)
+            .replace('{current_speed}', currentSpeedStr)
+            .replace('{unit}', wUnit)
+            .replace('{max_time_label}', maxTimeLabel)
+            .replace('{peak_dir}', peakDir)
+            .replace('{min_time_label}', minTimeLabel)
+            .replace('{after_dir}', afterDir);
+    }
+
+    // 3. wind_summary_calm の判定（標準的な無風帯判定 Tier 0）
+    let speedEvents = typeof extractWindSpeedEvents === 'function' ? extractWindSpeedEvents(data, nowIdx, endIdx, wUnit) : [];
     let firstCalmEvent = speedEvents.find(e => e.tier === 0);
     if (firstCalmEvent) {
         let nextNormalEvent = speedEvents.find(e => e.idx > firstCalmEvent.idx && e.tier > 0);
-        
         let startTime = new Date(data.time[firstCalmEvent.idx]);
-        let endTime = nextNormalEvent ? new Date(data.time[nextNormalEvent.idx]) : new Date(data.time[endIdx]);
-        
         let calmStartDayKey = startTime.getDate() !== now.getDate() ? 'tomorrow' : 'today';
-        let calmStartSlotKey = getTimeSlotId(startTime.getHours());
-        let calmEndSlotKey = getTimeSlotId(endTime.getHours());
+        let calmStartSlotKey = typeof getTimeSlotId === 'function' ? getTimeSlotId(startTime.getHours()) : "";
         
         let nextDirIdx = nextNormalEvent ? nextNormalEvent.idx : endIdx;
         let nextDir = getAzimuth(data.wind_direction_10m[nextDirIdx]);
         
+        // お預かりしたキー構造へ完璧にマッピング
         return i18n.t('wind_summary_calm')
-            .replace('{current_dir}', currentDir)
-            .replace('{current_speed}', currentSpeed)
+            .replace('{current_dir}', isJa ? get8Dir(currentDir) : currentDir)
+            .replace('{current_speed}', currentSpeedStr)
             .replace('{unit}', wUnit)
             .replace('{tomorrow}', i18n.t(calmStartDayKey))
             .replace('{calm_start_slot}', i18n.t(calmStartSlotKey))
-            .replace('{calm_end_slot}', i18n.t(calmEndSlotKey))
-            .replace('{next_dir}', nextDir);
+            .replace('{next_dir}', get8Dir(nextDir));
     }
     
-    // 2. 無風期間はないが、風向が大きく（90度以上）変わるイベントが存在する場合
+    // 4. wind_summary_shift の判定（ニューヨーク新・ロンドンケース：風向の大転換イベント）
+    let dirEvents = typeof extractWindDirEvents === 'function' ? extractWindDirEvents(data, nowIdx, endIdx, wUnit) : [];
     if (dirEvents.length > 0) {
         let firstDirEvent = dirEvents[0];
-        let shiftTime = new Date(data.time[firstDirEvent.idx]);
+        let shiftIdx = firstDirEvent.idx;
+        let shiftTime = new Date(data.time[shiftIdx]);
         let shiftDayKey = shiftTime.getDate() !== now.getDate() ? 'tomorrow' : 'today';
-        let shiftSlotKey = getTimeSlotId(shiftTime.getHours());
+        let shiftSlotKey = typeof getTimeSlotId === 'function' ? getTimeSlotId(shiftTime.getHours()) : "";
         
+        // 現在から「風向が大転換する前まで」の間で、最大の山（ピーク）があるか安全に探索
+        let preMaxSpeed = -1;
+        let preMaxIdx = nowIdx;
+        for (let k = nowIdx; k < shiftIdx; k++) {
+            if (data.wind_speed_10m[k] > preMaxSpeed) {
+                preMaxSpeed = data.wind_speed_10m[k];
+                preMaxIdx = k;
+            }
+        }
+
+        // 風向転換の前に、しっかりとした有効な風のピークが存在する場合
+        let prePeakText = "";
+        if (preMaxSpeed >= 3.0 && !isCalmWind(preMaxSpeed, wUnit)) {
+            let prePeakDir = get8Dir(getAzimuth(data.wind_direction_10m[preMaxIdx]));
+            let nextDir = get8Dir(firstDirEvent.dir);
+
+            // 【確実な重複ガード】
+            // 8方位で厳密に比較し、前半ピークと後半の転換後が「異なる方位」の時だけ文章を結合
+            if (prePeakDir !== nextDir) {
+                prePeakText = i18n.t('wind_summary_shift_pre_peak').replace('{pre_peak_dir}', prePeakDir);
+            }
+        }
+        
+        // お預かりしたキー構造へ完璧にマッピング。
+        // 「風」の重複をなくすため、テンプレート内の「の風」へ合流させず、ダイレクトに8方位名（「北西」「北東」等）がバインドされます。
         return i18n.t('wind_summary_shift')
-            .replace('{current_dir}', currentDir)
-            .replace('{current_speed}', currentSpeed)
+            .replace('{current_dir}', isJa ? get8Dir(currentDir) : currentDir)
+            .replace('{current_speed}', currentSpeedStr)
             .replace('{unit}', wUnit)
+            .replace('{pre_peak}', prePeakText)
             .replace('{tomorrow}', i18n.t(shiftDayKey))
             .replace('{shift_slot}', i18n.t(shiftSlotKey))
-            .replace('{next_dir}', firstDirEvent.dir);
+            .replace('{next_dir}', get8Dir(firstDirEvent.dir)); 
     }
     
-    // 3. 目立った変化（無風化や大転換）が24時間以内に発生しない場合
+    // 5. wind_summary_stable の判定（鹿屋市ケース：目立った変化がないケース）
+    let trendDir = currentDir;
+    if (isJa) {
+        if (trendDir.length > 2) {
+            trendDir = trendDir.replace('北東', '北東').replace('南東', '南東').replace('南西', '南西').replace('北西', '北西');
+        }
+    } else {
+        if (trendDir.length > 2) {
+            trendDir = trendDir.slice(-2);
+        }
+    }
+    
+    // お預かりしたキー構造へ完璧にマッピング
     return i18n.t('wind_summary_stable')
-        .replace('{current_dir}', currentDir)
-        .replace('{current_speed}', currentSpeed)
-        .replace('{unit}', wUnit);
+        .replace('{current_dir}', isJa ? get8Dir(currentDir) : currentDir)
+        .replace('{current_speed}', currentSpeedStr)
+        .replace('{unit}', wUnit)
+        .replace('{trend_dir}', get8Dir(trendDir));
 }
 
 /**
@@ -2884,6 +3074,11 @@ function generateWeatherSummary(data, label) {
                 weatherParts.push(part);
             }
         });
+
+        // 英語環境において、生成された天気配列の最後の要素の末尾に、確実にピリオドと半角スペースを付与する安全な後処理（コードを汚さず密着バグを完全防止）
+        if (!isJa && weatherParts.length > 0) {
+            weatherParts[weatherParts.length - 1] = weatherParts[weatherParts.length - 1] + ". ";
+        }
         
         if (isJa) {
             weatherFinal += weatherParts.join("") + (isUnstable ? i18n.t('weather_unstable') : "");
@@ -2934,7 +3129,14 @@ function generateWeatherSummary(data, label) {
     if (data.wave_height) {
         const curW = data.wave_height[nowIdx];
         const futW = data.wave_height[endIdx];
-        waveFinal = i18n.t('wave_current').replace('{current}', curW.toFixed(2)) + (futW - curW >= 0.3 ? i18n.t('wave_rise').replace('{future}', futW.toFixed(2)) : (futW - curW <= -0.3 ? i18n.t('wave_fall').replace('{future}', futW.toFixed(2)) : i18n.t('wave_stable')));
+        
+        // 内陸部などデータ無(null)のときは処理を行わず、波概況をスキップする安全ガード
+        if (curW !== null && futW !== null && curW !== undefined && futW !== undefined) {
+            waveFinal = i18n.t('wave_current').replace('{current}', curW.toFixed(2)) + 
+                (futW - curW >= 0.3 ? i18n.t('wave_rise').replace('{future}', futW.toFixed(2)) : 
+                (futW - curW <= -0.3 ? i18n.t('wave_fall').replace('{future}', futW.toFixed(2)) : 
+                i18n.t('wave_stable')));
+        }
     }
 
     return `${i18n.t('summary_title')} ${timeHeader} ${i18n.t('as_of')}\n${stormWarning}${weatherFinal}\n${windFinal}\n${waveFinal}`;
