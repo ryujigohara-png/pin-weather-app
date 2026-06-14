@@ -214,6 +214,9 @@ const i18n = {
             FUYUBI: "冬日となり、",
             NETTAIYA: "熱帯夜になる見込みで、",
             NORMAL: "",
+            storm_and_rain: "{day}日は暴風や大雨の恐れがありますので、今後の気象情報にご注意ください。",
+            storm:          "{day}日は暴風の恐れがありますので、今後の気象情報にご注意ください。",
+            rain:           "{day}日は大雨の恐れがありますので、今後の気象情報にご注意ください。",
             temp_info: "気温は最高{max}{unit}、最低は{min}{unit}で、",
             temp_diff_warn: "一日の寒暖差が大きくなるため体調管理にご注意ください。",
             temp_stable: "落ち着いた推移となるでしょう。",
@@ -391,6 +394,9 @@ const i18n = {
             FUYUBI: "a frost day, ",
             NETTAIYA: "a tropical night, ",
             NORMAL: "",
+            storm_and_rain: "There is a risk of severe storms and heavy rain on the {day}th. Please stay tuned for further weather updates.",
+            storm:          "There is a risk of severe storms on the {day}th. Please stay tuned for further weather updates.",
+            rain:           "There is a risk of heavy rain on the {day}th. Please stay tuned for further weather updates.",
             temp_info: "Temperatures will reach a high of {max}{unit} and a low of {min}{unit}. It will be ",
             temp_diff_warn: "a day with large temperature swings.",
             temp_stable: "relatively calm transitions.",
@@ -3002,8 +3008,16 @@ function generateWeatherSummary(data, label) {
     // --- 0. 暴風雨アラート ---
     let stormWarning = "";
     for (let i = nowIdx; i <= endIdx; i++) {
-        if ((data.wind_speed_10m[i] !== null && data.wind_speed_10m[i] >= 15) || (data.precipitation && data.precipitation[i] >= 20)) {
-            stormWarning = i18n.t('storm_warning').replace('{day}', new Date(data.time[i]).getDate());
+        const isWind = (data.wind_speed_10m[i] !== null && data.wind_speed_10m[i] >= 15);
+        const isRain = (data.precipitation && data.precipitation[i] >= 20);
+
+        if (isWind || isRain) {
+            let alertType = "";
+            if (isWind && isRain) alertType = "storm_and_rain"; // 暴風や大雨
+            else if (isWind)      alertType = "storm";          // 暴風
+            else                  alertType = "rain";           // 大雨
+
+            stormWarning = i18n.t(alertType).replace('{day}', new Date(data.time[i]).getDate()) + "\n";
             break;
         }
     }
