@@ -222,6 +222,7 @@ const i18n = {
             wind_summary_calm: "風は現在、{current_dir}{current_speed}{unit}ですが、{tomorrow}{calm_start_slot}から風は弱く風向は定まらない見込みです。その後は{next_dir}が吹く見込みです。",
             wind_summary_shift: "風は現在、{current_dir}{current_speed}{unit}ですが、{pre_peak}{tomorrow}{shift_slot}頃からは{next_dir}に変わる見込みです。",
             wind_summary_shift_pre_peak: "しばらくは{pre_peak_dir}が強く吹き、",
+            wind_summary_stable: "風は現在、{current_dir}{current_speed}{unit}です。今後24時間は{trend_dir}が続く見込みです。",
             wave_current: "波高は現在{current}mですが、",
             wave_rise: "今後は{future}mまで高まる見込みです。",
             wave_fall: "今後は{future}mまで落ち着く見込みです。",
