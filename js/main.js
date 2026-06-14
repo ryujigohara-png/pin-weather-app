@@ -21,8 +21,8 @@ const defaultViewConfig = {
     // ----------------------------
     iconScale: 0.7,             // 風向アイコン倍率
     hourWidth: 18,              // 1時間の幅
-    windHeight: 100,            // 風速グラフ高さ
-    subHeight: 100,             // 気温・海象グラフ高さ
+    windHeight: 140,            // 風速グラフ高さ
+    subHeight: 80,             // 気温・海象グラフ高さ
     graphMargin: 0,             // グラフ間余白
     fontSize: 12,               // ラベルフォントサイズ
     language: 'ja'              // 言語設定
