@@ -87,6 +87,16 @@ const i18n = {
             widgetDesc: "あなたのサイトにこの地点の気象グラフを埋め込むことができます。",
             widgetCopy: "コードをコピー",
 
+            // --- 通知設定 ---
+            btnNotificationSettings: "🔔 朝の通知設定",
+            notificationModalTitle: "毎朝の気象概況通知設定",
+            notificationSelectSpot: "通知する場所：",
+            notificationSelectTime: "通知時刻：",
+            notificationSaveBtn: "設定を保存",
+            notificationNoSpots: "登録地点がありません",
+            notificationSavedMsg: "保存しました",
+            notificationPermDenied: "通知がブロックされているため、設定時刻に通知が表示されない可能性があります。",
+
             // --- 地図・地点登録モーダル ---
             mapClickGuide: "地点をクリックしてください",
             btnSearch: "検索",
@@ -265,6 +275,16 @@ const i18n = {
             widgetTitle: "Widget Embedding Settings",
             widgetDesc: "You can embed this weather graph into your website or blog.",
             widgetCopy: "Copy Code",
+
+            // --- Notification Settings ---
+            btnNotificationSettings: "🔔 Morning Notification",
+            notificationModalTitle: "Daily Morning Weather Notification",
+            notificationSelectSpot: "Notification Location:",
+            notificationSelectTime: "Notification Time:",
+            notificationSaveBtn: "Save Settings",
+            notificationNoSpots: "No spots registered",
+            notificationSavedMsg: "Saved successfully",
+            notificationPermDenied: "Notifications are blocked. You may not receive alerts at the scheduled time.",
 
             // --- Map & Spot Modal ---
             mapClickGuide: "Click on the map",
@@ -1356,6 +1376,7 @@ function finalizeInit() {
  * サブルーチン：UIイベントの登録
  * 既存のユーザーデータ「pin_weather_spots」および「pin_weather_wind_filter」を厳守。
  * 修正内容：地図ボタン押下時のrenderTabs("Map")呼び出しを削除。
+ * サイドバー内「🔔 朝の通知設定ボタン」のイベント登録を追加。
  */
 function setupGeneralEvents() {
     // --- 新設：概況ボタン左隣のGPS/Mapボタン (nav-action-bar内) ---
@@ -1389,6 +1410,22 @@ function setupGeneralEvents() {
             } else {
                 toggleSidebar();
                 openModal('wind-modal');
+            }
+        };
+    }
+   
+    // 【新設】10. 通知設定ボタン（サイドバー）
+    // 既存の風向設定ボタンの仕様に完全準拠し、openModalFromSidebar経由で安全に起動します。
+    const openNotificationBtn = document.getElementById('openNotificationBtn');
+    if (openNotificationBtn) {
+        openNotificationBtn.onclick = () => {
+            if (typeof openModalFromSidebar === 'function') {
+                openModalFromSidebar('notification-modal');
+            } else {
+                toggleSidebar();
+                // 既存のグローバルなopenModal互換のフォールバック
+                const modal = document.getElementById('notification-modal');
+                if (modal) modal.style.display = 'block';
             }
         };
     }
@@ -1554,6 +1591,7 @@ function toggleSidebar() {
  * サイドバー内のボタンからモーダルを呼び出す専用関数
  * 戻るボタンの競合（一瞬で消える現象）を防ぐための完全版
  * 修正内容：ウィジェット設定時は翻訳データを反映する処理を追加
+ * 通知設定モーダル（notification-modal）オープン時の初期化ライフサイクルを追加
  */
 function openModalFromSidebar(modalId) {
     const sb = document.getElementById('sidebar');
@@ -1594,7 +1632,17 @@ function openModalFromSidebar(modalId) {
     if (modalId === 'wind-modal') {
         initCompassUI();
     }
-}
+    
+    // 【追加】通知設定モーダルの場合はコンボボックス等の最新化ライフサイクルを確実に実行
+    if (modalId === 'notification-modal') {
+        if (typeof refreshNotificationModalUI === 'function') {
+            refreshNotificationModalUI();
+        }
+        if (typeof i18n !== 'undefined' && typeof i18n.translatePage === 'function') {
+            i18n.translatePage(modal);
+        }
+    }
+}}
 
 /**
  * サブルーチン：コンパスUIの初期化
@@ -4006,6 +4054,334 @@ window.addEventListener('appinstalled', () => {
 
 // DOM構築後に実行
 window.addEventListener('DOMContentLoaded', initPwaInstall);
+
+// ======================================================================================
+// 追加サブルーチン: 通知設定モーダルUI of データ処理・保存 ＆ 通知予約ロジック
+// ======================================================================================
+
+// タイマーの重複登録を確実に防止するためのグローバルなタイマーID管理変数
+let notificationTimeoutId = null;
+
+/**
+ * 最新の pin_weather_spots からモーダル内のコンボボックスを動的に生成し、保存値を復元する
+ */
+function refreshNotificationModalUI() {
+    const selectSpot = document.getElementById('select-notification-spot');
+    const inputTime = document.getElementById('input-notification-time');
+    
+    if (!selectSpot || !inputTime) return;
+
+    // 1. localStorage から登録済みの場所リストを読み込む
+    const spotsStr = localStorage.getItem('pin_weather_spots');
+    if (!spotsStr) {
+        const noSpotsText = typeof i18n !== 'undefined' ? i18n.t('notificationNoSpots') : "No spots registered";
+        selectSpot.innerHTML = `<option value="">${noSpotsText}</option>`;
+        return;
+    }
+
+    const spots = JSON.parse(spotsStr);
+    selectSpot.innerHTML = ''; 
+
+    // 2. 動的に変化している配列から選択肢を生成（固定値をvalueに埋め込む）
+    spots.forEach((spot) => {
+        const option = document.createElement('option');
+        option.value = `${spot.lat},${spot.lon},${spot.label}`;
+        option.textContent = spot.label;
+        selectSpot.appendChild(option);
+    });
+
+    // 3. すでに個別に保存されている通知設定があれば、UIに復元反映
+    const savedLat = localStorage.getItem('notification_lat');
+    const savedLon = localStorage.getItem('notification_lon');
+    const savedTime = localStorage.getItem('notification_time');
+
+    if (savedLat && savedLon) {
+        for (let i = 0; i < selectSpot.options.length; i++) {
+            if (selectSpot.options[i].value.startsWith(`${savedLat},${savedLon},`)) {
+                selectSpot.selectedIndex = i;
+                break;
+            }
+        }
+    }
+
+    if (savedTime) {
+        inputTime.value = savedTime;
+    }
+}
+
+/**
+ * 通知設定モーダルを閉じる
+ */
+function closeNotificationModal() {
+    const modal = document.getElementById('notification-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        
+        // ステータスメッセージが残っていればクリア
+        const msgEl = document.getElementById('notification-save-status');
+        if (msgEl) msgEl.textContent = '';
+    }
+}
+
+/**
+ * 【通知予約コアロジック】
+ * 保存された個別の緯度経度・時刻を元に、指定された時刻に既存の関数を走らせるタイマーを設定する
+ */
+async function setupUserConfiguredNotificationTimer() {
+    // 既存のタイマーがすでに走っている場合は、二重発火を防ぐため一度完全にクリアする（安全ガード）
+    if (notificationTimeoutId !== null) {
+        clearTimeout(notificationTimeoutId);
+        notificationTimeoutId = null;
+    }
+
+    // 1. 通知許可および必須設定値の存在チェック
+    if (!('Notification' in window) || Notification.permission !== 'granted') {
+        return;
+    }
+
+    const savedTime = localStorage.getItem('notification_time'); // 例: "06:00"
+    const rawLat = localStorage.getItem('notification_lat');     // 例: "34.61439"
+    const rawLon = localStorage.getItem('notification_lon');     // 例: "138.2342"
+    const label = localStorage.getItem('notification_label');    // 例: "御前崎港"
+
+    // 設定値が一つでも欠けている場合はタイマーを設定しない
+    if (!savedTime || !rawLat || !rawLon || !label) {
+        console.log('[通知予約] 通知条件が未設定のため、タイマー予約をスキップしました。');
+        return;
+    }
+
+    // .toFixed()のエラーを防ぐため、確実に数値型に変換する
+    const lat = parseFloat(rawLat);
+    const lon = parseFloat(rawLon);
+
+    const [targetHour, targetMinute] = savedTime.split(':').map(Number);
+
+    // 2. 次回の発火時刻（指定時刻）のミリ秒計算
+    const now = new Date();
+    const nextNotification = new Date();
+    nextNotification.setHours(targetHour, targetMinute, 0, 0);
+
+    // すでに当日の指定時間を過ぎている場合は翌日の同時刻にセット
+    if (now >= nextNotification) {
+        nextNotification.setDate(nextNotification.getDate() + 1);
+    }
+
+    const delay = nextNotification.getTime() - now.getTime();
+    console.log(`[通知予約] 次回の概況通知 [${label}] は ${nextNotification.toLocaleString()} にセットされました。`);
+
+    // 3. 指定時間まで待機するタイマーをセット
+    notificationTimeoutId = setTimeout(async () => {
+        let notificationData = null;
+
+        try {
+            // 数値型に変換した lat, lon を安全に引き渡す（4時間キャッシュルールがそのまま適用される）
+            notificationData = await fetchWithCache(lat, lon);
+        } catch (error) {
+            console.error('[通知処理] 最新データの取得に失敗しました。キャッシュの検索を試みます。', error);
+        }
+
+        // オフライン時や通信エラー時のバックアップ処理
+        if (!notificationData) {
+            // 既存の規則性である weather_cache_緯度_経度 キーから直接キャッシュを復元
+            const cacheKey = `weather_cache_${lat}_${lon}`;
+            const localCacheStr = localStorage.getItem(cacheKey);
+            if (localCacheStr) {
+                notificationData = JSON.parse(localCacheStr);
+                console.log('[通知処理] 最新フェッチ失敗のため、ローカルキャッシュデータを使用します。');
+            }
+        }
+
+        // データが正常に取得またはキャッシュから復元できた場合のみ、文章を生成して通知を発火
+        if (notificationData && notificationData.data) {
+            try {
+                // 指定時刻（朝6:00など）にまさにこの関数が実行されるため、
+                // 既存の generateWeatherSummary 内の現在時刻特定ロジックが走り、
+                // 自動的にその時刻を起点とした24時間の文章が100%正しく生成されます。
+                const morningSummaryText = generateWeatherSummary(notificationData.data, label);
+
+                // サービスワーカーへ、生成されたテキストを送信して通知を表示
+                if (navigator.serviceWorker.controller) {
+                    navigator.serviceWorker.controller.postMessage({
+                        type: 'SHOW_LOCAL_NOTIFICATION',
+                        title: `${label}の気象概況`,
+                        body: morningSummaryText,
+                        url: window.location.origin + '/index.html'
+                    });
+                }
+            } catch (summaryError) {
+                console.error('[通知処理] 概況文章の生成または送信に失敗しました:', summaryError);
+            }
+        } else {
+            console.log('[通知処理] 最新データおよびキャッシュデータがどちらも存在しないため、通知を断念しました。');
+        }
+
+        // 4. 通知発火完了後、次の日（24時間後）のタイマーを再帰的に再設定
+        setupUserConfiguredNotificationTimer();
+    }, delay);
+}
+
+/**
+ * モーダル内の「設定を保存」ボタンが押された時の保存処理
+ */
+async function saveNotificationSettingsFromModal() {
+    const selectSpot = document.getElementById('select-notification-spot');
+    const inputTime = document.getElementById('input-notification-time');
+    const msgEl = document.getElementById('notification-save-status');
+
+    if (!selectSpot || !inputTime || !selectSpot.value) return;
+
+    if ('Notification' in window && Notification.permission !== 'granted') {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            const permDeniedText = typeof i18n !== 'undefined' ? i18n.t('notificationPermDenied') : "Notifications are blocked.";
+            alert(permDeniedText);
+        }
+    }
+
+    const [lat, lon, label] = selectSpot.value.split(',');
+    const time = inputTime.value;
+
+    if (!lat || !lon || !label || !time) return;
+
+    localStorage.setItem('notification_lat', lat);
+    localStorage.setItem('notification_lon', lon);
+    localStorage.setItem('notification_label', label);
+    localStorage.setItem('notification_time', time);
+
+    if (msgEl) {
+        msgEl.textContent = typeof i18n !== 'undefined' ? i18n.t('notificationSavedMsg') : "Saved successfully";
+        setTimeout(() => { 
+            msgEl.textContent = ''; 
+            closeNotificationModal(); 
+        }, 1200);
+    }
+
+    console.log(`[設定保存完了] 場所: ${label}, 時刻: ${time}`);
+
+    setupUserConfiguredNotificationTimer();
+}
+
+// ======================================================================================
+// 画面ロード時のイベントリスナー登録
+// ======================================================================================
+document.addEventListener('DOMContentLoaded', () => {
+
+    // 2. モーダル内の「×」閉じるボタンへの紐付け
+    const closeBtn = document.getElementById('closeNotificationModal');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            closeNotificationModal();
+        });
+    }
+
+    // 3. モーダルの外側（背景の黒い部分）をクリックしたときにも閉じる安全設計
+    const modal = document.getElementById('notification-modal');
+    if (modal) {
+        modal.addEventListener('click', (event) => {
+            if (event.target === modal) {
+                closeNotificationModal();
+            }
+        });
+    }
+
+    // 4. 保存ボタンへのイベント紐付け
+    const saveBtn = document.getElementById('saveNotificationSettings');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            saveNotificationSettingsFromModal();
+        });
+    }
+
+    // アプリ起動時に前回の設定が生きていれば、自動的にバックグラウンド待機タイマーを開始する
+    setupUserConfiguredNotificationTimer();
+});
+
+/**
+ * ユーザーに通知の許可を要求するサブルーチン
+ * @returns {Promise<string>} 許可状態 ('granted', 'denied', 'default')
+ */
+async function askNotificationPermission() {
+    const permission = await Notification.requestPermission();
+    return permission;
+}
+
+/**
+ * プッシュサービスに端末を登録し、Subscriptionオブジェクトを生成するサブルーチン
+ * @param {ServiceWorkerRegistration} registration 
+ * @param {string} publicKey Base64形式のVAPID公開鍵
+ * @returns {Promise<PushSubscription>}
+ */
+async function subscribeUserToPush(registration, publicKey) {
+    // VAPID鍵（文字列）をブラウザが解釈できるUint8Array形式に変換
+    const convertedKey = urlBase64ToUint8Array(publicKey);
+    
+    // 既存の購読（古い鍵など）があれば一度解除してクリーンにする
+    const existingSubscription = await registration.pushManager.getSubscription();
+    if (existingSubscription) {
+        await existingSubscription.unsubscribe();
+    }
+
+    // 新規にプッシュサービスに登録
+    return await registration.pushManager.subscribe({
+        userVisibleOnly: true, // ユーザーに必ず通知を表示することを約束する設定（必須）
+        applicationServerKey: convertedKey
+    });
+}
+
+/**
+ * 取得した接続鍵とタイムゾーンをGAS経由でスプレッドシートに保存するサブルーチン
+ * @param {string} userId 
+ * @param {PushSubscription} subscription 
+ * @param {string} timeZone 
+ */
+async function saveSubscriptionToSpreadsheet(userId, subscription, timeZone) {
+    // GAS側で POST または GET で受け取れるよう、送信用データを整形
+    // ※ 既存のGASの仕様に合わせてJSON文字列化して送信します
+    const payload = {
+        action: "updateSubscription", // GAS側で処理を分岐するための識別子
+        userId: userId,
+        subscription: JSON.stringify(subscription),
+        timeZone: timeZone
+    };
+
+    console.log("GASへデータを送信中...");
+
+    // GASウェブアプリへデータを送信（CORS回避のため通常はPOSTか、パラメータ付きGETを使用します）
+    // ここでは一般的な POST での送信例を記述しています
+    const response = await fetch(GAS_URL, {
+        method: "POST",
+        mode: "cors",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        throw new Error(`GASへのデータ保存に失敗しました (Status: ${response.status})`);
+    }
+}
+
+/**
+ * VAPIDのPublic Key文字列をブラウザ用のUint8Arrayに変換する補助サブルーチン
+ * （Web Pushの実装において世界標準的に使われる定型コードです）
+ * @param {string} base64String 
+ * @returns {Uint8Array}
+ */
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding)
+        .replace(/\-/g, '+')
+        .replace(/_/g, '/');
+
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
 
 
 /**

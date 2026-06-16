@@ -1,0 +1,285 @@
+// =========================================================================
+// サーバー側 処理プログラム (server.js) - Web Push通知組み込み完全版
+// =========================================================================
+
+const webpush = require('web-push');
+
+// 【重要】ご自身のGASウェブアプリのURL（末尾が /exec のもの）を貼り付けてください
+const GAS_URL = "https://script.google.com/macros/s/AKfycbwYazF9ITpmRHBni1VioTHvMg_wx8pbnqE3pYoOqMYqHnEv2K4KwXmUhI9iuHFmtoU7mg/exec";
+
+// 【重要】先ほどコマンドで生成した VAPID 鍵をここにそれぞれ貼り付けてください
+const VAPID_PUBLIC_KEY = "BJYVLMl3qqgbwsXUJAFHJsTbXgr8uB_8z1NawLGeon-cE4YpgGg3FmnSdjSzjdtVsp51Gapl53XwJ38KR5BXvjg";
+const VAPID_PRIVATE_KEY = "AtbriJ02jLz1oidQBuQKa35t7A9mW_5ABqHaaqq6cZQ";
+
+// Web Pushの設定（あなたの連絡先URLまたは mailto: メールアドレスを設定してください）
+webpush.setVapidDetails(
+    'mailto:example@example.com', 
+    VAPID_PUBLIC_KEY,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+    VAPID_PRIVATE_KEY
+);
+
+/**
+ * メイン処理を制御するサブルーチン
+ */
+async function main() {
+    try {
+        console.log("--- 処理を開始します ---");
+        
+        // 1. スプレッドシート（GAS）から全ユーザーデータを取得
+        const users = await fetchUserDataFromSpreadsheet(GAS_URL);
+        console.log(`データ取得成功: 合計 ${users.length} 件のユーザーデータがあります。`);
+        
+        // 2. 各ユーザーの判定と個別処理の実行
+        for (const user of users) {
+            await processUserNotification(user);
+        }
+        
+        console.log("\n--- 全ての処理が正常に終了しました ---");
+    } catch (error) {
+        console.error("\n[エラー] 処理中に問題が発生しました:", error.message);
+    }
+}
+
+/**
+ * 各ユーザーの時刻判定および通知準備を処理するサブルーチン
+ * @param {Object} user - ユーザーデータ
+ */
+async function processUserNotification(user) {
+    const userId = user.UserId || "(未設定)";
+    const label = user.Label || "(未設定)";
+    
+    // ユーザーのタイムゾーンに基づいた「現在の現地時刻」を取得 (HH:mm)
+    const localCurrentTime = getUserCurrentTime(user.TimeZone);
+    
+    // スプレッドシートの時刻表記（"7:00" など）を "07:00" 形式に整形して比較
+    const targetTime = formatTimeStr(user.NotificationTime);
+    
+    console.log(`\n[ユーザー: ${userId} (${label})]`);
+    console.log(`  設定時刻: ${targetTime} / 現在の現地時刻: ${localCurrentTime}`);
+    
+    // 時刻が一致しているか判定
+    if (targetTime === localCurrentTime) {
+        console.log("  -> ★通知対象の時間です。天気データを取得します。");
+        
+        if (!user.Lat || !user.Lon) {
+            console.log("  [スキップ] 緯度または経度が設定されていません。");
+            return;
+        }
+        
+        try {
+            // 3. Open-Meteoから一般気象データを取得（海洋気象は含まない）
+            const weatherData = await fetchWeatherData(user.Lat, user.Lon);
+            
+            // 4. 天気概況テキストを生成 (海洋気象は除外)
+            const summaryText = generateWeatherSummary(weatherData, label);
+            
+            console.log("  [生成された概況テキスト]");
+            console.log("----------------------------------------");
+            console.log(summaryText);
+            console.log("----------------------------------------");
+            
+            // 5. 該当ユーザーの端末へWeb Push通知を実際に送信する
+            await sendWebPushNotification(user.Subscription, summaryText, userId);
+            
+        } catch (err) {
+            console.error(`  [エラー] 天気データ取得・生成中に失敗しました:`, err.message);
+        }
+    } else {
+        console.log("  -> 時間外のため通知処理をスキップします。");
+    }
+}
+
+/**
+ * GASのウェブアプリAPIからユーザー設定データを取得するサブルーチン
+ * @param {string} url - GASのウェブアプリURL
+ * @returns {Promise<Array>} ユーザー設定データの配列
+ */
+async function fetchUserDataFromSpreadsheet(url) {
+    if (!url || url.includes("ここにあなたのGAS")) {
+        throw new Error("GAS_URL が設定されていません。コード内の GAS_URL に正しいURLを貼り付けてください。");
+    }
+
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`HTTP通信エラー (ステータス: ${response.status})`);
+    }
+
+    return await response.json();
+}
+
+/**
+ * 指定されたタイムゾーンにおける「現在の時刻」を HH:mm 形式の文字列で取得するサブルーチン
+ * @param {string} timeZone - タイムゾーン文字列 (例: "Asia/Tokyo", "America/New_York")
+ * @returns {string} HH:mm 形式の時刻文字列
+ */
+function getUserCurrentTime(timeZone) {
+    // タイムゾーンが未設定、または空文字の場合はデフォルトで 'UTC' として処理します
+    const tz = timeZone && timeZone.trim() !== "" ? timeZone : "UTC";
+    
+    try {
+        const options = {
+            timeZone: tz,
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false // 24時間表記（07:00 や 23:15 など）に固定します
+        };
+        
+        // 言語設定を 'en-US' に指定することで、余計な日本語（"午前"など）の混入を防ぎ、純粋な数字のみを取得します
+        const formatter = new Intl.DateTimeFormat("en-US", options);
+        return formatter.format(new Date());
+    } catch (error) {
+        // 万が一スプレッドシートに不正なタイムゾーン名が入っていた場合の防衛策
+        console.warn(`[警告] 不正なタイムゾーンが指定されたため UTC で代替します: "${timeZone}"`);
+        return getUserCurrentTime("UTC");
+    }
+}
+
+/**
+ * スプレッドシートからの時刻文字列（例 "7:00", "07:00"）を "07:00" の2桁形式に統一するサブルーチン
+ * @param {string} timeStr - 整形前の時刻文字列
+ * @returns {string} HH:mm 形式の文字列
+ */
+function formatTimeStr(timeStr) {
+    if (!timeStr || typeof timeStr !== "string" || !timeStr.includes(":")) {
+        return "";
+    }
+    const [hour, minute] = timeStr.split(":");
+    const paddedHour = hour.trim().padStart(2, "0");
+    const paddedMinute = minute.trim().padStart(2, "0");
+    return `${paddedHour}:${paddedMinute}`;
+}
+
+/**
+ * Open-Meteo APIから一般気象データを取得するサブルーチン（海洋気象は含まない）
+ * @param {number|string} lat - 緯度
+ * @param {number|string} lon - 経度
+ * @returns {Promise<Object>} 気象データのJSONオブジェクト
+ */
+async function fetchWeatherData(lat, lon) {
+    // 風速を m/s で取得するために &wind_speed_unit=ms を付与しています
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m&daily=temperature_2m_max,temperature_2m_min&wind_speed_unit=ms&timezone=auto`;
+    
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`Open-Meteo API 通信エラー (ステータス: ${response.status})`);
+    }
+    return await response.json();
+}
+
+/**
+ * Weather Code（WMO準拠）を日本語の天気文字列に変換するサブルーチン
+ * @param {number} code - 天気コード
+ * @returns {string} 日本語の天気名
+ */
+function getWeatherDescription(code) {
+    const codeMap = {
+        0: "晴れ",
+        1: "概ね晴れ", 2: "薄曇り", 3: "曇り",
+        45: "霧", 48: "着氷性の霧",
+        51: "弱い霧雨", 53: "霧雨", 55: "強い霧雨",
+        61: "弱い雨", 63: "雨", 65: "強い雨",
+        71: "弱い雪", 73: "雪", 75: "強い雪",
+        77: "ひょう",
+        80: "弱いにわか雨", 81: "にわか雨", 82: "激しいにわか雨",
+        85: "弱いにわか雪", 86: "激しいにわか雪",
+        95: "雷雨", 96: "ひょうを伴う雷雨", 99: "激しいひょうを伴う雷雨"
+    };
+    return codeMap[code] || "不明";
+}
+
+/**
+ * 風向きの度数（0-360）を16方位の日本語文字列に変換するサブルーチン
+ * @param {number} degree - 風向（度）
+ * @returns {string} 16方位の文字列
+ */
+function getWindDirectionStr(degree) {
+    const directions = [
+        "北", "北北東", "北東", "東北東",
+        "東", "東南東", "南東", "南南東",
+        "南", "南南西", "南西", "西南西",
+        "西", "西北西", "北西", "北北西"
+    ];
+    const index = Math.round(degree / 22.5) % 16;
+    return directions[index];
+}
+
+/**
+ * 取得した気象データから概況テキストを生成するサブルーチン（海洋気象は完全に除外）
+ * @param {Object} weatherData - Open-Meteoから取得したデータ
+ * @param {string} label - 地点名
+ * @returns {string} 生成された概況テキスト
+ */
+function generateWeatherSummary(weatherData, label) {
+    const current = weatherData.current;
+    const daily = weatherData.daily;
+    
+    // 現在の状態の抽出
+    const currentWeatherStr = getWeatherDescription(current.weather_code);
+    const windSpeed = current.wind_speed_10m;
+    const windDirStr = getWindDirectionStr(current.wind_direction_10m);
+    
+    // 本日の最高・最低気温の抽出
+    const maxTemp = daily.temperature_2m_max[0];
+    const minTemp = daily.temperature_2m_min[0];
+    
+    // 現在時刻の取得（テキスト表示用）
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const date = now.getDate();
+    const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
+    const dayOfWeek = dayNames[now.getDay()];
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    
+    // 概況テキストの組み立て
+    let summary = `【概況】 ${label}：${month}/${date}(${dayOfWeek}) ${hours}:${minutes} 現在\n`;
+    summary += `現在は${currentWeatherStr}です。気温は最高${maxTemp.toFixed(1)}℃、最低は${minTemp.toFixed(1)}℃で、落ち着いた推移となるでしょう。\n`;
+    summary += `風は現在${windDirStr}の風が${windSpeed.toFixed(1)}m/sです。今後24時間、${windDirStr}寄りの風が続く見込みです。`;
+    
+    return summary;
+}
+
+/**
+ * 該当ユーザーの端末へWeb Push通知を送信するサブルーチン
+ * @param {string} subscriptionStr - スプレッドシートから取得したSubscriptionのJSON文字列
+ * @param {string} messageText - 送信する通知の本文（概況テキスト）
+ * @param {string} userId - ユーザーID（ログ出力用）
+ */
+async function sendWebPushNotification(subscriptionStr, messageText, userId) {
+    if (!subscriptionStr || subscriptionStr.trim() === "") {
+        console.log(`  [通知スキップ] ユーザー: ${userId} の Subscription 情報が空欄です。`);
+        return;
+    }
+
+    try {
+        // スプレッドシートに保存されている文字列をJSONオブジェクトに復元します
+        const subscription = JSON.parse(subscriptionStr);
+
+        // プッシュ通知のペイロード（データ中身）を作成します
+        const payload = JSON.stringify({
+            title: "気象アラート",
+            body: messageText,
+            icon: "/icon.png" // PWA側のアイコン画像パスに合わせて調整してください
+        });
+
+        console.log(`  -> ユーザー: ${userId} へ Web Push 通知を送信中...`);
+        
+        // 実際に通知を送信
+        await webpush.sendNotification(subscription, payload);
+        
+        console.log(`  -> 正常に通知を配信しました。`);
+
+    } catch (error) {
+        console.error(`  [通知エラー] ユーザー: ${userId} への送信に失敗しました:`, error.message);
+        
+        // もし「410 Gone」のエラーが返ってきた場合、ユーザーがブラウザで通知を拒否したか、期限切れの古い情報であることを示します
+        if (error.statusCode === 410) {
+            console.log("  (提示): このSubscriptionは無効化されているため、スプレッドシートから削除することを推奨します。");
+        }
+    }
+}
+
+// -------------------------------------------------------------------------
+// プログラムの実行
+// -------------------------------------------------------------------------
+main();

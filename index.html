@@ -86,6 +86,7 @@
    
     <button class="btn btn-wind-config" id="wind-cfg-btn" data-i18n="btnWindConfig">🎐 風向色付設定</button>
     <button class="btn btn-detailSettings" id="openSettingsBtn" data-i18n="btnDetailSettings">⚙ 表示詳細設定</button>
+    <button class="btn btn-notificationSettings" id="openNotificationBtn" data-i18n="btnNotificationSettings">🔔 朝の通知設定</button>
 
     <!-- ウィジェット埋め込み用ボタン（修正版） -->
     <button class="btn" id="open-widget-modal-btn" 
@@ -323,6 +324,35 @@
         </div>
     </div>
 </div>
+
+<div id="notification-modal" class="notification-modal-overlay" style="display: none;">
+    <div class="modal-content notification-modal-box">
+        <span class="modal-close" id="closeNotificationModal">&times;</span>
+        
+        <h2 class="modal-header-title" data-i18n="notificationModalTitle">毎朝の気象概況通知設定</h2>
+        
+        <div class="modal-body">
+            <div class="setting-group">
+                <label class="setting-label" data-i18n="notificationSelectSpot">通知する場所：</label>
+                <div class="select-wrapper">
+                    <select id="select-notification-spot" class="full-width-select">
+                    </select>
+                </div>
+            </div>
+
+            <div class="setting-group">
+                <label class="setting-label" data-i18n="notificationSelectTime">通知時刻：</label>
+                <input type="time" id="input-notification-time" class="notification-time-input" value="06:00">
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <span id="notification-save-status" class="save-status-text"></span>
+            <button id="saveNotificationSettings" class="btn btn-save" data-i18n="notificationSaveBtn">設定を保存</button>
+        </div>
+    </div>
+</div>
+
 
 <div class="nav-action-bar" style="display: flex; gap: 2px; align-items: center; white-space: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;">
     <button class="nav-summary-btn" onclick="scrollToSummary()" style="flex-shrink: 0;">
