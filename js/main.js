@@ -1642,7 +1642,7 @@ function openModalFromSidebar(modalId) {
             i18n.translatePage(modal);
         }
     }
-}}
+}
 
 /**
  * サブルーチン：コンパスUIの初期化
@@ -4220,47 +4220,6 @@ async function setupUserConfiguredNotificationTimer() {
     }, delay);
 }
 
-/**
- * モーダル内の「設定を保存」ボタンが押された時の保存処理
- */
-async function saveNotificationSettingsFromModal() {
-    const selectSpot = document.getElementById('select-notification-spot');
-    const inputTime = document.getElementById('input-notification-time');
-    const msgEl = document.getElementById('notification-save-status');
-
-    if (!selectSpot || !inputTime || !selectSpot.value) return;
-
-    if ('Notification' in window && Notification.permission !== 'granted') {
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-            const permDeniedText = typeof i18n !== 'undefined' ? i18n.t('notificationPermDenied') : "Notifications are blocked.";
-            alert(permDeniedText);
-        }
-    }
-
-    const [lat, lon, label] = selectSpot.value.split(',');
-    const time = inputTime.value;
-
-    if (!lat || !lon || !label || !time) return;
-
-    localStorage.setItem('notification_lat', lat);
-    localStorage.setItem('notification_lon', lon);
-    localStorage.setItem('notification_label', label);
-    localStorage.setItem('notification_time', time);
-
-    if (msgEl) {
-        msgEl.textContent = typeof i18n !== 'undefined' ? i18n.t('notificationSavedMsg') : "Saved successfully";
-        setTimeout(() => { 
-            msgEl.textContent = ''; 
-            closeNotificationModal(); 
-        }, 1200);
-    }
-
-    console.log(`[設定保存完了] 場所: ${label}, 時刻: ${time}`);
-
-    setupUserConfiguredNotificationTimer();
-}
-
 // ======================================================================================
 // 画面ロード時のイベントリスナー登録
 // ======================================================================================
@@ -4297,6 +4256,80 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
+ * モーダル内の「設定を保存」ボタンが押された時の保存処理
+ */
+async function saveNotificationSettingsFromModal() {
+    const selectSpot = document.getElementById('select-notification-spot');
+    const inputTime = document.getElementById('input-notification-time');
+    const msgEl = document.getElementById('notification-save-status');
+
+    if (!selectSpot || !inputTime || !selectSpot.value) return;
+
+    if ('Notification' in window && Notification.permission !== 'granted') {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            const permDeniedText = typeof i18n !== 'undefined' ? i18n.t('notificationPermDenied') : "Notifications are blocked.";
+            alert(permDeniedText);
+        }
+    }
+
+    const [lat, lon, label] = selectSpot.value.split(',');
+    const time = inputTime.value;
+
+    if (!lat || !lon || !label || !time) return;
+
+    // ユーザーにIDを登録させず、意識させない運用のための自動発行ロジック
+    let userId = localStorage.getItem('notification_user_id');
+    if (!userId) {
+        // ブラウザ固有のランダムな一意のID（識別子）を自動生成して保存
+        userId = 'usr_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
+        localStorage.setItem('notification_user_id', userId);
+    }
+
+    localStorage.setItem('notification_lat', lat);
+    localStorage.setItem('notification_lon', lon);
+    localStorage.setItem('notification_label', label);
+    localStorage.setItem('notification_time', time);
+
+    // --- Web Push 購読の自動実行とGASへの設定一括保存処理（追加連動部分） ---
+    if ('serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+            console.log("[Web Push] 購読処理を開始します...");
+            const registration = await navigator.serviceWorker.ready;
+            
+            // server.jsに明記されているVAPID公開鍵をそのまま使用します
+            const publicKey = "BJYVLMl3qqgbwsXUJAFHJsTbXgr8uB_8z1NawLGeon-cE4YpgGg3FmnSdjSzjdtVsp51Gapl53XwJ38KR5BXvjg";
+            
+            // プッシュサービスへの端末登録を実行
+            const subscription = await subscribeUserToPush(registration, publicKey);
+            
+            // ユーザーの環境から現在のタイムゾーン（例: "Asia/Tokyo"）を自動取得
+            const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Tokyo";
+            
+            // 拡張したサブルーチンを呼び出し、位置情報・時刻・鍵情報をGASへ一括送信
+            await saveSubscriptionToSpreadsheet(userId, subscription, timeZone, lat, lon, label, time);
+            
+            console.log("[Web Push] GASへの購読・設定情報の保存がすべて正常に完了しました。");
+        } catch (pushErr) {
+            console.error("[Web Push エラー] 購読またはGASへのデータ送信に失敗しました:", pushErr.message);
+        }
+    }
+    // ---------------------------------------------------------------------
+
+    if (msgEl) {
+        msgEl.textContent = typeof i18n !== 'undefined' ? i18n.t('notificationSavedMsg') : "Saved successfully";
+        setTimeout(() => { 
+            msgEl.textContent = ''; 
+            closeNotificationModal(); 
+        }, 1200);
+    }
+
+    console.log(`[設定保存完了] 場所: ${label}, 時刻: ${time}`);
+
+    setupUserConfiguredNotificationTimer();
+}
+
+/**
  * ユーザーに通知の許可を要求するサブルーチン
  * @returns {Promise<string>} 許可状態 ('granted', 'denied', 'default')
  */
@@ -4329,37 +4362,48 @@ async function subscribeUserToPush(registration, publicKey) {
 }
 
 /**
- * 取得した接続鍵とタイムゾーンをGAS経由でスプレッドシートに保存するサブルーチン
+ * 取得した接続鍵、位置情報、通知時刻、タイムゾーンをGAS経由でスプレッドシートに保存するサブルーチン
  * @param {string} userId 
  * @param {PushSubscription} subscription 
  * @param {string} timeZone 
+ * @param {string} lat
+ * @param {string} lon
+ * @param {string} label
+ * @param {string} time
  */
-async function saveSubscriptionToSpreadsheet(userId, subscription, timeZone) {
-    // GAS側で POST または GET で受け取れるよう、送信用データを整形
-    // ※ 既存のGASの仕様に合わせてJSON文字列化して送信します
+async function saveSubscriptionToSpreadsheet(userId, subscription, timeZone, lat, lon, label, time) {
+    // server.jsに記述されているご自身のGASウェブアプリのURL
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzWvf34Bhc5qEjROo69GvMeJvtW3k7_jVbTSwrkWjOFalr-yWxqlNuvKLNNWCnDZMoLgw/exec";
+
+    // GAS側で受け取ってスプレッドシートの各列にマッピングできるよう送信用データを整形
     const payload = {
         action: "updateSubscription", // GAS側で処理を分岐するための識別子
         userId: userId,
         subscription: JSON.stringify(subscription),
-        timeZone: timeZone
+        timeZone: timeZone,
+        lat: lat,
+        lon: lon,
+        label: label,
+        time: time
     };
 
     console.log("GASへデータを送信中...");
 
-    // GASウェブアプリへデータを送信（CORS回避のため通常はPOSTか、パラメータ付きGETを使用します）
-    // ここでは一般的な POST での送信例を記述しています
+    // 【重要修正】mode: "no-cors" を削除（デフォルトの "cors" に変更）します。
+    // Content-Type: "text/plain" の指定によって、ブラウザのプレフライト(OPTIONS)制限を発生させずに通過させ、
+    // かつ "cors" モードにすることで、GAS特有のクロスオリジンリダイレクト（googleusercontent.comへの転送）をブラウザが正しく追跡してデータを確実に届けます。
     const response = await fetch(GAS_URL, {
         method: "POST",
-        mode: "cors",
         headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "text/plain"
         },
         body: JSON.stringify(payload)
     });
-
-    if (!response.ok) {
-        throw new Error(`GASへのデータ保存に失敗しました (Status: ${response.status})`);
-    }
+    
+    // デフォルトの "cors" モードにより、GAS側（ContentService）が自動付与するCORS許可ヘッダーをブラウザが正しく解釈できるため、
+    // GAS側から戻ってきた実際の処理成否レスポンス（JSONオブジェクト）を確実に取得してコンソールで確認できます。
+    const result = await response.json();
+    console.log("GAS処理結果:", result);
 }
 
 /**
