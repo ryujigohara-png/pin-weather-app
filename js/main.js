@@ -1248,6 +1248,15 @@ async function initApp() {
         console.log("DEBUG: Location, Wind Filters, and View Config loaded from URL parameters.");
     }
 
+    // --- 【新規追加】：通常モードでの座標パラメータ指定（通知からの遷移、地図指定と同じ挙動） ---
+    let isUrlLocationLoaded = false;
+    if (pMode !== 'widget' && pLat && pLon) {
+        currentLat = parseFloat(pLat);
+        currentLon = parseFloat(pLon);
+        currentLabel = pPlace ? decodeURIComponent(pPlace) : "Selected Location";
+        isUrlLocationLoaded = true;
+    }
+
     // --- ストレージの確認 ---
     const savedData = localStorage.getItem('pin_weather_spots');
     let parsedData = null;
@@ -1259,6 +1268,52 @@ async function initApp() {
 
     // --- 地点確定ロジック（上書きガード付き） ---
     if (isParamLoaded) {
+        finalizeInit(); 
+    } else if (isUrlLocationLoaded) {
+        // ストレージにデータがあればロード、なければ空配列で初期化（消されていた場合の防衛策）
+        mySpots = parsedData && parsedData.length > 0 ? parsedData : [];
+        
+        // 【地図指定と同じ挙動】：既存の mySpots から同一地点（誤差範囲内）を検索
+        const threshold = 0.0001;
+        const existingIdx = mySpots.findIndex(spot => 
+            Math.abs(spot.lat - currentLat) < threshold && 
+            Math.abs(spot.lon - currentLon) < threshold
+        );
+
+        if (existingIdx !== -1) {
+            // ケースA：すでにストレージに存在していた場合
+            // 配列から一度取り出して、0番目（先頭）に移動させる
+            const targetSpot = mySpots.splice(existingIdx, 1)[0];
+            if (pPlace) targetSpot.label = currentLabel; // ラベル名が更新されていれば最新にする
+            mySpots.unshift(targetSpot);
+            
+            // 地点個別の風向設定があれば反映
+            if (targetSpot.windFilters) {
+                targetWindDirections = [...targetSpot.windFilters];
+            }
+        } else {
+            // ケースB：ユーザーが削除した、あるいはまだ登録がない新規地点の場合
+            // 地図で新しくピンを刺した時と同様に、0番目に新規追加する
+            const newSpot = {
+                lat: currentLat,
+                lon: currentLon,
+                label: currentLabel,
+                windFilters: typeof jaDirs !== 'undefined' ? [...jaDirs] : []
+            };
+            mySpots.unshift(newSpot);
+            if (typeof jaDirs !== 'undefined') {
+                targetWindDirections = [...jaDirs];
+            }
+        }
+        
+        // 配列が10件を超えた場合は超過分を切り捨てる（防衛策）
+        if (mySpots.length > 10) {
+            mySpots = mySpots.slice(0, 10);
+        }
+        
+        // 変更した mySpots 配列をローカルストレージに即時保存して同期
+        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+        
         finalizeInit(); 
     } else if (parsedData && parsedData.length > 0) {
         // ストレージにデータがある場合
@@ -1290,7 +1345,7 @@ async function initApp() {
         finalizeInit();
 
         if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(
+            value = navigator.geolocation.getCurrentPosition(
                 (pos) => {
                     console.log("GPS accuracy position acquired, but not overwriting current view.");
                 },
@@ -1982,8 +2037,6 @@ function renderTabs(activeOverrideLabel = null) {
             renderTabs(item.rawLabel); 
         };
 
-
-        //
         /**
          * サブルーチン：地点タブの編集エディタ（修正版）
          * 修正内容：保存時に、地名一致または座標近接判定を行い、条件に応じて「上書き更新」または「新規追加」を行うロジックへ変更。

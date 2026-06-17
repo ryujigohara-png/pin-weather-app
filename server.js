@@ -2,42 +2,46 @@
 // サーバー側 処理プログラム (server.js) - Web Push通知組み込み完全版
 // =========================================================================
 
-const webpush = require('web-push');
+// 必要な外部モジュールのインポート
+// ※ 実際の環境に合わせて、あらかじめ npm install web-push 等を行ってください。
+const webpush = require("web-push");
 
-// 【重要】ご自身のGASウェブアプリのURL（末尾が /exec のもの）を貼り付けてください
-const GAS_URL = "https://script.google.com/macros/s/AKfycbwYazF9ITpmRHBni1VioTHvMg_wx8pbnqE3pYoOqMYqHnEv2K4KwXmUhI9iuHFmtoU7mg/exec";
+// main.js にある公開鍵と、お手元の秘密鍵をここに記述します
+const PUBLIC_KEY = 'BJYVLMl3qqgbwsXUJAFHJsTbXgr8uB_8z1NawLGeon-cE4YpgGg3FmnSdjSzjdtVsp51Gapl53XwJ38KR5BXvjg';
+const PRIVATE_KEY = 'AtbriJ02jLz1oidQBuQKa35t7A9mW_5ABqHaaqq6cZQ';
 
-// 【重要】先ほどコマンドで生成した VAPID 鍵をここにそれぞれ貼り付けてください
-const VAPID_PUBLIC_KEY = "BJYVLMl3qqgbwsXUJAFHJsTbXgr8uB_8z1NawLGeon-cE4YpgGg3FmnSdjSzjdtVsp51Gapl53XwJ38KR5BXvjg";
-const VAPID_PRIVATE_KEY = "AtbriJ02jLz1oidQBuQKa35t7A9mW_5ABqHaaqq6cZQ";
-
-// Web Pushの設定（あなたの連絡先URLまたは mailto: メールアドレスを設定してください）
 webpush.setVapidDetails(
-    'mailto:example@example.com', 
-    VAPID_PUBLIC_KEY,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
-    VAPID_PRIVATE_KEY
+  'mailto:ryuji.gohara@gmail.com', // 連絡先（通知が届かない時のエラー通知先となります）
+  PUBLIC_KEY,
+  PRIVATE_KEY
 );
 
+// GASのウェブアプリURL（環境に応じて書き換えてください）
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzWvf34Bhc5qEjROo69GvMeJvtW3k7_jVbTSwrkWjOFalr-yWxqlNuvKLNNWCnDZMoLgw/exec";
+
 /**
- * メイン処理を制御するサブルーチン
+ * メインの実行処理を管理するサブルーチン
  */
 async function main() {
+    console.log("=== 通知処理プログラムを開始します ===");
     try {
-        console.log("--- 処理を開始します ---");
-        
-        // 1. スプレッドシート（GAS）から全ユーザーデータを取得
+        // 1. GASからユーザーデータを取得
         const users = await fetchUserDataFromSpreadsheet(GAS_URL);
-        console.log(`データ取得成功: 合計 ${users.length} 件のユーザーデータがあります。`);
         
-        // 2. 各ユーザーの判定と個別処理の実行
+        if (!Array.isArray(users) || users.length === 0) {
+            console.log("処理対象のユーザーデータが存在しないか、空の配列です。");
+            return;
+        }
+
+        // 2. 各ユーザーの処理をループ実行
         for (const user of users) {
             await processUserNotification(user);
         }
-        
-        console.log("\n--- 全ての処理が正常に終了しました ---");
+
     } catch (error) {
-        console.error("\n[エラー] 処理中に問題が発生しました:", error.message);
+        console.error("【主処理エラー】プログラムの実行中に致命的なエラーが発生しました:", error.message);
     }
+    console.log("=== 通知処理プログラムを終了します ===");
 }
 
 /**
@@ -55,14 +59,14 @@ async function processUserNotification(user) {
     const targetTime = formatTimeStr(user.NotificationTime);
     
     console.log(`\n[ユーザー: ${userId} (${label})]`);
-    console.log(`  設定時刻: ${targetTime} / 現在の現地時刻: ${localCurrentTime}`);
+    console.log(`   設定時刻: ${targetTime} / 現在の現地時刻: ${localCurrentTime}`);
     
     // 時刻が一致しているか判定
     if (targetTime === localCurrentTime) {
-        console.log("  -> ★通知対象の時間です。天気データを取得します。");
+        console.log("   -> ★通知対象の時間です。天気データを取得します。");
         
         if (!user.Lat || !user.Lon) {
-            console.log("  [スキップ] 緯度または経度が設定されていません。");
+            console.log("   [スキップ] 緯度または経度が設定されていません。");
             return;
         }
         
@@ -71,21 +75,28 @@ async function processUserNotification(user) {
             const weatherData = await fetchWeatherData(user.Lat, user.Lon);
             
             // 4. 天気概況テキストを生成 (海洋気象は除外)
-            const summaryText = generateWeatherSummary(weatherData, label);
+            // サーバーのタイムゾーンに左右されず、判定した正確な現地時刻を反映するため localCurrentTime も渡せるよう配慮
+            const summaryText = generateWeatherSummary(weatherData, label, user.TimeZone);
             
-            console.log("  [生成された概況テキスト]");
+            console.log("   [生成された概況テキスト]");
             console.log("----------------------------------------");
             console.log(summaryText);
             console.log("----------------------------------------");
             
+            // 【デバッグ追加】送信直前のユーザーオブジェクト内にある、元の座標・地点名データを確認
+            console.log(`DEBUG [SERVER]: ユーザーオブジェクトから抽出したデータ -> Lat: ${user.Lat}, Lon: ${user.Lon}, Label: ${label}`);
+
             // 5. 該当ユーザーの端末へWeb Push通知を実際に送信する
-            await sendWebPushNotification(user.Subscription, summaryText, userId);
-            
+            // processUserNotification 関数内の呼び出し箇所
+            // 変更前: await sendWebPushNotification(user.Subscription, summaryText, userId);
+            // 変更後:
+            await sendWebPushNotification(user.Subscription, summaryText, userId, user.Lat, user.Lon, label);            
+
         } catch (err) {
-            console.error(`  [エラー] 天気データ取得・生成中に失敗しました:`, err.message);
+            console.error(`   [エラー] 天気データ取得・生成中に失敗しました:`, err.message);
         }
     } else {
-        console.log("  -> 時間外のため通知処理をスキップします。");
+        console.log("   -> 時間外のため通知処理をスキップします。");
     }
 }
 
@@ -99,7 +110,8 @@ async function fetchUserDataFromSpreadsheet(url) {
         throw new Error("GAS_URL が設定されていません。コード内の GAS_URL に正しいURLを貼り付けてください。");
     }
 
-    const response = await fetch(url);
+    // GASのリダイレクト（302）を確実に追従させるため redirect: "follow" を明示
+    const response = await fetch(url, { redirect: "follow" });
     if (!response.ok) {
         throw new Error(`HTTP通信エラー (ステータス: ${response.status})`);
     }
@@ -121,7 +133,8 @@ function getUserCurrentTime(timeZone) {
             timeZone: tz,
             hour: "2-digit",
             minute: "2-digit",
-            hour12: false // 24時間表記（07:00 や 23:15 など）に固定します
+            hour12: false, // 24時間表記（07:00 や 23:15 など）に固定します
+            hourCycle: "h23" // 深夜0時台が環境依存で "24:xx" になる挙動を防ぎ、確実に "00:xx" に統一します
         };
         
         // 言語設定を 'en-US' に指定することで、余計な日本語（"午前"など）の混入を防ぎ、純粋な数字のみを取得します
@@ -207,9 +220,10 @@ function getWindDirectionStr(degree) {
  * 取得した気象データから概況テキストを生成するサブルーチン（海洋気象は完全に除外）
  * @param {Object} weatherData - Open-Meteoから取得したデータ
  * @param {string} label - 地点名
+ * @param {string} [timeZone] - ユーザーのタイムゾーン（指定された拠点の正確な日付を取得するために使用）
  * @returns {string} 生成された概況テキスト
  */
-function generateWeatherSummary(weatherData, label) {
+function generateWeatherSummary(weatherData, label, timeZone = "Asia/Tokyo") {
     const current = weatherData.current;
     const daily = weatherData.daily;
     
@@ -222,14 +236,20 @@ function generateWeatherSummary(weatherData, label) {
     const maxTemp = daily.temperature_2m_max[0];
     const minTemp = daily.temperature_2m_min[0];
     
-    // 現在時刻の取得（テキスト表示用）
+    // サーバーの設置環境（UTC等）に引きずられず、対象ユーザーの現地日時でテキストを印字する補正
     const now = new Date();
-    const month = now.getMonth() + 1;
-    const date = now.getDate();
+    const targetTz = timeZone && timeZone.trim() !== "" ? timeZone : "UTC";
+    
+    const localDateStr = now.toLocaleDateString("en-US", { timeZone: targetTz });
+    const localDateObj = new Date(localDateStr);
+    
+    const month = localDateObj.getMonth() + 1;
+    const date = localDateObj.getDate();
     const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
-    const dayOfWeek = dayNames[now.getDay()];
-    const hours = String(now.getHours()).padStart(2, "0");
-    const minutes = String(now.getMinutes()).padStart(2, "0");
+    const dayOfWeek = dayNames[localDateObj.getDay()];
+    
+    // 時刻文字列は既に検証済みの形式を抽出し、確実に同期させます
+    const [hours, minutes] = getUserCurrentTime(targetTz).split(":");
     
     // 概況テキストの組み立て
     let summary = `【概況】 ${label}：${month}/${date}(${dayOfWeek}) ${hours}:${minutes} 現在\n`;
@@ -240,42 +260,40 @@ function generateWeatherSummary(weatherData, label) {
 }
 
 /**
- * 該当ユーザーの端末へWeb Push通知を送信するサブルーチン
+ * 該当ユーザーの端末へ Web Push 通知を送信するサブルーチン
  * @param {string} subscriptionStr - スプレッドシートから取得したSubscriptionのJSON文字列
  * @param {string} messageText - 送信する通知の本文（概況テキスト）
  * @param {string} userId - ユーザーID（ログ出力用）
  */
-async function sendWebPushNotification(subscriptionStr, messageText, userId) {
+
+async function sendWebPushNotification(subscriptionStr, messageText, userId, userLat, userLon, userLabel) {
     if (!subscriptionStr || subscriptionStr.trim() === "") {
-        console.log(`  [通知スキップ] ユーザー: ${userId} の Subscription 情報が空欄です。`);
+        console.log(`   [通知スキップ] ユーザー: ${userId} の Subscription 情報が空欄です。`);
         return;
     }
 
     try {
-        // スプレッドシートに保存されている文字列をJSONオブジェクトに復元します
         const subscription = JSON.parse(subscriptionStr);
 
-        // プッシュ通知のペイロード（データ中身）を作成します
+        // 【修正】地点情報をペイロードに追加
         const payload = JSON.stringify({
             title: "気象アラート",
             body: messageText,
-            icon: "/icon.png" // PWA側のアイコン画像パスに合わせて調整してください
+            icon: "/icon.png",
+            lat: userLat,
+            lon: userLon,
+            place: userLabel
         });
 
-        console.log(`  -> ユーザー: ${userId} へ Web Push 通知を送信中...`);
-        
-        // 実際に通知を送信
+        console.log("DEBUG [SERVER]: 送出する生のペイロードデータ (JSON):", payload);
+
+        await webpush.setVapidDetails(/* ...鍵情報... */); // 鍵設定はそのまま
         await webpush.sendNotification(subscription, payload);
         
-        console.log(`  -> 正常に通知を配信しました。`);
+        console.log(`   -> 正常に通知を配信しました。`);
 
     } catch (error) {
-        console.error(`  [通知エラー] ユーザー: ${userId} への送信に失敗しました:`, error.message);
-        
-        // もし「410 Gone」のエラーが返ってきた場合、ユーザーがブラウザで通知を拒否したか、期限切れの古い情報であることを示します
-        if (error.statusCode === 410) {
-            console.log("  (提示): このSubscriptionは無効化されているため、スプレッドシートから削除することを推奨します。");
-        }
+        console.error(`   [通知エラー] ユーザー: ${userId} への送信に失敗しました:`, error.message);
     }
 }
 
