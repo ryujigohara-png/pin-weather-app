@@ -125,13 +125,23 @@ async function handleNotificationClick(event) {
           console.log("DEBUG [SW]: 6. 既存ウィンドウのURL書き換えを実行します:", targetUrlString);
           await client.navigate(targetUrlString);
           console.log("DEBUG [SW]: 7. 既存ウィンドウへフォーカス（前面表示）を要求します。");
-          return client.focus();
+          
+          // フォーカス処理をawaitして結果をログ出力
+          const focusedClient = await client.focus();
+          console.log("DEBUG [SW]: 7-結果. フォーカス処理のPromiseが解決されました。オブジェクト:", focusedClient);
+          
+          return focusedClient;
         } catch (err) {
           console.error('Failed to navigate existing client:', err);
           // サービスワーカーの新旧不整合等でURL書き換えに失敗した場合でも、多重起動（真っ白）を防ぐため画面フォーカスのみ試みる
           try {
             console.log("DEBUG [SW]: 7-補足. ナビゲート失敗のため、既存ウィンドウのフォーカスのみ要求します。");
-            return client.focus();
+            
+            // 補足側のフォーカス処理もawaitして結果をログ出力
+            const focusedClient補足 = await client.focus();
+            console.log("DEBUG [SW]: 7-補足結果. フォーカス処理のPromiseが解決されました。オブジェクト:", focusedClient補足);
+            
+            return focusedClient補足;
           } catch (fErr) {
             console.error('Failed to focus existing client:', fErr);
           }

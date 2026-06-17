@@ -1,0 +1,32 @@
+name: 5-Minute Push Notification Cron
+
+on:
+  schedule:
+    # 5分ごとに定期実行
+    - cron: '*/5 * * * *'
+  # GitHub画面から手動でいつでもテスト起動できるようにするトリガー
+  workflow_dispatch:
+
+jobs:
+  run-notification:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run notification script
+        # GitHub Secretsに保存した値を、環境変数としてserver.jsへ安全に注入します
+        env:
+          GAS_URL: ${{ secrets.GAS_URL }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+        run: node server.js

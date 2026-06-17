@@ -4,16 +4,18 @@
 
 const webpush = require('web-push');
 
-// 【重要】ご自身のGASウェブアプリのURL（末尾が /exec のもの）を貼り付けてください
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzWvf34Bhc5qEjROo69GvMeJvtW3k7_jVbTSwrkWjOFalr-yWxqlNuvKLNNWCnDZMoLgw/exec";
-// 【重要】先ほどコマンドで生成した VAPID 鍵をここにそれぞれ貼り付けてください
-const VAPID_PUBLIC_KEY = "BJYVLMl3qqgbwsXUJAFHJsTbXgr8uB_8z1NawLGeon-cE4YpgGg3FmnSdjSzjdtVsp51Gapl53XwJ38KR5BXvjg";
-const VAPID_PRIVATE_KEY = "AtbriJ02jLz1oidQBuQKa35t7A9mW_5ABqHaaqq6cZQ";
+// GitHub Actionsから渡される環境変数を最優先で読み込み、コード上から実際の値を隠蔽します
+const GAS_URL = process.env.GAS_URL || "";
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "";
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";
+//※コード上に直接書かれていた元の文字列は、先ほどGitHubの「Secrets」に登録したため、Actions側では自動的かつ安全に読み込まれます。
+//（ローカル環境で再度テスト実行したい場合は、コマンドプロンプトやターミナルで GAS_URL="xxx" VAPID_PRIVATE_KEY="xxx" node server.js
+//  のように環境変数を付与して起動するか、一時的に値を書き戻してテストする運用になります）
 
 // Web Pushの設定（あなたの連絡先URLまたは mailto: メールアドレスを設定してください）
 webpush.setVapidDetails(
-    'mailto:example@example.com', 
-    VAPID_PUBLIC_KEY,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+    'mailto:ryuji.gohara@gmail.com', 
+    VAPID_PUBLIC_KEY, 
     VAPID_PRIVATE_KEY
 );
 
@@ -58,8 +60,8 @@ async function processUserNotification(user) {
     console.log(`\n[ユーザー: ${userId} (${label}) (${lat}) (${lon})]`);
     console.log(`  設定時刻: ${targetTime} / 現在の現地時刻: ${localCurrentTime}`);
     
-    // 時刻が一致しているか判定
-    if (targetTime === localCurrentTime) {
+    // 時刻が一致しているか判定（5分おきの定期実行に対応するため、5分以内の時間枠に入っているか判定）
+    if (isTimeInWindow(targetTime, localCurrentTime, 5)) {
         console.log("  -> ★通知対象の時間です。天気データを取得します。");
         
         if (!user.Lat || !user.Lon) {
@@ -73,11 +75,6 @@ async function processUserNotification(user) {
             
             // 4. 天気概況テキストを生成 (海洋気象は除外)
             const summaryText = generateWeatherSummary(weatherData, label);
-            
-            console.log("  [生成された概況テキスト]");
-            console.log("----------------------------------------");
-            console.log(summaryText);
-            console.log("----------------------------------------");
             
             // 5. 該当ユーザーの端末へWeb Push通知を実際に送信する
             await sendWebPushNotification(user.Subscription, summaryText, userId, user.Lat, user.Lon, user.Label);
@@ -284,6 +281,36 @@ async function sendWebPushNotification(subscriptionStr, messageText, userId, lat
             console.log("  (提示): このSubscriptionは無効化されているため、スプレッドシートから削除することを推奨します。");
         }
     }
+}
+
+/**
+ * 設定時刻が現在時刻から見て指定した時間幅（過去5分間）に含まれているか判定するサブルーチン
+ * @param {string} targetTime - 整形済みの設定時刻 (HH:mm)
+ * @param {string} currentTime - 現在の現地時刻 (HH:mm)
+ * @param {number} windowMinutes - 判定する時間幅（分）
+ * @returns {boolean} 範囲内であればtrue
+ */
+function isTimeInWindow(targetTime, currentTime, windowMinutes = 5) {
+    if (!targetTime || !currentTime) return false;
+
+    // "HH:mm" を時と分に分解
+    const [tHour, tMinute] = targetTime.split(":").map(Number);
+    const [cHour, cMinute] = currentTime.split(":").map(Number);
+
+    // 一日の総分数に換算
+    const targetMinutes = tHour * 60 + tMinute;
+    const currentMinutes = cHour * 60 + cMinute;
+
+    // 現在時刻から設定時刻を引いた差分を計算
+    let diff = currentMinutes - targetMinutes;
+
+    // 日を跨いだ場合の補正（例: 設定時刻 23:58、現在時刻 00:03 の場合、diffは -1435 になるため +1440 して 5分 とする）
+    if (diff < 0) {
+        diff += 1440;
+    }
+
+    // 差分が 0分以上、指定の幅（5分）未満であれば通知対象とする
+    return diff >= 0 && diff < windowMinutes;
 }
 
 // -------------------------------------------------------------------------
