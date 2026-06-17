@@ -74,7 +74,7 @@ async function processUserNotification(user) {
             const weatherData = await fetchWeatherData(user.Lat, user.Lon);
             
             // 4. 天気概況テキストを生成 (海洋気象は除外)
-            const summaryText = generateWeatherSummary(weatherData, label);
+            const summaryText = generateWeatherSummary(weatherData, label, user.TimeZone);
             
             // 5. 該当ユーザーの端末へWeb Push通知を実際に送信する
             await sendWebPushNotification(user.Subscription, summaryText, userId, user.Lat, user.Lon, user.Label);
@@ -151,7 +151,7 @@ function formatTimeStr(timeStr) {
  * Open-Meteo APIから一般気象データを取得するサブルーチン（海洋気象は含まない）
  * @param {number|string} lat - 緯度
  * @param {number|string} lon - 経度
- * @returns {Promise<Object>} 気象データのJSONオブジェクト
+ * @returns {Promise<Object>}気象データのJSONオブジェクト
  */
 async function fetchWeatherData(lat, lon) {
     // 風速を m/s で取得するために &wind_speed_unit=ms を付与しています
@@ -205,9 +205,10 @@ function getWindDirectionStr(degree) {
  * 取得した気象データから概況テキストを生成するサブルーチン（海洋気象は完全に除外）
  * @param {Object} weatherData - Open-Meteoから取得したデータ
  * @param {string} label - 地点名
+ * @param {string} timeZone - タイムゾーン文字列
  * @returns {string} 生成された概況テキスト
  */
-function generateWeatherSummary(weatherData, label) {
+function generateWeatherSummary(weatherData, label, timeZone) {
     const current = weatherData.current;
     const daily = weatherData.daily;
     
@@ -221,7 +222,8 @@ function generateWeatherSummary(weatherData, label) {
     const minTemp = daily.temperature_2m_min[0];
     
     // 現在時刻の取得（テキスト表示用）
-    const now = new Date();
+    const tz = timeZone && timeZone.trim() !== "" ? timeZone : "UTC";
+    const now = new Date(new Date().toLocaleString("en-US", { timeZone: tz }));
     const month = now.getMonth() + 1;
     const date = now.getDate();
     const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
