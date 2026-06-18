@@ -50,6 +50,8 @@ async function processUserNotification(user) {
     const label = user.Label || "(未設定)";
     const lat = user.Lat || "(未設定)";
     const lon = user.Lon || "(未設定)";
+    const lang = user.Lang || "ja";   // スプレッドシートに追加された言語設定（未設定時は'ja'）
+    const unit = user.Unit || "ms";   // スプレッドシートに追加された単位設定（未設定時は'ms'）
     
     // ユーザーのタイムゾーンに基づいた「現在の現地時刻」を取得 (HH:mm)
     const localCurrentTime = getUserCurrentTime(user.TimeZone);
@@ -70,14 +72,12 @@ async function processUserNotification(user) {
         }
         
         try {
-            // 3. Open-Meteoから一般気象データを取得（海洋気象は含まない）
+            // 3. Open-Meteoから時系列（hourly）気象データを取得
             const weatherData = await fetchWeatherData(user.Lat, user.Lon);
             
-            // 4. 天気概況テキストを生成 (海洋気象は除外)
-            const summaryText = generateWeatherSummary(weatherData, label, user.TimeZone);
-            
-            // 5. 該当ユーザーの端末へWeb Push通知を実際に送信する
-            await sendWebPushNotification(user.Subscription, summaryText, userId, user.Lat, user.Lon, user.Label);
+            // 4. 該当ユーザーの端末へ、気象データとユーザー設定をパッキングしてWeb Push通知を実際に送信する
+            //（※テキスト生成処理はService Worker側へ完全移譲されたため、weatherDataをそのまま渡します）
+            await sendWebPushNotification(user.Subscription, weatherData, userId, user.Lat, user.Lon, user.Label, lang, unit);
             
         } catch (err) {
             console.error(`  [エラー] 天気データ取得・生成中に失敗しました:`, err.message);
@@ -148,14 +148,14 @@ function formatTimeStr(timeStr) {
 }
 
 /**
- * Open-Meteo APIから一般気象データを取得するサブルーチン（海洋気象は含まない）
+ * Open-Meteo APIから時系列（hourly）気象データを取得するサブルーチン
  * @param {number|string} lat - 緯度
  * @param {number|string} lon - 経度
- * @returns {Promise<Object>}気象データのJSONオブジェクト
+ * @returns {Promise<Object>} 気象データのJSONオブジェクト
  */
 async function fetchWeatherData(lat, lon) {
-    // 風速を m/s で取得するために &wind_speed_unit=ms を付与しています
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m&daily=temperature_2m_max,temperature_2m_min&wind_speed_unit=ms&timezone=auto`;
+    // スマホ側の3時間おきサマリー生成に必要な hourly パラメータを追加し、&forecast_days=2 で確実に48時間分のデータに制限します
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=weather_code,precipitation,wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&forecast_days=2&timezone=auto`;
     
     const response = await fetch(url);
     if (!response.ok) {
@@ -165,90 +165,17 @@ async function fetchWeatherData(lat, lon) {
 }
 
 /**
- * Weather Code（WMO準拠）を日本語の天気文字列に変換するサブルーチン
- * @param {number} code - 天気コード
- * @returns {string} 日本語の天気名
- */
-function getWeatherDescription(code) {
-    const codeMap = {
-        0: "晴れ",
-        1: "概ね晴れ", 2: "薄曇り", 3: "曇り",
-        45: "霧", 48: "着氷性の霧",
-        51: "弱い霧雨", 53: "霧雨", 55: "強い霧雨",
-        61: "弱い雨", 63: "雨", 65: "強い雨",
-        71: "弱い雪", 73: "雪", 75: "強い雪",
-        77: "ひょう",
-        80: "弱いにわか雨", 81: "にわか雨", 82: "激しいにわか雨",
-        85: "弱いにわか雪", 86: "激しいにわか雪",
-        95: "雷雨", 96: "ひょうを伴う雷雨", 99: "激しいひょうを伴う雷雨"
-    };
-    return codeMap[code] || "不明";
-}
-
-/**
- * 風向きの度数（0-360）を16方位の日本語文字列に変換するサブルーチン
- * @param {number} degree - 風向（度）
- * @returns {string} 16方位の文字列
- */
-function getWindDirectionStr(degree) {
-    const directions = [
-        "北", "北北東", "北東", "東北東",
-        "東", "東南東", "南東", "南南東",
-        "南", "南南西", "南西", "西南西",
-        "西", "西北西", "北西", "北北西"
-    ];
-    const index = Math.round(degree / 22.5) % 16;
-    return directions[index];
-}
-
-/**
- * 取得した気象データから概況テキストを生成するサブルーチン（海洋気象は完全に除外）
- * @param {Object} weatherData - Open-Meteoから取得したデータ
- * @param {string} label - 地点名
- * @param {string} timeZone - タイムゾーン文字列
- * @returns {string} 生成された概況テキスト
- */
-function generateWeatherSummary(weatherData, label, timeZone) {
-    const current = weatherData.current;
-    const daily = weatherData.daily;
-    
-    // 現在の状態の抽出
-    const currentWeatherStr = getWeatherDescription(current.weather_code);
-    const windSpeed = current.wind_speed_10m;
-    const windDirStr = getWindDirectionStr(current.wind_direction_10m);
-    
-    // 本日の最高・最低気温の抽出
-    const maxTemp = daily.temperature_2m_max[0];
-    const minTemp = daily.temperature_2m_min[0];
-    
-    // 現在時刻の取得（テキスト表示用）
-    const tz = timeZone && timeZone.trim() !== "" ? timeZone : "UTC";
-    const now = new Date(new Date().toLocaleString("en-US", { timeZone: tz }));
-    const month = now.getMonth() + 1;
-    const date = now.getDate();
-    const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
-    const dayOfWeek = dayNames[now.getDay()];
-    const hours = String(now.getHours()).padStart(2, "0");
-    const minutes = String(now.getMinutes()).padStart(2, "0");
-    
-    // 概況テキストの組み立て
-    let summary = `【概況】 ${label}：${month}/${date}(${dayOfWeek}) ${hours}:${minutes} 現在\n`;
-    summary += `現在は${currentWeatherStr}です。気温は最高${maxTemp.toFixed(1)}℃、最低は${minTemp.toFixed(1)}℃で、落ち着いた推移となるでしょう。\n`;
-    summary += `風は現在${windDirStr}の風が${windSpeed.toFixed(1)}m/sです。今後24時間、${windDirStr}寄りの風が続く見込みです。`;
-    
-    return summary;
-}
-
-/**
  * 該当ユーザーの端末へWeb Push通知を送信するサブルーチン
  * @param {string} subscriptionStr - スプレッドシートから取得したSubscriptionのJSON文字列
- * @param {string} messageText - 送信する通知の本文（概況テキスト）
+ * @param {Object} weatherData - Open-Meteoから取得した時系列気象データオブジェクト
  * @param {string} userId - ユーザーID（ログ出力用）
- * @param {string} lat - 緯度（ログ出力用）
- * @param {string} lon - 経度（ログ出力用）
- * @param {string} place - 地点名（ログ出力用）
+ * @param {string} lat - 緯度
+ * @param {string} lon - 経度
+ * @param {string} place - 地点名（ラベル）
+ * @param {string} lang - 言語設定 ('ja' / 'en')
+ * @param {string} unit - 風速単位設定 ('ms' / 'kn')
  */
-async function sendWebPushNotification(subscriptionStr, messageText, userId, lat, lon, place) {
+async function sendWebPushNotification(subscriptionStr, weatherData, userId, lat, lon, place, lang, unit) {
     if (!subscriptionStr || subscriptionStr.trim() === "") {
         console.log(`  [通知スキップ] ユーザー: ${userId} の Subscription 情報が空欄です。`);
         return;
@@ -259,13 +186,14 @@ async function sendWebPushNotification(subscriptionStr, messageText, userId, lat
         const subscription = JSON.parse(subscriptionStr);
 
         // プッシュ通知のペイロード（データ中身）を作成します
+        // タイトルはスマホ側（Service Worker）で固定記述するため、ここでは含めず純粋なデータのみをパッキングします
         const payload = JSON.stringify({
-            title: "気象アラート",
-            body: messageText,
-            icon: "/icon.png",
+            hourly: weatherData.hourly,
             lat: lat,
             lon: lon,
-            place: place // PWA側のアイコン画像パスに合わせて調整してください
+            place: place,
+            lang: lang,
+            unit: unit
         });
 
         console.log(`  -> ユーザー: ${userId} へ Web Push 通知を送信中...`);
