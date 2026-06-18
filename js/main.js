@@ -2479,7 +2479,7 @@ async function updateLocation(lat, lon, label) {
 }
 
 
-const weatherIcons = { 0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️", 45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "🌦️", 61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "❄️", 73: "❄️", 75: "❄️", 80: "🌦️", 81: "🌦️", 82: "🌦️", 95: "⛈️" };
+const weatherIcons = { 0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️", 45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "🌦️", 61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "❄️", 73: "❄️", 75: "❄️", 80: "🌦️", 81: "🌦️", 82: "🌦️", 95: "⛈️", 96: "⛈️", 99: "⛈️" };
 function getWindDirText(deg) { return windDirs[Math.round(deg / 22.5) % 16]; }
 
 /**
@@ -4359,8 +4359,12 @@ async function saveNotificationSettingsFromModal() {
             // ユーザーの環境から現在のタイムゾーン（例: "Asia/Tokyo"）を自動取得
             const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Tokyo";
             
-            // 拡張したサブルーチンを呼び出し、位置情報・時刻・鍵情報をGASへ一括送信
-            await saveSubscriptionToSpreadsheet(userId, subscription, timeZone, lat, lon, label, time);
+            // 【方針2追加】現在のアプリ画面設定から言語と風速単位を動的に取得します
+            const lang = viewConfig.language || "ja";
+            const unit = viewConfig.windSpeedUnit || "ms"; // 'kn' を変換せず、そのままシステム全体に流通させます
+            
+            // 拡張したサブルーチンを呼び出し、位置情報・時刻・鍵情報に加えて言語と単位をGASへ一括送信
+            await saveSubscriptionToSpreadsheet(userId, subscription, timeZone, lat, lon, label, time, lang, unit);
             
             console.log("[Web Push] GASへの購読・設定情報の保存がすべて正常に完了しました。");
         } catch (pushErr) {
@@ -4415,7 +4419,7 @@ async function subscribeUserToPush(registration, publicKey) {
 }
 
 /**
- * 取得した接続鍵、位置情報、通知時刻、タイムゾーンをGAS経由でスプレッドシートに保存するサブルーチン
+ * 取得した接続鍵、位置情報、通知時刻、タイムゾーン、および言語・単位設定をGAS経由でスプレッドシートに保存するサブルーチン
  * @param {string} userId 
  * @param {PushSubscription} subscription 
  * @param {string} timeZone 
@@ -4423,8 +4427,10 @@ async function subscribeUserToPush(registration, publicKey) {
  * @param {string} lon
  * @param {string} label
  * @param {string} time
+ * @param {string} lang
+ * @param {string} unit
  */
-async function saveSubscriptionToSpreadsheet(userId, subscription, timeZone, lat, lon, label, time) {
+async function saveSubscriptionToSpreadsheet(userId, subscription, timeZone, lat, lon, label, time, lang, unit) {
     // server.jsに記述されているご自身のGASウェブアプリのURL
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzWvf34Bhc5qEjROo69GvMeJvtW3k7_jVbTSwrkWjOFalr-yWxqlNuvKLNNWCnDZMoLgw/exec";
 
@@ -4437,14 +4443,16 @@ async function saveSubscriptionToSpreadsheet(userId, subscription, timeZone, lat
         lat: lat,
         lon: lon,
         label: label,
-        time: time
+        time: time,
+        lang: lang, // 追加：現在の言語設定 ('ja' / 'en')
+        unit: unit  // 追加：現在の風速単位設定 ('ms' / 'kn')
     };
 
     console.log("GASへデータを送信中...");
 
     // 【重要修正】mode: "no-cors" を削除（デフォルトの "cors" に変更）します。
     // Content-Type: "text/plain" の指定によって、ブラウザのプレフライト(OPTIONS)制限を発生させずに通過させ、
-    // かつ "cors" モードにすることで、GAS特有のクロスオリジンリダイレクト（googleusercontent.comへの転送）をブラウザが正しく追跡してデータを確実に届けます。
+    // かつ "cors" モードにすることで、GAS特有のリダイレクトをブラウザが正しく追跡してデータを確実に届けます。
     const response = await fetch(GAS_URL, {
         method: "POST",
         headers: {
@@ -4453,8 +4461,6 @@ async function saveSubscriptionToSpreadsheet(userId, subscription, timeZone, lat
         body: JSON.stringify(payload)
     });
     
-    // デフォルトの "cors" モードにより、GAS側（ContentService）が自動付与するCORS許可ヘッダーをブラウザが正しく解釈できるため、
-    // GAS側から戻ってきた実際の処理成否レスポンス（JSONオブジェクト）を確実に取得してコンソールで確認できます。
     const result = await response.json();
     console.log("GAS処理結果:", result);
 }
