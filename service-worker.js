@@ -68,6 +68,7 @@ async function displayNotification(event) {
       options.data.lat = data.lat || null;
       options.data.lon = data.lon || null;
       options.data.place = data.place || null;
+      title = `【${data.place || "不明な地点"}の24時間概況】`; // タイトルに地点名を反映
 
       // 【追加ロジック】気象データ(hourly)が含まれている場合、3時間おき4行サマリーを動的に組み立ててbodyを上書き
       if (data.hourly) {
@@ -215,19 +216,22 @@ function findCurrentTimeIndex(timeArray) {
 
 /**
  * 3. WMO気象コードを1文字の絵文字に変換するサブルーチン
+ * 修正内容：main.jsの weatherIcons 条件と100%完全に一致するようマッピングを修正
  * @param {number} code - WMO Weather Code
  * @returns {string} 天気絵文字
  */
 function getWeatherEmoji(code) {
-    if (code === 0) return "☀️"; // Clear sky
-    if (code >= 1 && code <= 3) return "🌤️"; // Mainly clear, partly cloudy, and overcast
-    if (code >= 45 && code <= 48) return "🌫️"; // Fog
-    if (code >= 51 && code <= 67) return "🌧️"; // Drizzle, Rain
-    if (code >= 71 && code <= 77) return "❄️"; // Snow
-    if (code >= 80 && code <= 82) return "🌧️"; // Rain showers
-    if (code >= 85 && code <= 86) return "❄️"; // Snow showers
-    if (code >= 95 && code <= 99) return "⛈️"; // Thunderstorm
-    return "☁️";
+    const weatherIcons = { 
+        0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️", 
+        45: "🌫️", 48: "🌫️", 
+        51: "🌦️", 53: "🌦️", 55: "🌦️", 
+        61: "🌧️", 63: "🌧️", 65: "🌧️", 
+        71: "❄️", 73: "❄️", 75: "❄️", 
+        80: "🌦️", 81: "🌦️", 82: "🌦️", 
+        95: "⛈️", 96: "⛈️", 99: "⛈️" 
+    };
+    // マッピングに存在しないコードが万が一届いた場合は、デフォルトとして「☁️」を返す安全設計
+    return weatherIcons[code] || "☁️";
 }
 
 /**
@@ -258,7 +262,8 @@ function convertAndFloorWindSpeed(speedMs, unit) {
 
 /**
  * 6. 3時間分のデータブロックから1行のテキストを組み立てるサブルーチン
- * @param {Object} hourly - Open-Meteoのhourlyオブジェクト
+ * 修正内容：ユーザー指定のフォーマット（例: 00:00-）に合わせてコロン位置とスペース配置を調整
+ * @param {Object} hourly - Open-Meteo of hourly object
  * @param {number} startIndex - 3時間ブロックの開始インデックス
  * @param {string} lang - 言語コード ('ja' または 'en')
  * @param {string} unit - 風速単位 ('ms' または 'kn')
@@ -277,16 +282,24 @@ function formatThreeHourLine(hourly, startIndex, lang, unit) {
     const weekdays = lang === "en" ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] : ["日", "月", "火", "水", "木", "金", "土"];
     const weekdayStr = weekdays[baseDate.getDay()];
 
-    // 時刻文字列の生成（例: 00-03時）
+    // 時刻文字列の生成（修正: ユーザー指定の開始時刻＋コロン形式「00:00-」へ変更）
     const startHour = String(baseDate.getHours()).padStart(2, '0');
-    const endHour = String(baseDate.getHours() + 3).padStart(2, '0');
-    const timeRange = `${startHour}-${endHour}${dict.hours}`;
+    const timeRange = `${startHour}:00-`;
 
     // ① 天気絵文字を3つ並べる
-    const emoji1 = getWeatherEmoji(hourly.weather_code[startIndex]);
-    const emoji2 = getWeatherEmoji(hourly.weather_code[startIndex + 1]);
-    const emoji3 = getWeatherEmoji(hourly.weather_code[startIndex + 2]);
+    const code1 = hourly.weather_code[startIndex];
+    const code2 = hourly.weather_code[startIndex + 1];
+    const code3 = hourly.weather_code[startIndex + 2];
+
+    const emoji1 = getWeatherEmoji(code1);
+    const emoji2 = getWeatherEmoji(code2);
+    const emoji3 = getWeatherEmoji(code3);
     const emojis = `${emoji1}${emoji2}${emoji3}`;
+
+    // 【デバッグ出力】この行で参照した3時間の天気コードと変換結果の絵文字を正確に確認
+    console.log(`DEBUG [SW] 行生成時刻 [${timeRange}] -> インデックス: ${startIndex}〜${startIndex+2}`);
+    console.log(`  -> 生天気コード: [${code1}, ${code2}, ${code3}]`);
+    console.log(`  -> 変換後絵文字: ${emojis}`);
 
     // ② 最大降水量の計算（3時間の中の最大値を抽出して切り捨て）
     const maxPrecip = Math.floor(
@@ -302,8 +315,8 @@ function formatThreeHourLine(hourly, startIndex, lang, unit) {
     const windSpeedStart = convertAndFloorWindSpeed(hourly.wind_speed_10m[startIndex], unit);
     const windSpeedEnd = convertAndFloorWindSpeed(hourly.wind_speed_10m[startIndex + 2], unit);
 
-    // 1行のテキストへ結合（既存フォーマット・スペース配置を厳密に維持）
-    return `${month}/${day}(${weekdayStr}) ${timeRange}: ${emojis} ${maxPrecip}mm ${windDirStr} ${windSpeedStart} → ${windSpeedEnd}${unitStr}`;
+    // 1行のテキストへ結合（末尾の区切りコロンをスペースに変更し、ご指定通りの「00:00- 」の間隔を厳密に維持）
+    return `${month}/${day}(${weekdayStr}) ${timeRange} ${emojis} ${maxPrecip}mm ${windDirStr} ${windSpeedStart} → ${windSpeedEnd}${unitStr}`;
 }
 
 /**
@@ -315,10 +328,14 @@ function formatThreeHourLine(hourly, startIndex, lang, unit) {
  */
 function buildNotificationBody(weatherData, lang, unit) {
     const hourly = weatherData.hourly;
-    if (!hourly) return "";
+    if (!hourly) {
+        console.warn("DEBUG [SW]: hourlyデータが存在しません。");
+        return "";
+    }
 
     // 現在時刻が属するインデックス（3の倍数）を特定
     let currentIndex = findCurrentTimeIndex(hourly.time);
+    console.log(`DEBUG [SW]: buildNotificationBody 開始時の起点インデックス: ${currentIndex} (時刻: ${hourly.time[currentIndex]})`);
     
     const lines = [];
     // 3時間おきに4回（計12時間分）ループ処理を行う
@@ -327,6 +344,8 @@ function buildNotificationBody(weatherData, lang, unit) {
         if (currentIndex + 2 < hourly.time.length) {
             const line = formatThreeHourLine(hourly, currentIndex, lang, unit);
             lines.push(line);
+        } else {
+            console.warn(`DEBUG [SW]: インデックス ${currentIndex} がデータの長さ ${hourly.time.length} を超えるためスキップされました。`);
         }
         currentIndex += 3; // 次の3時間ブロックへ
     }
