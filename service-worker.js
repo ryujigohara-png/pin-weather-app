@@ -47,7 +47,7 @@ self.addEventListener('notificationclick', (event) => {
  * @param {ExtendableEvent} event 
  */
 async function displayNotification(event) {
-  let title = '【24時間概況】'; // ご指定通りデフォルトのタイトルを「【24時間概況】」に変更
+  let title = '【12時間概況】'; // ご指定通りデフォルトのタイトルを「【12時間概況】」に変更
   let options = {
     body: '新しい天気情報があります。',
     icon: '/icon.png',
@@ -68,7 +68,7 @@ async function displayNotification(event) {
       options.data.lat = data.lat || null;
       options.data.lon = data.lon || null;
       options.data.place = data.place || null;
-      title = `【${data.place || "不明な地点"}の24時間概況】`; // タイトルに地点名を反映
+      title = `【${data.place || "不明な地点"}】`; // タイトルに地点名を反映
 
       // 【追加ロジック】気象データ(hourly)が含まれている場合、3時間おき4行サマリーを動的に組み立ててbodyを上書き
       if (data.hourly) {
