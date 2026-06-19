@@ -777,6 +777,40 @@ body.widget-mode .footer-info {
     background-color: #1d4ed8;
 }
 
+/* --- 汎用モーダル内：通知設定フォームの専用スタイル --- */
+
+/* エラーメッセージ表示エリア（初期は非表示、エラー時に赤字で表示） */
+.notification-error-area {
+    display: none;
+    color: #dc2626;
+    background-color: #fef2f2;
+    border: 1px solid #fee2e2;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-top: 12px;
+    font-size: 13px;
+    line-height: 1.4;
+    text-align: left;
+}
+
+/* ==========================================================================
+   PCブラウザ固有の input[type="time"] の崩れた時計ポップアップを無効化する修正
+   （既存のダークモードの色指定や、Androidの標準セレクタには一切影響を与えません）
+   ========================================================================== */
+
+/* Chrome, Edge, Safari 等で時計アイコンおよび崩れるポップアップを非表示 */
+input[type="time"]::-webkit-calendar-picker-indicator {
+    display: none !important;
+    -webkit-appearance: none !important;
+    margin: 0 !important;
+}
+
+/* Firefox で時計アイコンや独自のピッカーを非表示 */
+input[type="time"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
 /* ============================================================
    以下、端末のダークモード対応（prefers-color-scheme: dark）
    既存の構造化スタイルを一切変更せず、末尾で安全に上書きします

@@ -1469,22 +1469,15 @@ function setupGeneralEvents() {
         };
     }
    
-    // 【新設】10. 通知設定ボタン（サイドバー）
-    // 既存の風向設定ボタンの仕様に完全準拠し、openModalFromSidebar経由で安全に起動します。
+    // 【修正版】10. 通知設定ボタン（サイドバー）
+    // 履歴の競合を回避し、一本化された汎用モーダルを安全に起動します。
     const openNotificationBtn = document.getElementById('openNotificationBtn');
     if (openNotificationBtn) {
         openNotificationBtn.onclick = () => {
-            if (typeof openModalFromSidebar === 'function') {
-                openModalFromSidebar('notification-modal');
-            } else {
-                toggleSidebar();
-                // 既存のグローバルなopenModal互換のフォールバック
-                const modal = document.getElementById('notification-modal');
-                if (modal) modal.style.display = 'block';
-            }
+            openNotificationModalGeneral(); // 安全な画面遷移ロジックを内包したサブルーチンを直接実行
         };
     }
-    
+
     // 4. 風向設定モーダル内のボタン群
     const applyWindBtn = document.getElementById('apply-wind-btn');
     if (applyWindBtn) {
@@ -1687,16 +1680,6 @@ function openModalFromSidebar(modalId) {
     if (modalId === 'wind-modal') {
         initCompassUI();
     }
-    
-    // 【追加】通知設定モーダルの場合はコンボボックス等の最新化ライフサイクルを確実に実行
-    if (modalId === 'notification-modal') {
-        if (typeof refreshNotificationModalUI === 'function') {
-            refreshNotificationModalUI();
-        }
-        if (typeof i18n !== 'undefined' && typeof i18n.translatePage === 'function') {
-            i18n.translatePage(modal);
-        }
-    }
 }
 
 /**
@@ -1764,10 +1747,11 @@ function initCompassUI() {
 }
 
 /**
- * サブルーチン：環境色を反映した汎用ダイアログを表示
+ * サブローチン：環境色を反映した汎用ダイアログを表示
  * 修正内容：通知専用の引数 onOk を追加。これが存在する場合は、他のボタンを排除してOKボタンのみを表示する。
+ * 【今回追加】：customElement 引数を追加し、外部から組み立てられたフォーム要素を中央に流し込めるように拡張。
  */
-function showAppDialog({ title, message = null, messageKey = null, inputValue = null, onMap = null, onSave = null, onDelete = null, saveBtnKey = null, onOk = null }) {
+function showAppDialog({ title, message = null, messageKey = null, inputValue = null, onMap = null, onSave = null, onDelete = null, saveBtnKey = null, onOk = null, customElement = null }) {
     const modal = document.getElementById('app-common-modal');
     const header = document.getElementById('common-modal-header');
     const titleEl = document.getElementById('common-modal-title');
@@ -1807,8 +1791,16 @@ function showAppDialog({ title, message = null, messageKey = null, inputValue = 
     msgEl.innerText = messageKey ? i18n.t(messageKey) : (message || "");
     
     if (inputArea && input) {
-        inputArea.style.display = (inputValue !== null) ? 'block' : 'none';
-        if (inputValue !== null) input.value = inputValue;
+        // --- 【追加】外部からカスタム要素が渡された場合は、既存の1行入力欄をクリアして流し込む ---
+        if (customElement) {
+            inputArea.style.display = 'block';
+            inputArea.innerHTML = ""; 
+            inputArea.appendChild(customElement);
+        } else {
+            // --- 通常時は既存の1行入力欄のロジックを1文字も変えず完全維持（既存の13か所はここを通る） ---
+            inputArea.style.display = (inputValue !== null) ? 'block' : 'none';
+            if (inputValue !== null) input.value = inputValue;
+        }
     }
 
     // ボタンの生成
@@ -1827,7 +1819,7 @@ function showAppDialog({ title, message = null, messageKey = null, inputValue = 
         };  
         footer.appendChild(btnOk);
     } else {
-        // --- 通常モード（既存ロジックを完全維持） ---
+        // --- 通常モード（既存ロジックを1文字も変えず完全維持） ---
         const isWidgetMode = (!onDelete && !onMap && !onSave && title === i18n.t('widgetTitle'));
         if (isWidgetMode) {
             footer.style.display = 'none';
@@ -1857,10 +1849,7 @@ function showAppDialog({ title, message = null, messageKey = null, inputValue = 
                 const btnSave = document.createElement('button');
                 btnSave.className = "btn btn-save";
                 btnSave.innerText = saveBtnKey ? i18n.t(saveBtnKey) : (i18n.t('btnSaveSpot') || "Update");
-                btnSave.onclick = () => {
-                    onSave(input ? input.value : null);
-                    modal.style.display = 'none';
-                };
+                btnSave.onclick = () => { onSave(input ? input.value : null); modal.style.display = 'none'; };
                 footer.appendChild(btnSave);
             }
         }
@@ -4127,52 +4116,6 @@ window.addEventListener('DOMContentLoaded', initPwaInstall);
 // タイマーの重複登録を確実に防止するためのグローバルなタイマーID管理変数
 let notificationTimeoutId = null;
 
-/**
- * 最新の pin_weather_spots からモーダル内のコンボボックスを動的に生成し、保存値を復元する
- */
-function refreshNotificationModalUI() {
-    const selectSpot = document.getElementById('select-notification-spot');
-    const inputTime = document.getElementById('input-notification-time');
-    
-    if (!selectSpot || !inputTime) return;
-
-    // 1. localStorage から登録済みの場所リストを読み込む
-    const spotsStr = localStorage.getItem('pin_weather_spots');
-    if (!spotsStr) {
-        const noSpotsText = typeof i18n !== 'undefined' ? i18n.t('notificationNoSpots') : "No spots registered";
-        selectSpot.innerHTML = `<option value="">${noSpotsText}</option>`;
-        return;
-    }
-
-    const spots = JSON.parse(spotsStr);
-    selectSpot.innerHTML = ''; 
-
-    // 2. 動的に変化している配列から選択肢を生成（固定値をvalueに埋め込む）
-    spots.forEach((spot) => {
-        const option = document.createElement('option');
-        option.value = `${spot.lat},${spot.lon},${spot.label}`;
-        option.textContent = spot.label;
-        selectSpot.appendChild(option);
-    });
-
-    // 3. すでに個別に保存されている通知設定があれば、UIに復元反映
-    const savedLat = localStorage.getItem('notification_lat');
-    const savedLon = localStorage.getItem('notification_lon');
-    const savedTime = localStorage.getItem('notification_time');
-
-    if (savedLat && savedLon) {
-        for (let i = 0; i < selectSpot.options.length; i++) {
-            if (selectSpot.options[i].value.startsWith(`${savedLat},${savedLon},`)) {
-                selectSpot.selectedIndex = i;
-                break;
-            }
-        }
-    }
-
-    if (savedTime) {
-        inputTime.value = savedTime;
-    }
-}
 
 /**
  * 通知設定モーダルを閉じる
@@ -4321,6 +4264,215 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
+ * サブルーチン：通知設定モーダルを汎用ダイアログとして一本化して表示（方法A：完全流用版）
+ * 修正内容：独自ボタンの生成をすべて撤廃。既存のフッターおよび onSave ロジックを100%流用するように修正。
+ */
+function openNotificationModalGeneral() {
+    // --- 既存の openModalFromSidebar の安全設計に準拠（戻るボタン暴発防止） ---
+    const sb = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (sb) {
+        sb.classList.remove('open');
+        sb.style.display = 'none';
+    }
+    if (overlay) overlay.style.display = 'none';
+
+    // 履歴を上書きして popstate の誤作動を防ぐ
+    window.history.replaceState({ page: 'modal', id: 'app-common-modal' }, "");
+    // ------------------------------------------------------------------
+
+    // 汎用モーダルに流し込むための親コンテナ（入力欄のみを格納）
+    const container = document.createElement('div');
+    container.className = "notification-container";
+
+    // 1. 場所選択セレクトボックスのグループ作成
+    const groupSpot = document.createElement('div');
+    groupSpot.className = "setting-group";
+    groupSpot.style.marginBottom = "14px";
+    
+    const labelSpot = document.createElement('label');
+    labelSpot.className = "setting-label";
+    labelSpot.style.display = "block";
+    labelSpot.style.marginBottom = "6px";
+    // 既存の正しい辞書キーを使用
+    labelSpot.innerText = typeof i18n !== 'undefined' ? i18n.t('notificationSelectSpot') : "通知する場所：";
+    
+    const selectSpot = document.createElement('select');
+    selectSpot.id = 'select-notification-spot';
+    selectSpot.style.width = "100%";
+    selectSpot.style.padding = "8px";
+    selectSpot.style.borderRadius = "4px";
+    selectSpot.style.border = "1px solid #ccc";
+
+    // 既存のお気に入りスポット(mySpots)から選択肢を動的に生成
+    if (typeof mySpots !== 'undefined' && Array.isArray(mySpots)) {
+        mySpots.forEach(spot => {
+            const opt = document.createElement('option');
+            opt.value = `${spot.lat},${spot.lon},${spot.label}`;
+            opt.innerText = spot.label;
+            selectSpot.appendChild(opt);
+        });
+    }
+    // 既存の保存データがあれば初期値を復元
+    const savedLat = localStorage.getItem('notification_lat');
+    const savedLon = localStorage.getItem('notification_lon');
+    const savedLabel = localStorage.getItem('notification_label');
+    if (savedLat && savedLon && savedLabel) {
+        selectSpot.value = `${savedLat},${savedLon},${savedLabel}`;
+    }
+    groupSpot.appendChild(labelSpot);
+    groupSpot.appendChild(selectSpot);
+
+    // 2. 時刻入力欄のグループ作成
+    const groupTime = document.createElement('div');
+    groupTime.className = "setting-group";
+    groupTime.style.marginBottom = "14px";
+    
+    const labelTime = document.createElement('label');
+    labelTime.className = "setting-label";
+    labelTime.style.display = "block";
+    labelTime.style.marginBottom = "6px";
+    // 既存の正しい辞書キーを使用
+    labelTime.innerText = typeof i18n !== 'undefined' ? i18n.t('notificationSelectTime') : "通知時刻：";
+    
+    const inputTime = document.createElement('input');
+    inputTime.type = 'time';
+    inputTime.id = 'input-notification-time';
+    inputTime.style.width = "100%";
+    inputTime.style.padding = "8px";
+    inputTime.style.borderRadius = "4px";
+    inputTime.style.border = "1px solid #ccc";
+    inputTime.value = localStorage.getItem('notification_time') || "07:00";
+    
+    groupTime.appendChild(labelTime);
+    groupTime.appendChild(inputTime);
+
+    // 3. 【方法A】エラーメッセージ表示用のエリア（初期状態は隠す）
+    const errorArea = document.createElement('div');
+    errorArea.style.display = 'none';
+    errorArea.style.color = '#dc2626';
+    errorArea.style.backgroundColor = '#fef2f2';
+    errorArea.style.border = '1px solid #fee2e2';
+    errorArea.style.borderRadius = '4px';
+    errorArea.style.padding = '8px 12px';
+    errorArea.style.marginTop = '12px';
+    errorArea.style.fontSize = '13px';
+    errorArea.style.lineHeight = '1.4';
+    errorArea.style.textAlign = 'left';
+
+    // コンテナに入力欄とエラーエリアのみを結合
+    container.appendChild(groupSpot);
+    container.appendChild(groupTime);
+    container.appendChild(errorArea);
+
+    // 4. 既存の汎用ダイアログの仕組み（onSave）に、実際の保存処理を渡して呼び出す
+    showAppDialog({
+        title: "毎朝の気象概況通知設定",
+        message: "",
+        customElement: container, // 中央エリアに上記の入力欄を流し込む
+        saveBtnKey: "notificationSaveBtn", // フッターの青いボタンのテキストに既存辞書キーを指定
+        onSave: async () => {
+            // フッター内の既存の青い保存ボタンを取得
+            const footer = document.getElementById('common-modal-footer');
+            const saveBtn = footer ? footer.querySelector('.btn-save') : null;
+            const originalBtnText = typeof i18n !== 'undefined' ? i18n.t('notificationSaveBtn') : "設定を保存";
+
+            // 二重クリック防止およびローディング演出
+            if (saveBtn && saveBtn.disabled) return;
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.innerText = "保存中..."; // 既存ボタンのテキストを切り替えて処理中を表現
+            }
+            errorArea.style.display = 'none';
+            errorArea.textContent = '';
+
+            // 非同期保存処理を実行
+            const success = await executeNotificationSaveLogic(selectSpot.value, inputTime.value, errorArea);
+            
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerText = originalBtnText;
+            }
+
+            // 【超重要】成功した場合のみ、明示的に共通モーダルを閉じる
+            if (success) {
+                const modal = document.getElementById('app-common-modal');
+                if (modal) modal.style.display = 'none';
+            }
+        }
+    });
+}
+
+/**
+ * サブルーチン：通知設定の実際の保存・Push購読通信処理（方法A：エラーを画面内に書き出す）
+ */
+async function executeNotificationSaveLogic(spotValue, timeValue, errorAreaElement) {
+    if (!spotValue || !timeValue) return false;
+
+    // 1. 通知パーミッションの確認
+    if ('Notification' in window && Notification.permission !== 'granted') {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            errorAreaElement.textContent = typeof i18n !== 'undefined' ? i18n.t('notificationPermDenied') : "通知の許可がブロックされています。ブラウザの設定を変更してください。";
+            errorAreaElement.style.display = 'block';
+            return false;
+        }
+    }
+
+    const [lat, lon, label] = spotValue.split(',');
+    const time = timeValue;
+
+    if (!lat || !lon || !label || !time) return false;
+
+    // 2. ローカルストレージへの保存
+    let userId = localStorage.getItem('notification_user_id');
+    if (!userId) {
+        userId = 'usr_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
+        localStorage.setItem('notification_user_id', userId);
+    }
+
+    localStorage.setItem('notification_lat', lat);
+    localStorage.setItem('notification_lon', lon);
+    localStorage.setItem('notification_label', label);
+    localStorage.setItem('notification_time', time);
+
+    // 3. ServiceWorkerを用いたWeb Push購読とGASサーバーへの非同期通信
+    if ('serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+            console.log("[Web Push] 購読処理を開始します...");
+            const registration = await navigator.serviceWorker.ready;
+            const publicKey = "BJYVLMl3qqgbwsXUJAFHJsTbXgr8uB_8z1NawLGeon-cE4YpgGg3FmnSdjSzjdtVsp51Gapl53XwJ38KR5BXvjg";
+            
+            const subscription = await subscribeUserToPush(registration, publicKey);
+            const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Tokyo";
+            const lang = viewConfig.language || "ja";
+            const unit = viewConfig.windSpeedUnit || "ms";
+            
+            // サーバー通信実行
+            await saveSubscriptionToSpreadsheet(userId, subscription, timeZone, lat, lon, label, time, lang, unit);
+            console.log("[Web Push] GASへの保存が正常に完了しました。");
+
+        } catch (pushErr) {
+            console.error("[Web Push エラー] 失敗しました:", pushErr.message);
+            
+            // 【方法A】：既存モーダルを上書きせず、現在の入力画面の中にあるエラーエリアに赤字で原因を表示
+            const failText = typeof i18n !== 'undefined' ? i18n.t('notificationSaveFailed') : "設定の保存に失敗しました。";
+            errorAreaElement.textContent = `${failText}\n(原因: ${pushErr.message})`;
+            errorAreaElement.style.display = 'block';
+            
+            return false; // 失敗を返す（呼び出し元でモーダルを閉じさせない）
+        }
+    }
+
+    console.log(`[設定保存完了] 場所: ${label}, 時刻: ${time}`);
+    if (typeof setupUserConfiguredNotificationTimer === 'function') {
+        setupUserConfiguredNotificationTimer();
+    }
+    
+    return true; // 成功を返す（呼び出し元でモーダルを閉じる）
+}
+
+/**
  * モーダル内の「設定を保存」ボタンが押された時の保存処理
  */
 async function saveNotificationSettingsFromModal() {
@@ -4342,6 +4494,11 @@ async function saveNotificationSettingsFromModal() {
     const time = inputTime.value;
 
     if (!lat || !lon || !label || !time) return;
+
+    // 【追加】処理開始直後に「保存中...」のステータスを表示（ガセ情報を防ぐ）
+    if (msgEl) {
+        msgEl.textContent = typeof i18n !== 'undefined' ? i18n.t('savingMsg') : "Saving...";
+    }
 
     // ユーザーにIDを登録させず、意識させない運用のための自動発行ロジック
     let userId = localStorage.getItem('notification_user_id');
@@ -4381,17 +4538,21 @@ async function saveNotificationSettingsFromModal() {
             console.log("[Web Push] GASへの購読・設定情報の保存がすべて正常に完了しました。");
         } catch (pushErr) {
             console.error("[Web Push エラー] 購読またはGASへのデータ送信に失敗しました:", pushErr.message);
+            
+            // 【修正】エラー発生時はステータスを戻し、原因をユーザーにポップアップで通知して処理を中断（モーダルは閉じない）
+            if (msgEl) msgEl.textContent = '';
+            const errText = typeof i18n !== 'undefined' ? i18n.t('notificationSaveFailed') : "通知設定の保存に失敗しました。";
+            alert(`${errText}\n原因: ${pushErr.message}`);
+            return; 
         }
     }
     // ---------------------------------------------------------------------
 
+    // 【修正】すべての非同期処理が無事に終わったら、文字をクリアして即座にモーダルを閉じます
     if (msgEl) {
-        msgEl.textContent = typeof i18n !== 'undefined' ? i18n.t('notificationSavedMsg') : "Saved successfully";
-        setTimeout(() => { 
-            msgEl.textContent = ''; 
-            closeNotificationModal(); 
-        }, 1200);
+        msgEl.textContent = '';
     }
+    closeNotificationModal();
 
     console.log(`[設定保存完了] 場所: ${label}, 時刻: ${time}`);
 
