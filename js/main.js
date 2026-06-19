@@ -1128,27 +1128,34 @@ function setupWidgetHeader() {
 
 /**
  * サブルーチン：環境判定とUIへの反映
+ * 修正内容：ダークモード（夜間モード）判定を追加。環境識別カラーを維持したまま、見ぐるしくない深みのある色へシフト。
  */
 function applyEnvVisuals() {
     const hostname = window.location.hostname;
     let config = {};
 
+    // ブラウザが現在ダークモードに設定されているかどうかの事実を判定
+    const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.includes("192.168.")) {
         config = {
             titleSuffix: " [Local]",
-            headerColor: "#b0fbcf", 
+            // ダークモード時は深いフォレストエメラルド、通常時は明るいミントグリーン
+            headerColor: isDarkMode ? "#064e3b" : "#b0fbcf", 
             envName: "PC Localhost"
         };
     } else if (hostname.includes("beta")) {
         config = {
             titleSuffix: " (B)",
-            headerColor: "#f5dc1b", 
+            // ダークモード時は深みのあるアンバー・ゴールド、通常時は鮮やかな黄色
+            headerColor: isDarkMode ? "#78350f" : "#f5dc1b", 
             envName: "Beta"
         };
     } else {
         config = {
             titleSuffix: "",
-            headerColor: "#00c8ff", 
+            // ダークモード時は深いロイヤルブルー、通常時は鮮やかな水色
+            headerColor: isDarkMode ? "#0f172a" : "#00c8ff", 
             envName: "Main"
         };
     }
@@ -1157,6 +1164,13 @@ function applyEnvVisuals() {
     if (headerEl) {
         headerEl.style.backgroundColor = config.headerColor;
         headerEl.style.transition = "background-color 0.3s ease";
+        
+        // 【視認性向上】ダークモードの深い背景色に対して、トップバーの文字やボタンが埋もれないよう色を微調整
+        if (isDarkMode) {
+            headerEl.style.color = "#f1f5f9";
+        } else {
+            headerEl.style.color = (hostname.includes("localhost") || hostname.includes("127.0.0.1") || hostname.includes("192.168.") || hostname.includes("beta")) ? "#333333" : "#ffffff";
+        }
     }
 
     const footerDisclaimer = document.querySelector('.footer-info');
@@ -1750,6 +1764,7 @@ function initCompassUI() {
  * サブローチン：環境色を反映した汎用ダイアログを表示
  * 修正内容：通知専用の引数 onOk を追加。これが存在する場合は、他のボタンを排除してOKボタンのみを表示する。
  * 【今回追加】：customElement 引数を追加し、外部から組み立てられたフォーム要素を中央に流し込めるように拡張。
+ * 修正内容2：モーダルヘッダーもトップバーと同様に、ダークモード時は環境色を維持したディープトーンに切り替え、見ぐるしさを解消。
  */
 function showAppDialog({ title, message = null, messageKey = null, inputValue = null, onMap = null, onSave = null, onDelete = null, saveBtnKey = null, onOk = null, customElement = null }) {
     const modal = document.getElementById('app-common-modal');
@@ -1774,14 +1789,19 @@ function showAppDialog({ title, message = null, messageKey = null, inputValue = 
     if (widgetArea) widgetArea.style.display = 'none';
     if (widgetActionArea) widgetActionArea.style.display = 'none';
 
-    // 環境色の反映（既存維持）
+    // 環境色の反映（既存維持しつつダークモード適合に拡張）
     const hostname = window.location.hostname;
-    let bgColor = "#007bff"; 
+    const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    let bgColor = isDarkMode ? "#0f172a" : "#007bff"; 
     let textColor = "#ffffff";
+    
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.includes("192.168.")) {
-        bgColor = "#b0fbcf"; textColor = "#333333";
+        bgColor = isDarkMode ? "#064e3b" : "#b0fbcf"; 
+        textColor = isDarkMode ? "#f1f5f9" : "#333333";
     } else if (hostname.includes("beta")) {
-        bgColor = "#f5dc1b"; textColor = "#333333";
+        bgColor = isDarkMode ? "#78350f" : "#f5dc1b"; 
+        textColor = isDarkMode ? "#f1f5f9" : "#333333";
     }
     header.style.backgroundColor = bgColor;
     titleEl.style.color = textColor;
