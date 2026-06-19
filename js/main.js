@@ -3522,6 +3522,7 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
         html += `<line x1="0" y1="${yPosSvg}" x2="${totalW}" y2="${yPosSvg}" class="grid-y-sub" />`;
     }
 
+
     // グリッド（X軸・時間）
     for (let i = startIdx; i < totalDataCount; i++) {
         const x = (i - startIdx) * hScale;
@@ -3529,7 +3530,18 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
         if (i % 24 === 0 || i === startIdx) {
             html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight}" class="grid-day" />`;
             const dayIdx = d.getDay();
-            let dayColor = (dayIdx === 0) ? "#FF0000" : (dayIdx === 6 ? "#0000FF" : "#000000");
+            
+            // 【修正】現在の環境がダークモードかどうかを自動判定
+            const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            let dayColor;
+            if (isDarkMode) {
+                // ダークモード時は背景と同化しない明るい色相を割り当て
+                dayColor = (dayIdx === 0) ? "#ff6b6b" : (dayIdx === 6 ? "#66b2ff" : "#ffffff");
+            } else {
+                // 通常モード時はご提示元のカラー設定を完全に維持
+                dayColor = (dayIdx === 0) ? "#FF0000" : (dayIdx === 6 ? "#0000FF" : "#000000");
+            }
+            
             const localizedDateStr = getLocalizedDate(d);
             const labelContent = `<span style="color:${dayColor}; font-size:${labelFS * 1.5}px;" class="notranslate">${localizedDateStr}</span>`;
             dateContHtml += `<div class="sticky-date-bottom" style="left:${x}px;" data-x="${x}">${isLast ? labelContent : ''}</div>`;
