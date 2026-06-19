@@ -3446,6 +3446,11 @@ async function draw() {
             wHtml += `<line x1="0" y1="${gy}" x2="${totalW}" y2="${gy}" class="grid-y-sub" />`;
         }
 
+        // 【追加】ブラウザが現在ダークモードであるかどうかの事実を判定
+        const isDarkForPrecip = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        // ダークモード時は黒背景に映える鮮やかなスカイブルー、通常時は既存の青
+        const precipColor = isDarkForPrecip ? "#38bdf8" : "#0059ff";
+
         for(let i = startIdx; i < totalDataCount; i++) {
             const x = (i - startIdx) * hScale; 
             const icon = weatherIcons[allData.data.weather_code[i]] || "❓";
@@ -3453,13 +3458,15 @@ async function draw() {
             const p = allData.data.precipitation ? allData.data.precipitation[i] : 0;
             if (p > 0) {
                 const barH = (p / pRange) * pPlotH;
-                wHtml += `<rect x="${x - (hScale*0.3)}" y="${pBaseY - barH}" width="${hScale*0.6}" height="${barH}" fill="#0059ff" opacity="0.7" />`;
+                // fill の色指定を判定された precipColor に変更（不透明度や幅などの計算は完全維持）
+                wHtml += `<rect x="${x - (hScale*0.3)}" y="${pBaseY - barH}" width="${hScale*0.6}" height="${barH}" fill="${precipColor}" opacity="0.7" />`;
                 
                 // 【制御の組み込み】graphValuesVisibility が 'hide' でない場合のみ、グラフ上の数値テキストを描画する
                 if (viewConfig.graphValuesVisibility !== 'hide') {
                     // 【追加修正】降水量の数値テキストも風速と同様に45度左回りに回転させ、綺麗に中心で整列させる
                     const targetY = pBaseY - barH - 7;
-                    wHtml += `<text x="${x}" y="${targetY}" font-size="${labelFS - 1}" font-weight="bold" fill="#0000FF" text-anchor="middle" transform="rotate(-45, ${x}, ${targetY})">${p.toFixed(1)}</text>`;
+                    // fill の色指定を判定された precipColor に変更（フォントサイズや回転処理は完全維持）
+                    wHtml += `<text x="${x}" y="${targetY}" font-size="${labelFS - 1}" font-weight="bold" fill="${precipColor}" text-anchor="middle" transform="rotate(-45, ${x}, ${targetY})">${p.toFixed(1)}</text>`;
                 }
             }
         }
