@@ -3449,7 +3449,7 @@ async function draw() {
         // 【追加】ブラウザが現在ダークモードであるかどうかの事実を判定
         const isDarkForPrecip = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         // ダークモード時は黒背景に映える鮮やかなスカイブルー、通常時は既存の青
-        const precipColor = isDarkForPrecip ? "#38bdf8" : "#0059ff";
+        const precipColor = isDarkForPrecip ? "#388ef8" : "#0000FF";
 
         for(let i = startIdx; i < totalDataCount; i++) {
             const x = (i - startIdx) * hScale; 
@@ -3842,11 +3842,16 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
             ftStr = `${ft.getMonth()+1}/${ft.getDate()}(${ftDayStr}) ${ft.getHours()}:${ft.getMinutes().toString().padStart(2, '0')}`;
         }
 
+        // 【追加】ブラウザが現在ダークモードであるかどうかの事実を判定
+        const isDarkForPrecip = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        // ダークモード時は黒背景に映える鮮やかなスカイブルー、通常時は既存の青
+        const precipColor = isDarkForPrecip ? "#388ef8" : "#0000FF";
+
         tooltip.innerHTML = `
             <span class="spot-name-tip">📍 ${currentLabel}</span>
             <span class="coord-tip notranslate">${currentLat.toFixed(3)}, ${currentLon.toFixed(3)}</span>
             <b class="notranslate">${localizedDateStr} ${d.getHours()}:00 ${wIcon}</b>
-            <div class="icon-box"><span class="legend-bar" style="background:#0000FF; margin-right:0;"></span></div>${i18n.t('precip')}: ${precipVal}<br>
+            <div class="icon-box"><span class="legend-bar" style="background:${precipColor}; margin-right:0;"></span></div>${i18n.t('precip')}: ${precipVal}<br>
             <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${rotateDeg})"/></svg></div>${i18n.t('windDir')}: ${deg !== null && !isNaN(deg) ? getWindDirText(deg) + ' (' + deg + '°)' : '---'}<br>
             <div class="icon-box">🚩</div>${i18n.t('windSpeed')}: ${windVal}<br>
             <div class="icon-box"><span class="legend-line" style="background: linear-gradient(to right, #ff4500 50%, transparent 50%); background-size: 8px 100%; height: 2px; margin-right: 0; display: inline-block; vertical-align: middle; width: 14px;"></span></div>${i18n.t('gust')}: ${gustVal}<br>
