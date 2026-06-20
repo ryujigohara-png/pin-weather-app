@@ -45,9 +45,9 @@ self.addEventListener('notificationclick', (event) => {
  * サーバーから受信したデータを解析し、通知ポップアップを表示するサブルーチン
  * デバッグ内容：サーバーから到達した生のデータ（テキスト）を冒頭で出力。
  * @param {ExtendableEvent} event 
- */
+ * */
 async function displayNotification(event) {
-  let title = '【24時間概況】'; // ご指定通りデフォルトのタイトルを「【24時間概況】」に変更
+  let title = '【12時間概況】'; // ご指定通りデフォルトのタイトルを「【12時間概況】」に変更
   let options = {
     body: '新しい天気情報があります。',
     icon: '/icon.png',
@@ -68,7 +68,7 @@ async function displayNotification(event) {
       options.data.lat = data.lat || null;
       options.data.lon = data.lon || null;
       options.data.place = data.place || null;
-      title = `【${data.place || "不明な地点"}の24時間概況】`; // タイトルに地点名を反映
+      title = `【${data.place || "不明な地点"}】`; // タイトルに地点名を反映
 
       // 【追加ロジック】気象データ(hourly)が含まれている場合、3時間おき4行サマリーを動的に組み立ててbodyを上書き
       if (data.hourly) {
@@ -91,7 +91,7 @@ async function displayNotification(event) {
  * 通知ポップアップがクリックされた時の遷移・フォーカス処理を行うサブルーチン
  * 修正内容：既存ウィンドウが存在する場合、ナビゲート成否に関わらず新規起動(すり抜け)を絶対させない構造にガード。
  * @param {NotificationEvent} event 
- */
+ * */
 async function handleNotificationClick(event) {
   console.log("DEBUG [SW]: 1. 通知クリックイベントを検知しました。");
 
@@ -176,7 +176,7 @@ async function handleNotificationClick(event) {
 
 /**
  * 1. 多言語化のための固定辞書オブジェクト
- */
+ * */
 const I18N_DICT = {
     ja: {
         hours: "時",
@@ -196,7 +196,7 @@ const I18N_DICT = {
  * 2. 現在時刻（JST）が属するOpen-Meteo hourly配列のインデックスを検索するサブルーチン
  * @param {string[]} timeArray - ISO8601形式の時刻文字列配列
  * @returns {number} 現在時刻に最も近いインデックス（見つからない場合は0）
- */
+ * */
 function findCurrentTimeIndex(timeArray) {
     const now = new Date();
     let closestIndex = 0;
@@ -210,8 +210,8 @@ function findCurrentTimeIndex(timeArray) {
             closestIndex = i;
         }
     }
-    // 3時間ブロックの先頭に合わせるため、3の倍数に丸める（例：14時なら12時（インデックス12）を起点にする）
-    return closestIndex - (closestIndex % 3);
+    // 【修正】現在時刻の「時」をそのままダイレクトに開始起点にするため、3の倍数への丸め処理を廃止します
+    return closestIndex;
 }
 
 /**
@@ -219,7 +219,7 @@ function findCurrentTimeIndex(timeArray) {
  * 修正内容：main.jsの weatherIcons 条件と100%完全に一致するようマッピングを修正
  * @param {number} code - WMO Weather Code
  * @returns {string} 天気絵文字
- */
+ * */
 function getWeatherEmoji(code) {
     const weatherIcons = { 
         0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️", 
@@ -239,7 +239,7 @@ function getWeatherEmoji(code) {
  * @param {number} degree - 0〜360度
  * @param {string} lang - 言語コード ('ja' または 'en')
  * @returns {string} 方位文字列
- */
+ * */
 function getWindDirectionStr(degree, lang) {
     const dict = I18N_DICT[lang] || I18N_DICT["ja"];
     const index = Math.floor(((degree + 11.25) % 360) / 22.5);
@@ -251,7 +251,7 @@ function getWindDirectionStr(degree, lang) {
  * @param {number} speedMs - m/s単位の風速（小数）
  * @param {string} unit - 単位設定 ('ms' または 'kn')
  * @returns {number} 切り捨てられた整数の風速値
- */
+ * */
 function convertAndFloorWindSpeed(speedMs, unit) {
     if (unit === "kn") {
         // 1 m/s = 1.94384 knots
@@ -268,7 +268,7 @@ function convertAndFloorWindSpeed(speedMs, unit) {
  * @param {string} lang - 言語コード ('ja' または 'en')
  * @param {string} unit - 風速単位 ('ms' または 'kn')
  * @returns {string} 整形された1行のテキスト
- */
+ * */
 function formatThreeHourLine(hourly, startIndex, lang, unit) {
     const dict = I18N_DICT[lang] || I18N_DICT["ja"];
     const unitStr = unit === "kn" ? "kn" : "m/s";
@@ -325,7 +325,7 @@ function formatThreeHourLine(hourly, startIndex, lang, unit) {
  * @param {string} lang - ユーザーの言語設定 ('ja' / 'en')
  * @param {string} unit - ユーザーの単位設定 ('ms' / 'kn')
  * @returns {string} 通知のbodyに設定する最終文字列
- */
+ * */
 function buildNotificationBody(weatherData, lang, unit) {
     const hourly = weatherData.hourly;
     if (!hourly) {

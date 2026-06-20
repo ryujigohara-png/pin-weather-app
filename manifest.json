@@ -10,6 +10,19 @@
   "orientation": "any",
   "background_color": "#ffffff",
   "theme_color": "#0078ff",
+  "color_schemes": [
+    {
+      "color_scheme": "light",
+      "background_color": "#ffffff",
+      "theme_color": "#0078ff"
+    },
+    {
+      "color_scheme": "dark",
+      "background_color": "#121212", 
+      "theme_color": "#121212" 
+    }
+  ],
+
   "scope": "/",
   "icons": [
     {
