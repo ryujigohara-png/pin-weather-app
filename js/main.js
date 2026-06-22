@@ -1442,6 +1442,7 @@ function finalizeInit() {
     updateLocation(currentLat, currentLon, currentLabel);
     generateSidebarQRCode();
     setupGeneralEvents(); // UIイベント登録
+    initScrollHelper();
 }
 
 /**
@@ -3653,6 +3654,81 @@ function renderChartMode() {
     if (typeof draw === 'function') {
         draw();
     }
+}
+
+/**
+ * サブローチン：スクロール補助ボタンの自動生成と表示制御
+ * 画面右下に「上↑」「左←」ボタンを動的に配置し、スクロール量に応じて表示・非表示を切り替えます。
+ * グラフモード（.main-card）とテキストモード（#textModeContainer）の両方の横スクロールに完全自動対応。
+ */
+function initScrollHelper() {
+    // 重複生成を防ぐ安全ガード
+    if (document.getElementById('scroll-helper-container')) return;
+
+    // 1. ボタンを包む固定コンテナを生成
+    const container = document.createElement('div');
+    container.id = 'scroll-helper-container';
+
+    // 2. 「上↑」ボタンの生成（縦スクロール用）
+    const btnTop = document.createElement('button');
+    btnTop.className = 'scroll-helper-btn';
+    btnTop.innerHTML = '↑';
+    btnTop.setAttribute('aria-label', 'トップへ戻る');
+    btnTop.onclick = () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    // 3. 「左←」ボタンの生成（横スクロール用）
+    const btnLeft = document.createElement('button');
+    btnLeft.className = 'scroll-helper-btn';
+    btnLeft.innerHTML = '←';
+    btnLeft.setAttribute('aria-label', '左端へ戻る');
+    btnLeft.onclick = () => {
+        const textContainer = document.getElementById('textModeContainer');
+        const graphContainer = document.querySelector('.main-card');
+        
+        // 存在するコンテナをすべて安全に左端へスムーズスクロール
+        if (textContainer) textContainer.scrollTo({ left: 0, behavior: 'smooth' });
+        if (graphContainer) graphContainer.scrollTo({ left: 0, behavior: 'smooth' });
+    };
+
+    // コンテナにボタンを結合してDOMへ追加
+    container.appendChild(btnTop);
+    container.appendChild(btnLeft);
+    document.body.appendChild(container);
+
+    // 4. 縦スクロールの監視（200px以上スクロールで「上↑」を表示）
+    window.addEventListener('scroll', () => {
+        if (window.scrollY > 200) {
+            btnTop.classList.add('is-visible');
+        } else {
+            btnTop.classList.remove('is-visible');
+        }
+    });
+
+    // 5. 横スクロールの監視（40px以上横スクロールで「左←」を表示）
+    const checkHorizontalScroll = (e) => {
+        if (e.target.scrollLeft > 40) {
+            btnLeft.classList.add('is-visible');
+        } else {
+            // 両方のコンテナがどちらも左端に戻っている場合のみ非表示にする
+            const textContainer = document.getElementById('textModeContainer');
+            const graphContainer = document.querySelector('.main-card');
+            const textLeft = textContainer ? textContainer.scrollLeft : 0;
+            const graphLeft = graphContainer ? graphContainer.scrollLeft : 0;
+
+            if (textLeft <= 40 && graphLeft <= 40) {
+                btnLeft.classList.remove('is-visible');
+            }
+        }
+    };
+
+    // 対象要素のスクロールイベントにサブルーチンを紐付け
+    const textContainer = document.getElementById('textModeContainer');
+    const graphContainer = document.querySelector('scroll-container');
+
+    if (textContainer) textContainer.addEventListener('scroll', checkHorizontalScroll);
+    if (graphContainer) graphContainer.addEventListener('scroll', checkHorizontalScroll);
 }
 
 //////グラフモード//////////////////////////////////////////////////////////////////////////////////
