@@ -9,6 +9,7 @@ const defaultViewConfig = {
     windSpeedUnit: 'ms',        // 風速単位
     
     // --- 新設：表示フラグの既定値（デフォルトに戻すボタンとも連動） ---
+    displayMode: 'text',           // 【追加】初期表示モード ('text' or 'graph')
     tooltipVisibility: 'show',     // ツールチップ表示設定 ('show' or 'hide')
     graphValuesVisibility: 'show', // グラフ内数値表示設定 ('show' or 'hide')
     welcomeBarVisibility: 'show',  // 【追加】ウェルカムバー表示設定 ('show' or 'hide')
@@ -102,6 +103,7 @@ const i18n = {
             btnSearch: "検索",
             btnSaveSpot: "MySpotsに登録",
             btnTempView: "グラフ表示",
+            btnTextView: "文字表示", // 【追加】テキストモード切り替えボタン用（日本語）
             btnClose: "キャンセル", 
             limitReached: "10箇所までしか登録できません。これ以上追加する場合は、既存の地点を長押しまたは右クリックして削除してください。",
             mapStatusFetching: "地点情報を取得中...",
@@ -291,6 +293,7 @@ const i18n = {
             btnSearch: "Search",
             btnSaveSpot: "Save to MySpots",
             btnTempView: "View Graph",
+            btnTextView: "View Text", // 【追加】テキストモード切り替えボタン用（英語）
             btnClose: "Cancel",
             limitReached: "Maximum of 10 spots allowed. Please delete an existing spot to add a new one.",
             mapStatusFetching: "Fetching location info...",
@@ -1444,8 +1447,9 @@ function finalizeInit() {
 /**
  * サブルーチン：UIイベントの登録
  * 既存のユーザーデータ「pin_weather_spots」および「pin_weather_wind_filter」を厳守。
- * 修正内容：地図ボタン押下時のrenderTabs("Map")呼び出しを削除。
- * サイドバー内「🔔 朝の通知設定ボタン」のイベント登録を追加。
+ * 【修正確定版】：HTML上の実際の要素（modeToggleButton, textModeContainer, main-card）に完全対応。
+ * ボタンにクラスを自動適用して形をそろえ、モード変更時に「概況」ボタンの表示・非表示も完全に連動させます。
+ * ※追加仕様：.legend-wind-container および #condition-summary-target をグラフと一体で表示・非表示にします。
  */
 function setupGeneralEvents() {
     // --- 新設：概況ボタン左隣のGPS/Mapボタン (nav-action-bar内) ---
@@ -1455,8 +1459,76 @@ function setupGeneralEvents() {
     const navMapBtn = document.getElementById('map-btn-nav');
     if (navMapBtn) navMapBtn.onclick = () => {
         openMap(currentLat, currentLon);
-        // renderTabs("Map") を削除（タブの色が消える不具合対策）
     };
+
+    // --- 新設：リアルタイム表示切換トグルボタン (HTML構造に完全適合版) ---
+    const modeToggleBtn = document.getElementById('modeToggleButton');
+    const summaryBtn = document.getElementById('summaryButton');
+    const graphContainer = document.querySelector('.main-card');
+    const textContainer = document.getElementById('textModeContainer');
+
+    // 【追加取得】グラフと一体に表示・非表示にするためのHTML要素
+    const legendContainer = document.querySelector('.legend-wind-container');
+    const summaryTargetContainer = document.getElementById('condition-summary-target');
+
+    // 内部処理：表示モードに応じて画面要素とボタンの「形・テキスト」をすべて整える
+    function applyDisplayModeUI(mode) {
+        if (!modeToggleBtn) return;
+        
+        // HTML側でクラスが空なのを補うため、GPSボタン等と全く同じCSSクラスを動的に適用して形をそろえる
+        modeToggleBtn.className = 'btn-mode-small'; 
+        
+        if (mode === 'text') {
+            if (graphContainer) graphContainer.style.display = 'none';
+            if (textContainer) textContainer.style.display = 'block';
+            if (summaryBtn) summaryBtn.style.display = 'none'; // 新規ユーザー等、テキストモード時は概況ボタンを消す（仕様通り）
+            
+            // 【連動非表示】テキストモード時は風向凡例と気象概況コンテナを非表示にする
+            if (legendContainer) legendContainer.style.display = 'none';
+            if (summaryTargetContainer) summaryTargetContainer.style.display = 'none';
+
+            modeToggleBtn.innerText = typeof i18n !== 'undefined' ? i18n.t('btnTempView') || "グラフ表示" : "グラフ表示";
+        } else {
+            if (graphContainer) graphContainer.style.display = 'block';
+            if (textContainer) textContainer.style.display = 'none';
+            if (summaryBtn) summaryBtn.style.display = 'block'; // 既存ユーザー等、グラフモード時は概況ボタンを出す
+            
+            // 【連動表示】グラフモード時は風向凡例と気象概況コンテナを表示する（インラインスタイルを消去しCSS本来の横並びを復元）
+            if (legendContainer) legendContainer.style.display = '';
+            if (summaryTargetContainer) summaryTargetContainer.style.display = '';
+
+            modeToggleBtn.innerText = typeof i18n !== 'undefined' ? i18n.t('btnTextView') || "文字表示" : "文字表示";
+        }
+    }
+
+    // 起動時：現在の保存状態（未定義ならデフォルトの'text'）に従ってUIの形を初期化
+    if (viewConfig.displayMode === undefined) viewConfig.displayMode = 'text';
+    applyDisplayModeUI(viewConfig.displayMode);
+
+    if (modeToggleBtn) {
+        modeToggleBtn.onclick = () => {
+            // 現在と反対のモードを判定
+            const nextMode = viewConfig.displayMode === 'graph' ? 'text' : 'graph';
+            
+            // 1. 「閉じたときと同じ条件で開く」思想に基づき、即時ローカルストレージへ保存
+            viewConfig.displayMode = nextMode;
+            localStorage.setItem('pin_weather_view_config', JSON.stringify(viewConfig));
+            
+            // 2. 画面レイアウト、およびトグルボタン・概況ボタンの表示状態（形）をリアルタイム更新
+            applyDisplayModeUI(nextMode);
+            
+            // 3. 各モードに対応する描画処理の安全な呼び出し
+            if (nextMode === 'text') {
+                if (typeof renderTextMode === 'function' && typeof allData !== 'undefined' && allData) {
+                    renderTextMode(allData);
+                }
+            } else {
+                if (typeof renderChartMode === 'function') {
+                    renderChartMode();
+                }
+            }
+        };
+    }
 
     // 1. 地図検索入力欄
     const searchInput = document.getElementById('map-search-input');
@@ -1483,12 +1555,11 @@ function setupGeneralEvents() {
         };
     }
    
-    // 【修正版】10. 通知設定ボタン（サイドバー）
-    // 履歴の競合を回避し、一本化された汎用モーダルを安全に起動します。
+    // 10. 通知設定ボタン（サイドバー）
     const openNotificationBtn = document.getElementById('openNotificationBtn');
     if (openNotificationBtn) {
         openNotificationBtn.onclick = () => {
-            openNotificationModalGeneral(); // 安全な画面遷移ロジックを内包したサブルーチンを直接実行
+            openNotificationModalGeneral(); 
         };
     }
 
@@ -1588,7 +1659,6 @@ function setupGeneralEvents() {
     if (mapBtn) {
         mapBtn.onclick = () => { 
             openMap(); 
-            // renderTabs("Map") を削除（タブの色が消える不具合対策）
         };
     }
 
@@ -3301,6 +3371,291 @@ function getI18nWeatherName(code) {
     return `weather_code_${code}`;
 }
 
+/////テキストモード//////////////////////////////////////////////////////////////////////////////////
+/**
+ * サブルーチン：3時間ブロックの中から「最大1時間雨量」を抽出し、小数点以下を切り捨てる
+ * （通知ロジックの計算結果と100%一貫性を保ちます）
+ * * @param {Object} hourly - Open-Meteoのhourlyデータオブジェクト
+ * @param {number} startIndex - 3時間ブロックの開始インデックス (0, 3, 6, 9, ...)
+ * @returns {number} 切り捨てられた最大降水量（mm）
+ */
+function getMaxPrecipitation(hourly, startIndex) {
+    // データの存在チェックと安全ガード（不正なデータによるエラーを完全に防ぎます）
+    if (!hourly || !hourly.precipitation || !Array.isArray(hourly.precipitation)) {
+        return 0;
+    }
+
+    // 3時間分のデータを安全に取得（配列の範囲外アクセス時は0として処理）
+    const p0 = hourly.precipitation[startIndex]     !== undefined ? hourly.precipitation[startIndex] : 0;
+    const p1 = hourly.precipitation[startIndex + 1] !== undefined ? hourly.precipitation[startIndex + 1] : 0;
+    const p2 = hourly.precipitation[startIndex + 2] !== undefined ? hourly.precipitation[startIndex + 2] : 0;
+
+    // 3時間の中の最大値を抽出
+    const maxVal = Math.max(p0, p1, p2);
+
+    // 仕様に基づき、小数点以下を切り捨てて返す
+    return Math.floor(maxVal);
+}
+
+/**
+ * サブルーチン：風速（m/s）に応じて、既存の凡例（グレー ➔ 青 ➔ オレンジ ➔ 赤 ➔ 濃い赤）の
+ * 間をRGB値で線形補間（計算）し、なめらかに変化するカラーコードを返す
+ * * @param {number} speedMs - m/s単位の風速数値
+ * @returns {Object} { fill: 塗りつぶし色コード, stroke: 枠線色コード }
+ */
+function getWindColorStyles(speedMs) {
+    // データの存在チェックと安全ガード（不正な値は最低風速のグレーとする）
+    if (speedMs === undefined || speedMs === null || isNaN(speedMs)) {
+        return { fill: "#cccccc", stroke: "#b3b3b3" };
+    }
+
+        // --- 1. カラーチェックポイント（ストップデータ）の定義 ---
+        // 15m/s以上の警告レベル「濃い赤」のチェックポイントを確実に追加しました
+        const colorStops = [
+            { speed: 0,  r: 204, g: 204, b: 204 }, // 0m/s基準：グレー   (#ccc)
+            { speed: 3,  r: 135, g: 206, b: 235 }, // 3m/s基準：青       (#87ceeb)
+            { speed: 5,  r: 255, g: 165, b: 0   }, // 5m/s基準：オレンジ (#ffa500)
+            { speed: 10, r: 220, g: 20,  b: 60  }, // 10m/s基準：赤       (#dc143c)
+            { speed: 15, r: 139, g: 0,   b: 0   }  // 15m/s基準：濃い赤   (#8b0000)
+        ];
+
+    let targetR = 0;
+    let targetG = 0;
+    let targetB = 0;
+
+    // --- 2. 風速が位置する区間の特定とRGBの線形補間計算 ---
+    if (speedMs <= colorStops[0].speed) {
+        // 下限（0m/s以下）の場合はグレー固定
+        targetR = colorStops[0].r;
+        targetG = colorStops[0].g;
+        targetB = colorStops[0].b;
+    } else if (speedMs >= colorStops[colorStops.length - 1].speed) {
+        // 上限（15m/s以上）の場合は濃い赤固定
+        targetR = colorStops[colorStops.length - 1].r;
+        targetG = colorStops[colorStops.length - 1].g;
+        targetB = colorStops[colorStops.length - 1].b;
+    } else {
+        // 中間区間の計算（ループ処理で該当する区間を特定）
+        for (let i = 0; i < colorStops.length - 1; i++) {
+            const startStop = colorStops[i];
+            const endStop = colorStops[i + 1];
+
+            // 現在の風速がこの2つのチェックポイントの間にある場合
+            if (speedMs >= startStop.speed && speedMs <= endStop.speed) {
+                // この区間内での風速の進捗比率（0.0 〜 1.0）を割り戻します
+                const t = (speedMs - startStop.speed) / (endStop.speed - startStop.speed);
+
+                // RGBの各成分を線形補間（比例計算）します
+                targetR = Math.round(startStop.r + (endStop.r - startStop.r) * t);
+                targetG = Math.round(startStop.g + (endStop.g - startStop.g) * t);
+                targetB = Math.round(startStop.b + (endStop.b - startStop.b) * t);
+                break; // 区間が特定できたらループを抜けます
+            }
+        }
+    }
+
+    // --- 3. 枠線用（stroke）に少し暗くしたRGBを計算 ---
+    // 計算されたfillの色に対して、一律で80%の輝度に落とすことで、中間色に完璧に馴染む枠線を動的生成します
+    const strokeR = Math.round(targetR * 0.8);
+    const strokeG = Math.round(targetG * 0.8);
+    const strokeB = Math.round(targetB * 0.8);
+
+    // --- 4. RGB数値を16進数カラーコード文字列（#rrggbb）に変換する内部ヘルパー ---
+    const toHex = (r, g, b) => {
+        const hexComponent = (c) => {
+            const hex = c.toString(16);
+            return hex.length === 1 ? "0" + hex : hex; // 1桁の場合は0で埋める
+        };
+        return "#" + hexComponent(r) + hexComponent(g) + hexComponent(b);
+    };
+
+    // fill（塗りつぶし）と stroke（枠線）のカラーコードをセットで返します
+    return {
+        fill: toHex(targetR, targetG, targetB),
+        stroke: toHex(strokeR, strokeG, strokeB)
+    };
+}
+
+/**
+ * サブルーチン：3時間ブロックの開始時間帯に応じて、最高気温または最低気温を動的に判定して抽出する
+ * * 【時間帯ルールの仕様】
+ * ・00:00-, 03:00- (深夜・明け方) ➔ 最低気温 (Math.min)
+ * ・06:00-, 09:00-, 12:00- (朝・日中) ➔ 最高気温 (Math.max)
+ * ・15:00-, 18:00-, 21:00- (夕方・夜間) ➔ 最低気温 (Math.min)
+ * * @param {Object} hourly - Open-Meteoのhourlyデータオブジェクト
+ * @param {number} startIndex - 3時間ブロックの配列開始インデックス
+ * @param {number} startHour - ブロックの開始時刻 (0, 3, 6, 9, 12, 15, 18, 21 のいずれか)
+ * @returns {number} 判定・抽出された気温数値（小数点第1位を四捨五入して整数化）
+ */
+function getDynamicTemperature(hourly, startIndex, startHour) {
+    // データの存在チェックと安全ガード（不正なデータによるエラーを完全に防ぎます）
+    if (!hourly || !hourly.temperature_2m || !Array.isArray(hourly.temperature_2m)) {
+        return 0;
+    }
+
+    // 3時間分の気温データを安全に取得（配列の範囲外アクセス時は0として処理）
+    const t0 = hourly.temperature_2m[startIndex]     !== undefined ? hourly.temperature_2m[startIndex] : 0;
+    const t1 = hourly.temperature_2m[startIndex + 1] !== undefined ? hourly.temperature_2m[startIndex + 1] : 0;
+    const t2 = hourly.temperature_2m[startIndex + 2] !== undefined ? hourly.temperature_2m[startIndex + 2] : 0;
+
+    let targetTemperature = 0;
+
+    // 開始時刻（startHour）に基づいて、計算ロジックを厳格に分岐
+    if (startHour === 0 || startHour === 3) {
+        // 深夜・明け方ブロック：1日のうちで最も気温が下がるボトムを捉えるため「最低気温」
+        targetTemperature = Math.min(t0, t1, t2);
+    } 
+    else if (startHour === 6 || startHour === 9 || startHour === 12) {
+        // 朝・日中ブロック：太陽が昇り気温が上がるピークを捉えるため「最高気温」
+        targetTemperature = Math.max(t0, t1, t2);
+    } 
+    else if (startHour === 15 || startHour === 18 || startHour === 21) {
+        // 夕方・夜間ブロック：日が落ちて再び冷え込んでいく変化を捉えるため「最低気温」
+        targetTemperature = Math.min(t0, t1, t2);
+    } 
+    else {
+        // 想定外の時間（イレギュラーなインデックスなど）が渡された場合の安全用デフォルト
+        targetTemperature = Math.max(t0, t1, t2);
+    }
+
+    // アプリ内のテキスト表示の統一感に合わせ、四捨五入して整数（あるいは必要に応じて丸めなしに変更可能）で返します
+    return Math.round(targetTemperature);
+}
+
+/**
+ * サブルーチン①：3時間分（1行分）のテキストモード用HTMLを生成する（多言語・単位連動版）
+ * @param {Object} hourly - Open-Meteoのhourlyデータオブジェクト
+ * @param {number} startIndex - 3時間ブロックの配列開始インデックス (0, 3, 6, 9, ...)
+ * @param {number} startHour - ブロックの開始時刻 (0, 3, 6, 9, ...)
+ * @returns {string} 1行分の構築済みHTML文字列
+ */
+function generateTextModeLine(hourly, startIndex, startHour) {
+    // データの存在チェックと安全ガード
+    if (!hourly || !hourly.time || startIndex === undefined) {
+        return "";
+    }
+
+    // 1. 時間表示の整形 (例: "03:00-")
+    const timeText = String(startHour).padStart(2, '0') + ':00-';
+
+    // 2. 既存の weatherIcons オブジェクトをそのまま流用して絵文字を3つ結合
+    let weatherEmojis = "";
+    for (let i = 0; i < 3; i++) {
+        const idx = startIndex + i;
+        const code = hourly.weather_code && hourly.weather_code[idx] !== undefined ? hourly.weather_code[idx] : null;
+        const emoji = (code !== null && weatherIcons[code] !== undefined) ? weatherIcons[code] : "☁️";
+        weatherEmojis += emoji;
+    }
+
+    // 3. 既成サブルーチンによる「動的気温」の取得と、viewConfigに連動した温度単位の付与
+    const temperature = getDynamicTemperature(hourly, startIndex, startHour);
+    const tempUnit = viewConfig.temperatureUnit === 'celsius' ? '°C' : '°F';
+
+    // 4. 既成サブルーチンによる「最大降水量」の取得
+    const maxPrecipitation = getMaxPrecipitation(hourly, startIndex);
+
+    // 5. 3時間分の風向SVGアイコン（矢羽根デザイン）の生成ループ
+    let windIconsHtml = "";
+    for (let i = 0; i < 3; i++) {
+        const idx = startIndex + i;
+        const deg = hourly.wind_direction_10m && hourly.wind_direction_10m[idx] !== undefined ? hourly.wind_direction_10m[idx] : null;
+        const speed = hourly.wind_speed_10m && hourly.wind_speed_10m[idx] !== undefined ? hourly.wind_speed_10m[idx] : 0;
+        
+        const colors = getWindColorStyles(speed);
+        const rotateDeg = deg !== null && !isNaN(deg) ? deg : 0;
+
+        // 【修正】改行と空白を完全除去して密着させ、transformで2px上に引き上げます
+        windIconsHtml += `
+            <div class="icon-box" style="display: inline-block; margin: 0 -4px; transform: translateY(-4px);">
+                <svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align: middle;">
+                    <path d="M0,-12 L6,6 L0,2 L-6,6 Z" 
+                          fill="${colors.fill}" 
+                          stroke="${colors.stroke}" 
+                          stroke-width="1" 
+                          transform="rotate(${rotateDeg})"/>
+                </svg>
+            </div>`;
+    }
+    // 6. 風速テキストの生成（開始時 ➔ 終了時、既存辞書の speedunit 設定に完全連動）
+    const startSpeed = hourly.wind_speed_10m && hourly.wind_speed_10m[startIndex] !== undefined ? Math.floor(hourly.wind_speed_10m[startIndex]) : 0;
+    const endSpeed = hourly.wind_speed_10m && hourly.wind_speed_10m[startIndex + 2] !== undefined ? Math.floor(hourly.wind_speed_10m[startIndex + 2]) : 0;
+    const speedUnit = i18n.t('speedunit');
+    const windSpeedText = `${startSpeed}➔${endSpeed} ${speedUnit}`;
+
+    // 7. 1つの行としてHTMLを出力
+    return `
+        <div class="text-mode-row">
+            <div class="text-cell-time">${timeText}</div>
+            <div class="text-cell-weather">${weatherEmojis}</div>
+            <div class="text-cell-temp">${temperature}${tempUnit}</div>
+            <div class="text-cell-precip">${maxPrecipitation}mm</div>
+            <div class="text-cell-wind-dir">${windIconsHtml}</div>
+            <div class="text-cell-wind-speed">${windSpeedText}</div>
+        </div>
+    `;
+}
+
+
+/**
+ * サブルーチン②：テキストモードの全日程をループ処理し、多言語ヘッダーを挟んで画面に描画する
+ * @param {Object} weatherData - Open-Meteoから取得したAPIレスポンスの全体オブジェクト
+ */
+function renderTextMode(weatherData) {
+    // 【原因特定による修正】：実際のデータ構造（weatherData.data）に合わせて安全ガードを厳密化
+    if (!weatherData || !weatherData.data) {
+        return;
+    }
+
+    // 実際のデータ格納先である「data」を「hourly」としてエイリアス（代入）することで、
+    // 後続の構造化ロジックやコメント、変数名を一切変更せずにそのまま確実に動作させます。
+    const hourly = weatherData.data;
+    const totalHours = hourly.time.length;
+    let containerHtml = "";
+
+    // 既存の i18n オブジェクトから現在言語の曜日配列を直接取得
+    const weekDays = i18n.t('days');
+
+    // 全時間帯を3時間ステップでループ処理
+    for (let i = 0; i < totalHours; i += 3) {
+        const dateObj = new Date(hourly.time[i]);
+        const currentHour = dateObj.getHours();
+
+        // 24時間ごと（00:00）、またはループの最初に対象日の「日付ヘッダー」を生成
+        if (currentHour === 0 || i === 0) {
+            const month = dateObj.getMonth() + 1;
+            const date = dateObj.getDate();
+            const dayName = weekDays[dateObj.getDay()];
+            
+            containerHtml += `
+                <div class="text-mode-date-header">
+                    ${month}/${date} (${dayName})
+                </div>
+            `;
+        }
+
+        // 既成の1行生成サブルーチンを呼び出して結合
+        containerHtml += generateTextModeLine(hourly, i, currentHour);
+    }
+
+    // DOMへの描画（表示切り替えやUI制御は applyDisplayModeUI 側に完全移管）
+    const textContainer = document.getElementById("textModeContainer");
+    if (textContainer) {
+        textContainer.innerHTML = containerHtml;
+    }
+}
+
+/**
+ * サブルーチン③：グラフモード（通常画面）への切り替え時に、実際のグラフ描画ロジックを安全に呼び出す
+ * （コンテナの表示・非表示やナビゲーション状態の復元は applyDisplayModeUI 側で一括処理されます）
+ */
+function renderChartMode() {
+    // グラフモード移行時に実際のSVG描画（draw）を確実に実行して画面を復元する
+    if (typeof draw === 'function') {
+        draw();
+    }
+}
+
+//////グラフモード//////////////////////////////////////////////////////////////////////////////////
 // ツールチップ消去用タイマー変数
 let tooltipTimer = null;
 
@@ -3362,6 +3717,13 @@ async function draw() {
             }
         }
         console.timeEnd("1. Data Fetch (Cache)");
+
+        // ==========================================================
+        // 【提案追記】起動時またはデータ更新時、テキストモードなら中身をレンダリングする
+        // ==========================================================
+        if (viewConfig.displayMode === 'text' && typeof renderTextMode === 'function' && allData) {
+            renderTextMode(allData);
+        }
 
         const svgW = document.getElementById('svg-weather');
         if (!svgW || !allData || !allData.data) return;
