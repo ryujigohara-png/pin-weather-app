@@ -3659,7 +3659,7 @@ function renderChartMode() {
 /**
  * サブローチン：スクロール補助ボタンの自動生成と表示制御
  * 画面右下に「上↑」「左←」ボタンを動的に配置し、スクロール量に応じて表示・非表示を切り替えます。
- * グラフモード（.main-card）とテキストモード（#textModeContainer）の両方の横スクロールに完全自動対応。
+ * グラフモード（#scroll-root）とテキストモード（#textModeContainer）の両方の横スクロールに完全自動対応。
  */
 function initScrollHelper() {
     // 重複生成を防ぐ安全ガード
@@ -3685,17 +3685,19 @@ function initScrollHelper() {
     btnLeft.setAttribute('aria-label', '左端へ戻る');
     btnLeft.onclick = () => {
         const textContainer = document.getElementById('textModeContainer');
-        const graphContainer = document.querySelector('.main-card');
+        const graphContainer = document.getElementById('scroll-root');
         
         // 存在するコンテナをすべて安全に左端へスムーズスクロール
         if (textContainer) textContainer.scrollTo({ left: 0, behavior: 'smooth' });
         if (graphContainer) graphContainer.scrollTo({ left: 0, behavior: 'smooth' });
     };
 
-    // コンテナにボタンを結合してDOMへ追加
-    container.appendChild(btnTop);
+    // 【修正】コンテナにボタンを結合（「←」を上、「↑」を下にすることで、下端の位置を完全固定）
     container.appendChild(btnLeft);
-    document.body.appendChild(container);
+    container.appendChild(btnTop);
+    
+    // html直下に挿入することで、上位要素のtransform干渉を100%完全回避
+    document.documentElement.appendChild(container);
 
     // 4. 縦スクロールの監視（200px以上スクロールで「上↑」を表示）
     window.addEventListener('scroll', () => {
@@ -3713,7 +3715,7 @@ function initScrollHelper() {
         } else {
             // 両方のコンテナがどちらも左端に戻っている場合のみ非表示にする
             const textContainer = document.getElementById('textModeContainer');
-            const graphContainer = document.querySelector('.main-card');
+            const graphContainer = document.getElementById('scroll-root');
             const textLeft = textContainer ? textContainer.scrollLeft : 0;
             const graphLeft = graphContainer ? graphContainer.scrollLeft : 0;
 
@@ -3725,7 +3727,7 @@ function initScrollHelper() {
 
     // 対象要素のスクロールイベントにサブルーチンを紐付け
     const textContainer = document.getElementById('textModeContainer');
-    const graphContainer = document.querySelector('scroll-container');
+    const graphContainer = document.getElementById('scroll-root');
 
     if (textContainer) textContainer.addEventListener('scroll', checkHorizontalScroll);
     if (graphContainer) graphContainer.addEventListener('scroll', checkHorizontalScroll);
