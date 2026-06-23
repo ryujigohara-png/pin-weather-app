@@ -245,10 +245,10 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
 .text-cell-weather    { width: 88px; letter-spacing: 1px; text-align: center; }
 
 /* 3. 気温セル：45px（維持） */
-.text-cell-temp       { width: 40px; text-align: right; font-size: 16px; }
+.text-cell-temp       { width: 38px; text-align: right; font-size: 16px; }
 
 /* 4. 降水セル：40px（維持） */
-.text-cell-precip     { width: 45px; text-align: right; font-size: 16px; color: #388ef8; }
+.text-cell-precip     { width: 50px; text-align: right; font-size: 16px; color: #388ef8; }
 
 /* 5. 風向きセル：【修正】JSでのマージン縮小に合わせて幅を 56px から 50px に狭め、さらに右マージン 10px を追加して風速と離す */
 .text-cell-wind-dir   { width: 50px; text-align: center; white-space: nowrap; margin-right: 10px; }

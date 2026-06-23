@@ -3350,17 +3350,6 @@ function getAzimuth(degrees) {
     return isJa ? directionsJa[idx] : directionsEn[idx];
 }
 
-/*function getLocalizedDate(date) {
-    const m = date.getMonth() + 1;
-    const d = date.getDate();
-    const daysJa = ["日", "月", "火", "水", "木", "金", "土"];
-    const daysEn = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    if (typeof i18n !== 'undefined' && i18n._currentLang === 'ja') {
-        return `${m}/${d}(${daysJa[date.getDay()]})`;
-    }
-    return `${m}/${d} (${daysEn[date.getDay()]})`;
-}*/
-
 /**
  * weatherMasterオブジェクトから現在の言語に対応する正確な天気名を取得するサブルーチン
  */
