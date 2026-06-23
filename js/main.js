@@ -3611,7 +3611,6 @@ function generateTextModeLine(hourly, startIndex, startHour) {
     `;
 }
 
-
 /**
  * サブルーチン②：テキストモードの全日程をループ処理し、多言語ヘッダーを挟んで画面に描画する
  * @param {Object} weatherData - Open-Meteoから取得したAPIレスポンスの全体オブジェクト
@@ -3642,8 +3641,17 @@ function renderTextMode(weatherData) {
             const date = dateObj.getDate();
             const dayName = weekDays[dateObj.getDay()];
             
+            // 曜日（0:日曜日, 6:土曜日）を判定してクラスを動的に決定
+            const dayOfWeek = dateObj.getDay();
+            let dayClass = "";
+            if (dayOfWeek === 0) {
+                dayClass = " is-sunday";
+            } else if (dayOfWeek === 6) {
+                dayClass = " is-saturday";
+            }
+            
             containerHtml += `
-                <div class="text-mode-date-header">
+                <div class="text-mode-date-header${dayClass}">
                     ${getLocalizedDate(dateObj)} 
                 </div>
             `;
