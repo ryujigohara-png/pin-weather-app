@@ -3384,7 +3384,8 @@ function getMaxPrecipitation(hourly, startIndex) {
     const maxVal = Math.max(p0, p1, p2);
 
     // 仕様に基づき、小数点以下を切り捨てて返す
-    return Math.floor(maxVal);
+    //return Math.floor(maxVal);
+    return maxVal;
 }
 
 /**
@@ -3543,7 +3544,7 @@ function generateTextModeLine(hourly, startIndex, startHour) {
 
     // 4. 既成サブルーチンによる「最大降水量」の取得
     let maxPrecipitation = getMaxPrecipitation(hourly, startIndex);
-    if (maxPrecipitation !== 0) maxPrecipitation = maxPrecipitation + "mm" 
+    if (maxPrecipitation !== 0) maxPrecipitation = Math.floor(maxPrecipitation) + "mm";
     else maxPrecipitation = ""; // 0mmの場合は非表示
 
     // 5. 3時間分の風向SVGアイコン（矢羽根デザイン）の生成ループ
