@@ -799,7 +799,8 @@ function syncSliderValues() {
         'hourWidth', 'windHeight', 'subHeight', 'margin', 'fontSize', 
         'iconScale', 'tooltipDuration', 'forecastDays', 'tempUnit', 'windUnit',
         'windThresholdHigh', 'windThresholdMid', 'windThresholdLow',
-        'tooltipVisibility', 'graphValuesVisibility', 'welcomeBarVisibility' // 【追加】新設セレクトボックスのキー
+        'tooltipVisibility', 'graphValuesVisibility', 'welcomeBarVisibility',
+        'themeMode' // 【追加】新設テーマ設定コンボボックスのキー
     ];
 
     const windUnitInput = document.getElementById('input-windUnit');
@@ -821,6 +822,7 @@ function syncSliderValues() {
         let val = viewConfig[configKey];
         // 【追加】ウェルカムバーのデフォルト値（未定義時）の考慮
         if (id === 'welcomeBarVisibility' && val === undefined) val = 'show';
+        if (id === 'themeMode' && val === undefined) val = 'system'; // 【追加】画面テーマのデフォルト値（未定義時）の考慮
         if (id === 'forecastDays' && val === undefined) val = 9;
 
         const input = document.getElementById(`input-${id}`);
@@ -847,26 +849,27 @@ function syncSliderValues() {
  * サブルーチン：設定の保存と適用
  */
 async function saveViewSettings() {
+    viewConfig.welcomeBarVisibility = document.getElementById('input-welcomeBarVisibility').value; // 【追加】ウェルカムバーの表示状態を保存
+    viewConfig.themeMode = document.getElementById('input-themeMode').value; // 【追加】画面テーマ設定の保存
+    // 【追加】新設セレクトボックスの選択状態を viewConfig へ保存
     viewConfig.forecastDays = parseInt(document.getElementById('input-forecastDays').value);
+    viewConfig.graphValuesVisibility = document.getElementById('input-graphValuesVisibility').value;
+    viewConfig.tooltipVisibility = document.getElementById('input-tooltipVisibility').value;
+    viewConfig.tooltipDuration = parseInt(document.getElementById('input-tooltipDuration').value);
+    
+    viewConfig.temperatureUnit = document.getElementById('input-tempUnit').value;
+    viewConfig.windSpeedUnit = document.getElementById('input-windUnit').value;
+
+    viewConfig.windThresholdHigh = Math.round(parseFloat(document.getElementById('input-windThresholdHigh').value));
+    viewConfig.windThresholdMid = Math.round(parseFloat(document.getElementById('input-windThresholdMid').value));
+    viewConfig.windThresholdLow = Math.round(parseFloat(document.getElementById('input-windThresholdLow').value));
+
     viewConfig.hourWidth = parseInt(document.getElementById('input-hourWidth').value);
     viewConfig.windHeight = parseInt(document.getElementById('input-windHeight').value);
     viewConfig.subHeight = parseInt(document.getElementById('input-subHeight').value);
     viewConfig.graphMargin = parseInt(document.getElementById('input-margin').value);
     viewConfig.fontSize = parseInt(document.getElementById('input-fontSize').value);
     viewConfig.iconScale = parseFloat(document.getElementById('input-iconScale').value);
-    viewConfig.tooltipDuration = parseInt(document.getElementById('input-tooltipDuration').value);
-    
-    viewConfig.temperatureUnit = document.getElementById('input-tempUnit').value;
-    viewConfig.windSpeedUnit = document.getElementById('input-windUnit').value;
-
-    // 【追加】新設セレクトボックスの選択状態を viewConfig へ保存
-    viewConfig.tooltipVisibility = document.getElementById('input-tooltipVisibility').value;
-    viewConfig.graphValuesVisibility = document.getElementById('input-graphValuesVisibility').value;
-    viewConfig.welcomeBarVisibility = document.getElementById('input-welcomeBarVisibility').value; // 【追加】ウェルカムバーの表示状態を保存
-
-    viewConfig.windThresholdHigh = Math.round(parseFloat(document.getElementById('input-windThresholdHigh').value));
-    viewConfig.windThresholdMid = Math.round(parseFloat(document.getElementById('input-windThresholdMid').value));
-    viewConfig.windThresholdLow = Math.round(parseFloat(document.getElementById('input-windThresholdLow').value));
 
     const savedSpots = localStorage.getItem('pin_weather_spots');
     let hasSpots = false;
@@ -1527,6 +1530,9 @@ function setupGeneralEvents() {
                 if (typeof renderChartMode === 'function') {
                     renderChartMode();
                 }
+                // 【追加仕様】：グラフモードへの切り替え時、下方にスクロールしていれば最上部へ自動で戻す
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            
             }
         };
     }
@@ -3626,14 +3632,54 @@ function renderTextMode(weatherData) {
             `;
         }
 
-        // 既成の1行生成サブルーチンを呼び出して結合
-        containerHtml += generateTextModeLine(hourly, i, currentHour);
+        // 既成の1行生成サブルーチンを呼び出してベースHTMLを取得
+        let lineHtml = generateTextModeLine(hourly, i, currentHour);
+
+        // 【経過分数ベースの動的タイムライン判定】
+        const now = new Date();
+        const blockStart = new Date(hourly.time[i]);
+        const blockEnd = new Date(blockStart.getTime() + 3 * 60 * 60 * 1000); // 3時間後
+
+        // 現在時刻がこの3時間ブロック（180分間）の範囲内にある場合
+        if (now >= blockStart && now < blockEnd) {
+            // 3時間の枠内（180分）で、現在何分経過しているかをミリ秒から正確に算出
+            const passedMinutes = Math.floor((now.getTime() - blockStart.getTime()) / (60 * 1000));
+            
+            // 180分に対する経過割合をパーセンテージ（%）に換算
+            const topPercent = (passedMinutes / 180) * 100;
+
+            // サブルーチン①の戻り値（lineHtml）には一切触れず、外側からラッパーで包み、
+            // 計算した%の位置（top）に最背面レイヤーとして青破線を安全に滑り込ませます。
+            // 【スクロール用変更】：自動スクロールの対象を補足するため、id="textModeCurrentRow" を追加付与します。
+            lineHtml = `
+                <div id="textModeCurrentRow" class="text-mode-row-wrapper">
+                    ${lineHtml}
+                    <div class="text-mode-current-timeline" style="top: ${topPercent}%;"></div>
+                </div>
+            `;
+        }
+
+        // 最終的なHTMLコンテナに結合
+        containerHtml += lineHtml;
     }
 
     // DOMへの描画（表示切り替えやUI制御は applyDisplayModeUI 側に完全移管）
     const textContainer = document.getElementById("textModeContainer");
     if (textContainer) {
         textContainer.innerHTML = containerHtml;
+    }
+
+    // ============================================================
+    // 【新規追加仕様】：現在時刻の予報位置への自動スムーズスクロール
+    // ============================================================
+    // 描画されたHTMLの中から、現在時刻のIDを持つラッパー要素を即座に検索
+    const currentTargetRow = document.getElementById("textModeCurrentRow");
+    if (currentTargetRow) {
+        // 画面の中央（block: 'center'）にジャストフィットするよう、滑らかにスクロールさせます
+        currentTargetRow.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+        });
     }
 }
 

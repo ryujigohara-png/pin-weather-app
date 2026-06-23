@@ -34,7 +34,7 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     z-index: 100 !important;
     /* 重なり時に下が透けないよう背景色を指定 */
     /* 背景色はjs側の環境判定に依存とのことですが、
-       潜り込むタブを隠すために不透明な色（白など）が必須となります */
+        潜り込むタブを隠すために不透明な色（白など）が必須となります */
     background-color: #ffffff; 
     /* 固定されている境目をわかりやすくする影（右側のみ） */
     box-shadow: 4px 0 6px -2px rgba(0,0,0,0.15);
@@ -217,7 +217,7 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
 
 /* ============================================================
     テキストモード用レイアウトスタイル（スマホ完全対応版）
-   ============================================================ */
+    ============================================================ */
 
 /* テキスト予報全体コンテナ：幅が足りないスマホのために横スクロールを許可（安全策） */
 #textModeContainer {
@@ -270,9 +270,47 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     min-width: 100%; /* コンテナ幅が広い場合は100%広げる */
 }
 
+/* --------------------------------------------------
+ * テキストモード用：現在時刻タイムライン（最背面レイヤー方式）
+ * -------------------------------------------------- */
+
+/* 1行を包むラッパー（破線の絶対配置の基準になります） */
+.text-mode-row-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+/* 既存の行スタイルに重なり順（最前面）を付与。背景は透過させて破線を透けさせます */
+.text-mode-row {
+    position: relative;
+    z-index: 2;
+    background-color: transparent !important;
+}
+
+/* 最背面に配置される青破線タイムライン */
+.text-mode-current-timeline {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    border-top: 2px dashed #007bff; /* ライトモード用の鮮やかな青破線 */
+    z-index: 1;                     /* 文字（z-index: 2）の後ろに配置 */
+    pointer-events: none;           /* マウスイベントを透過 */
+    transform: translateY(-1px);    /* 線の厚み分、中央にジャストフィットさせる微調整 */
+}
+
+/* ダークモード環境（手動ダーク固定、またはシステム連動かつライト固定以外）での青破線の色微調整 */
+html[data-theme="dark"] .text-mode-current-timeline {
+    border-top: 2px dashed #3897ff; /* ダークモード用の明るい青破線 */
+}
+@media (prefers-color-scheme: dark) {
+    html:not([data-theme="light"]) .text-mode-current-timeline {
+        border-top: 2px dashed #3897ff; /* ダークモード用の明るい青破線 */
+    }
+}
+
 /* ============================================================
-   メインカード（グラフコンテナ）の上部調整
-   ============================================================ */
+    メインカード（グラフコンテナ）の上部調整
+    ============================================================ */
 .main-card { 
     max-width: 1500px; 
     margin: auto; 
@@ -497,8 +535,8 @@ svg { width: 100%; display: block; overflow: visible; }
 }
 
 /* ============================================================
-   1. 汎用ダイアログ（app-common-modal）用スタイル
-   ============================================================ */
+    1. 汎用ダイアログ（app-common-modal）用スタイル
+    ============================================================ */
 
 .btn-save { 
     background: #007bff !important; 
@@ -570,8 +608,8 @@ svg { width: 100%; display: block; overflow: visible; }
 }
 
 /* ============================================================
-   widget-mode専用：余白を最小化し、凡例とボタンを枠内に収める
-   ============================================================ */
+    widget-mode専用：余白を最小化し、凡例とボタンを枠内に収める
+    ============================================================ */
 
 /* 1. body設定：ナビバーの余白(70px)を消し、スクロールを許可 */
 body.widget-mode {
@@ -636,8 +674,8 @@ body.widget-mode .footer-info {
 }
 
 /* ============================================================
-   ナビゲーションアクションバー（隙間・水平線解消版完全版）
-   ============================================================ */
+    ナビゲーションアクションバー（隙間・水平線解消版完全版）
+    ============================================================ */
 .nav-action-bar {
     position: sticky !important;
     top: var(--nav-height) !important; 
@@ -664,7 +702,7 @@ body.widget-mode .footer-info {
     margin-bottom: 0 !important;
 }
 
-/* Chrome, Safari 用のスクロールバー非表示設定の維持 */
+/* Chrome, Safari 用のスクロールバー非表示設定 of the維持 */
 .nav-action-bar::-webkit-scrollbar {
     display: none !important;
 }
@@ -850,9 +888,9 @@ body.widget-mode .footer-info {
 }
 
 /* ==========================================================================
-   PCブラウザ固有の input[type="time"] の崩れた時計ポップアップを無効化する修正
-   （既存のダークモードの色指定や、Androidの標準セレクタには一切影響を与えません）
-   ========================================================================== */
+    PCブラウザ固有の input[type="time"] の崩れた時計ポップアップを無効化する修正
+    （既存のダークモードの色指定や、Androidの標準セレクタには一切影響を与えません）
+    ========================================================================== */
 
 /* Chrome, Edge, Safari 等で時計アイコンおよび崩れるポップアップを非表示 */
 input[type="time"]::-webkit-calendar-picker-indicator {
@@ -868,247 +906,493 @@ input[type="time"] {
 }
 
 
+/* ============================================================
+    ダークモード設定（システム連動：ライト固定時を除く ＆ 手動強制ダークの共通化）
+    ============================================================ */
 @media (prefers-color-scheme: dark) {
-    :root {
+    html:not([data-theme="light"]) {
         color-scheme: dark;
+
+        & body {
+            background: #121212;
+        }
+        
+        /* ボタン配置とタブの親コンテナの境界線調整 */
+        & .control-wrapper {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* 1番目の固定タブ：重なり時に下が透けないよう暗めの不透明背景を指定 */
+        & .scroll-tabs > .btn-location:first-child {
+            background-color: #1e1e1e;
+            box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.4);
+        }
+        
+        /* 共通ボタン基本スタイルのダークモード化 */
+        & .btn {
+            border: 1px solid #475569;
+            background: #1e1e1e;
+            color: #e2e8f0;
+        }
+        
+        /* MySpots＋ボタン：環境色に左右されない視認性を維持 */
+        & .btn-add-tab { 
+            background: rgba(30, 41, 59, 0.8) !important;
+            color: #60a5fa !important;
+            border: 1px dashed #3b82f6 !important;
+        }
+        
+        /* ホバー挙動 */
+        & .btn:not(.active):hover {
+            background: #2d3748;
+            border-color: #4a5568;
+        }
+        
+        /* サイドバー関連 */
+        & .sidebar-header { 
+            border-bottom: 1px solid #334155; 
+        }
+        & .sidebar {
+            background: #1e1e1e;
+            color: #e2e8f0;
+        }
+        & .sidebar.open { 
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5); 
+        }
+        & .sidebar-overlay {
+            background: rgba(0, 0, 0, 0.6); 
+        }
+        & .sidebar-qr-area {
+            border-top: 1px solid #334155;
+        }
+        & .sidebar-qr-area p { color: #94a3b8; }
+        & #sidebar-qrcode { 
+            border: 1px solid #475569; 
+        }
+
+        & #welcome-bar {
+            background: #1e293b !important; /* ダークモード用の濃い背景色 */
+            color: #f8fafc !important;      /* ダークモード用の明るい文字色 */
+            border-bottom: 1px solid #334155 !important;
+        }
+        & #close-welcome {
+            background: #334155 !important;
+            color: #38bdf8 !important;
+            border: 1px solid #38bdf8 !important;
+        }
+
+        /* モーダル関連 */
+        & .modal-overlay {
+            background: rgba(0, 0, 0, 0.6); 
+        }
+        & .modal-content {
+            background: #1e1e1e;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); 
+        }
+        & .search-bar { 
+            background: #1e1e1e; 
+            border-bottom: 1px solid #334155; 
+        }
+        & .search-input { 
+            background: #2d3748; 
+            border: 1px solid #475569; 
+            color: #fff;
+        }
+        & #map-canvas { 
+            background-color: #121212 !important; 
+        }
+
+        /* コンパス */
+        & .compass-container {
+            background: #1e293b; 
+            border: 2px solid #475569;
+        }
+        & .compass-label {
+            background: #1e1e1e; 
+            border: 1px solid #475569; 
+        }
+
+        /* 地図最大化フッター */
+        & .modal-footer { 
+            background: #1e1e1e; 
+            border-top: 1px solid #334155;
+        }
+        & .modal-footer .guide-text { color: #94a3b8; }
+
+        /* メインカード（グラフコンテナ） */
+        & .main-card { 
+            background: #1e1e1e; 
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); 
+        }
+        & .chart-section { 
+            background: #1e1e1e; 
+            border: 1px solid #334155; 
+        }
+        & .sticky-label {
+            background: rgba(30, 30, 30, 0.85);
+        }
+        & .y-axis-title { color: #f1f5f9; }
+
+        /* SVGグリッド・テキストの視認性確保 */
+        & .grid-day { stroke: #94a3b8; } 
+        & .grid-3h { stroke: #475569; }  
+        & .grid-y-sub { stroke: #334155; } 
+        & .label-time { fill: #f1f5f9; }
+        
+        & .sticky-date-top,
+        & .sticky-date-bottom {
+            color: #fff;
+        }
+        & .y-axis-values { color: #cbd5e1; }
+
+        /* 詳細設定 */
+        & .view-settings-body {
+            background: #1e1e1e;
+        }
+        & .config-group {
+            border-bottom: 1px solid #334155;
+        }
+        & .config-title {
+            color: #e2e8f0;
+        }
+        & .config-slider {
+            background: #334155;
+        }
+
+        /* 風速凡例 */
+        & .legend-wind-container {
+            background: rgba(30, 30, 30, 0.85);
+        }
+        & .legend-wind-label {
+            color: #e2e8f0;
+        }
+
+        /* 汎用ダイアログ */
+        & #common-modal-header {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        & #common-modal-title {
+            color: #f1f5f9 !important;
+        }
+        & #common-modal-message {
+            color: #94a3b8;
+        }
+        & #common-modal-footer {
+            background: #1e1e1e;
+            border-top: 1px solid #334155;
+        }
+
+        /* widget-mode専用 */
+        & body.widget-mode {
+            background: #121212 !important;
+        }
+
+        /* ナビゲーションアクションバー */
+        & .nav-action-bar {
+            background-color: #1e1e1e !important;
+        }
+
+        /* 通知設定モーダル */
+        & .notification-modal-box {
+            background: #1e1e1e;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        }
+        & .modal-header-title {
+            color: #f1f5f9;
+            border-bottom: 1px solid #334155;
+        }
+        & .setting-label {
+            color: #94a3b8;
+        }
+        & .full-width-select {
+            background-color: #1e293b;
+            border: 1px solid #475569;
+            color: #f1f5f9;
+        }
+        & .notification-time-input {
+            background-color: #1e293b;
+            border: 1px solid #475569;
+            color: #f1f5f9;
+        }
+
+        /* --------------------------------------------------
+         * 追加：【概況】・3連ボタン・活用ガイドのダークモード化
+         * -------------------------------------------------- */
+
+        /* 1. 【概況】カードの背景と文字色 */
+        & #condition-summary-target {
+            background-color: transparent !important; /* 外枠コンテナの白背景を透過させて隠れる問題を解消 */
+        }
+        & #weather-summary-container {
+            background-color: #1e1e1e !important; /* 目に優しいダークグレー */
+            border-color: #333333 !important;     /* 枠線も暗く */
+        }
+        & #weather-summary {
+            color: #f5f5f5 !important;             /* 文字を白っぽく */
+        }
+
+        /* 2. 3連外部サイトボタンの背景コンテナ */
+        & .weather-links {
+            background: #1e1e1e !important;        /* 背景を周囲と合わせて黒系に */
+            border-bottom-color: #252525 !important; /* 下部の太い境界線も暗く */
+        }
+
+        /* 3. 活用ガイドカードの背景と文字色 */
+        & #user-guide-container {
+            background: #1e1e1e !important;        /* 背景をダークグレーに */
+            border-color: #333333 !important;     /* 枠線も暗く */
+        }
+        & #guide-main-title {
+            color: #f5f5f5 !important;             /* メインタイトルを白に */
+        }
+        /* ガイド内の各説明文（div）の文字色を一括で白系に */
+        & #user-guide-container div[id^="guide-body-"] {
+            color: #e0e0e0 !important;             /* 説明文を少し落ち着いた白に */
+        }
     }
-    body {
+}
+
+html[data-theme="dark"] {
+    color-scheme: dark;
+
+    & body {
         background: #121212;
     }
     
     /* ボタン配置とタブの親コンテナの境界線調整 */
-    .control-wrapper {
+    & .control-wrapper {
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
     
     /* 1番目の固定タブ：重なり時に下が透けないよう暗めの不透明背景を指定 */
-    .scroll-tabs > .btn-location:first-child {
+    & .scroll-tabs > .btn-location:first-child {
         background-color: #1e1e1e;
         box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.4);
     }
     
     /* 共通ボタン基本スタイルのダークモード化 */
-    .btn {
+    & .btn {
         border: 1px solid #475569;
         background: #1e1e1e;
         color: #e2e8f0;
     }
     
     /* MySpots＋ボタン：環境色に左右されない視認性を維持 */
-    .btn-add-tab { 
+    & .btn-add-tab { 
         background: rgba(30, 41, 59, 0.8) !important;
         color: #60a5fa !important;
         border: 1px dashed #3b82f6 !important;
     }
     
     /* ホバー挙動 */
-    .btn:not(.active):hover {
+    & .btn:not(.active):hover {
         background: #2d3748;
         border-color: #4a5568;
     }
     
     /* サイドバー関連 */
-    .sidebar-header { 
+    & .sidebar-header { 
         border-bottom: 1px solid #334155; 
     }
-    .sidebar {
+    & .sidebar {
         background: #1e1e1e;
         color: #e2e8f0;
     }
-    .sidebar.open { 
+    & .sidebar.open { 
         box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5); 
     }
-    .sidebar-overlay {
+    & .sidebar-overlay {
         background: rgba(0, 0, 0, 0.6); 
     }
-    .sidebar-qr-area {
+    & .sidebar-qr-area {
         border-top: 1px solid #334155;
     }
-    .sidebar-qr-area p { color: #94a3b8; }
-    #sidebar-qrcode { 
+    & .sidebar-qr-area p { color: #94a3b8; }
+    & #sidebar-qrcode { 
         border: 1px solid #475569; 
     }
 
-    #welcome-bar {
+    & #welcome-bar {
         background: #1e293b !important; /* ダークモード用の濃い背景色 */
         color: #f8fafc !important;      /* ダークモード用の明るい文字色 */
         border-bottom: 1px solid #334155 !important;
     }
-    #close-welcome {
+    & #close-welcome {
         background: #334155 !important;
         color: #38bdf8 !important;
         border: 1px solid #38bdf8 !important;
     }
 
     /* モーダル関連 */
-    .modal-overlay {
+    & .modal-overlay {
         background: rgba(0, 0, 0, 0.6); 
     }
-    .modal-content {
+    & .modal-content {
         background: #1e1e1e;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); 
     }
-    .search-bar { 
+    & .search-bar { 
         background: #1e1e1e; 
         border-bottom: 1px solid #334155; 
     }
-    .search-input { 
+    & .search-input { 
         background: #2d3748; 
         border: 1px solid #475569; 
         color: #fff;
     }
-    #map-canvas { 
+    & #map-canvas { 
         background-color: #121212 !important; 
     }
 
     /* コンパス */
-    .compass-container {
+    & .compass-container {
         background: #1e293b; 
         border: 2px solid #475569;
     }
-    .compass-label {
+    & .compass-label {
         background: #1e1e1e; 
         border: 1px solid #475569; 
     }
 
     /* 地図最大化フッター */
-    .modal-footer { 
+    & .modal-footer { 
         background: #1e1e1e; 
         border-top: 1px solid #334155;
     }
-    .modal-footer .guide-text { color: #94a3b8; }
+    & .modal-footer .guide-text { color: #94a3b8; }
 
     /* メインカード（グラフコンテナ） */
-    .main-card { 
+    & .main-card { 
         background: #1e1e1e; 
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); 
     }
-    .chart-section { 
+    & .chart-section { 
         background: #1e1e1e; 
         border: 1px solid #334155; 
     }
-    .sticky-label {
+    & .sticky-label {
         background: rgba(30, 30, 30, 0.85);
     }
-    .y-axis-title { color: #f1f5f9; }
+    & .y-axis-title { color: #f1f5f9; }
 
     /* SVGグリッド・テキストの視認性確保 */
-    .grid-day { stroke: #94a3b8; } 
-    .grid-3h { stroke: #475569; }  
-    .grid-y-sub { stroke: #334155; } 
-    .label-time { fill: #f1f5f9; }
+    & .grid-day { stroke: #94a3b8; } 
+    & .grid-3h { stroke: #475569; }  
+    & .grid-y-sub { stroke: #334155; } 
+    & .label-time { fill: #f1f5f9; }
     
-    .sticky-date-top,
-    .sticky-date-bottom {
+    & .sticky-date-top,
+    & .sticky-date-bottom {
         color: #fff;
     }
-    .y-axis-values { color: #cbd5e1; }
+    & .y-axis-values { color: #cbd5e1; }
 
     /* 詳細設定 */
-    .view-settings-body {
+    & .view-settings-body {
         background: #1e1e1e;
     }
-    .config-group {
+    & .config-group {
         border-bottom: 1px solid #334155;
     }
-    .config-title {
+    & .config-title {
         color: #e2e8f0;
     }
-    .config-slider {
+    & .config-slider {
         background: #334155;
     }
 
     /* 風速凡例 */
-    .legend-wind-container {
+    & .legend-wind-container {
         background: rgba(30, 30, 30, 0.85);
     }
-    .legend-wind-label {
+    & .legend-wind-label {
         color: #e2e8f0;
     }
 
     /* 汎用ダイアログ */
-    #common-modal-header {
+    & #common-modal-header {
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
-    #common-modal-title {
+    & #common-modal-title {
         color: #f1f5f9 !important;
     }
-    #common-modal-message {
+    & #common-modal-message {
         color: #94a3b8;
     }
-    #common-modal-footer {
+    & #common-modal-footer {
         background: #1e1e1e;
         border-top: 1px solid #334155;
     }
 
     /* widget-mode専用 */
-    body.widget-mode {
+    & body.widget-mode {
         background: #121212 !important;
     }
 
     /* ナビゲーションアクションバー */
-    .nav-action-bar {
+    & .nav-action-bar {
         background-color: #1e1e1e !important;
     }
 
     /* 通知設定モーダル */
-    .notification-modal-box {
+    & .notification-modal-box {
         background: #1e1e1e;
         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
     }
-    .modal-header-title {
+    & .modal-header-title {
         color: #f1f5f9;
         border-bottom: 1px solid #334155;
     }
-    .setting-label {
+    & .setting-label {
         color: #94a3b8;
     }
-    .full-width-select {
+    & .full-width-select {
         background-color: #1e293b;
         border: 1px solid #475569;
         color: #f1f5f9;
     }
-    .notification-time-input {
+    & .notification-time-input {
         background-color: #1e293b;
         border: 1px solid #475569;
         color: #f1f5f9;
     }
 
-/* --------------------------------------------------
+    /* --------------------------------------------------
      * 追加：【概況】・3連ボタン・活用ガイドのダークモード化
      * -------------------------------------------------- */
 
     /* 1. 【概況】カードの背景と文字色 */
-    #condition-summary-target {
+    & #condition-summary-target {
         background-color: transparent !important; /* 外枠コンテナの白背景を透過させて隠れる問題を解消 */
     }
-    #weather-summary-container {
+    & #weather-summary-container {
         background-color: #1e1e1e !important; /* 目に優しいダークグレー */
         border-color: #333333 !important;     /* 枠線も暗く */
     }
-    #weather-summary {
+    & #weather-summary {
         color: #f5f5f5 !important;             /* 文字を白っぽく */
     }
 
     /* 2. 3連外部サイトボタンの背景コンテナ */
-    .weather-links {
+    & .weather-links {
         background: #1e1e1e !important;        /* 背景を周囲と合わせて黒系に */
         border-bottom-color: #252525 !important; /* 下部の太い境界線も暗く */
     }
 
     /* 3. 活用ガイドカードの背景と文字色 */
-    #user-guide-container {
+    & #user-guide-container {
         background: #1e1e1e !important;        /* 背景をダークグレーに */
         border-color: #333333 !important;     /* 枠線も暗く */
     }
-    #guide-main-title {
+    & #guide-main-title {
         color: #f5f5f5 !important;             /* メインタイトルを白に */
     }
     /* ガイド内の各説明文（div）の文字色を一括で白系に */
-    #user-guide-container div[id^="guide-body-"] {
+    & #user-guide-container div[id^="guide-body-"] {
         color: #e0e0e0 !important;             /* 説明文を少し落ち着いた白に */
     }
 }
+
 
 /* --------------------------------------------------
  * 追加：スクロール補助ボタン（右下固定・連動出現）
@@ -1157,9 +1441,14 @@ input[type="time"] {
     pointer-events: auto; /* 【修正】表示されたときだけクリック可能にする */
 }
 
-/* ダークモード時の視認性微調整 */
+/* ダークモード環境での視認性微調整（手動ダーク固定、またはシステム連動かつライト固定以外） */
+html[data-theme="dark"] .scroll-helper-btn {
+    background-color: rgba(26, 115, 232, 0.7); /* ダークモード用半透明青 */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
 @media (prefers-color-scheme: dark) {
-    .scroll-helper-btn {
+    html:not([data-theme="light"]) .scroll-helper-btn {
         background-color: rgba(26, 115, 232, 0.7); /* ダークモード用半透明青 */
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
         border: 1px solid rgba(255, 255, 255, 0.1);
