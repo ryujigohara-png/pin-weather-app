@@ -232,29 +232,29 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     flex-wrap: nowrap; /* 絶対に折り返さない（横1列を死守） */
     padding: 10px 6px; /* スマホ最適化のタイトなパディング */
     border-bottom: 1px solid #eee;
-    font-size: 18px;
+    font-size: 20px;
     width: max-content; /* 中身に合わせてコンテナを広げ、スクロールを発生させる（安全策） */
 }
 
 /* 【修正】合計334pxに収め、360px幅のスマホでも絶対に1行表示・重なりなしを達成するpx幅設定 */
 
 /* 1. 時間セル：55px（維持） 【修正：colorの固定値を削除し、気温と同様の自動切換に対応】 */
-.text-cell-time       { width: 55px; font-size: 16px; }
+.text-cell-time       { width: 30px; font-size: 16px; }
 
 /* 2. 天気セル：【修正】幅を 52px から 60px に広げ、 letter-spacing を 2px から 4px に増やしてゆとりを持たせる */
-.text-cell-weather    { width: 72px; letter-spacing: 1px; text-align: center; }
+.text-cell-weather    { width: 88px; letter-spacing: 1px; text-align: center; }
 
 /* 3. 気温セル：45px（維持） */
-.text-cell-temp       { width: 45px; text-align: right; font-size: 16px; }
+.text-cell-temp       { width: 40px; text-align: right; font-size: 16px; }
 
 /* 4. 降水セル：40px（維持） */
-.text-cell-precip     { width: 40px; text-align: right; font-size: 16px; color: #00d4ff; }
+.text-cell-precip     { width: 45px; text-align: right; font-size: 16px; color: #388ef8; }
 
 /* 5. 風向きセル：【修正】JSでのマージン縮小に合わせて幅を 56px から 50px に狭め、さらに右マージン 10px を追加して風速と離す */
-.text-cell-wind-dir   { width: 45px; text-align: center; white-space: nowrap; margin-right: 10px; }
+.text-cell-wind-dir   { width: 50px; text-align: center; white-space: nowrap; margin-right: 10px; }
 
 /* 6. 風速セル：【修正】幅を 72px に維持しつつ、絶対に改行させない white-space: nowrap; を追加 【修正：color: #fefefe; を削除し白背景での同化を解消】 */
-.text-cell-wind-speed { width: 72px; text-align: right; font-size: 16px; white-space: nowrap; }
+.text-cell-wind-speed { width: 70px; text-align: right; font-size: 16px; white-space: nowrap; }
 
 /* 日付ヘッダー */
 .text-mode-date-header {

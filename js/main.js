@@ -3350,7 +3350,7 @@ function getAzimuth(degrees) {
     return isJa ? directionsJa[idx] : directionsEn[idx];
 }
 
-function getLocalizedDate(date) {
+/*function getLocalizedDate(date) {
     const m = date.getMonth() + 1;
     const d = date.getDate();
     const daysJa = ["日", "月", "火", "水", "木", "金", "土"];
@@ -3359,7 +3359,7 @@ function getLocalizedDate(date) {
         return `${m}/${d}(${daysJa[date.getDay()]})`;
     }
     return `${m}/${d} (${daysEn[date.getDay()]})`;
-}
+}*/
 
 /**
  * weatherMasterオブジェクトから現在の言語に対応する正確な天気名を取得するサブルーチン
@@ -3536,8 +3536,8 @@ function generateTextModeLine(hourly, startIndex, startHour) {
         return "";
     }
 
-    // 1. 時間表示の整形 (例: "03:00-")
-    const timeText = String(startHour).padStart(2, '0') + ':00-';
+    // 1. 時間表示の整形 (例: "03-")
+    const timeText = String(startHour).padStart(2, '0') + '-';
 
     // 2. 既存の weatherIcons オブジェクトをそのまま流用して絵文字を3つ結合
     let weatherEmojis = "";
@@ -3553,7 +3553,9 @@ function generateTextModeLine(hourly, startIndex, startHour) {
     const tempUnit = viewConfig.temperatureUnit === 'celsius' ? '°C' : '°F';
 
     // 4. 既成サブルーチンによる「最大降水量」の取得
-    const maxPrecipitation = getMaxPrecipitation(hourly, startIndex);
+    let maxPrecipitation = getMaxPrecipitation(hourly, startIndex);
+    if (maxPrecipitation !== 0) maxPrecipitation = maxPrecipitation + "mm" 
+    else maxPrecipitation = ""; // 0mmの場合は非表示
 
     // 5. 3時間分の風向SVGアイコン（矢羽根デザイン）の生成ループ
     let windIconsHtml = "";
@@ -3567,7 +3569,7 @@ function generateTextModeLine(hourly, startIndex, startHour) {
 
         // 【修正】改行と空白を完全除去して密着させ、transformで2px上に引き上げます
         windIconsHtml += `
-            <div class="icon-box" style="display: inline-block; margin: 0 -4px; transform: translateY(-4px);">
+            <div class="icon-box" style="display: inline-block; margin: 0 -6px; transform: translateY(-4px);">
                 <svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align: middle;">
                     <path d="M0,-12 L6,6 L0,2 L-6,6 Z" 
                           fill="${colors.fill}" 
@@ -3589,7 +3591,7 @@ function generateTextModeLine(hourly, startIndex, startHour) {
             <div class="text-cell-time">${timeText}</div>
             <div class="text-cell-weather">${weatherEmojis}</div>
             <div class="text-cell-temp">${temperature}${tempUnit}</div>
-            <div class="text-cell-precip">${maxPrecipitation}mm</div>
+            <div class="text-cell-precip">${maxPrecipitation}</div>
             <div class="text-cell-wind-dir">${windIconsHtml}</div>
             <div class="text-cell-wind-speed">${windSpeedText}</div>
         </div>
@@ -3629,7 +3631,7 @@ function renderTextMode(weatherData) {
             
             containerHtml += `
                 <div class="text-mode-date-header">
-                    ${month}/${date} (${dayName})
+                    ${getLocalizedDate(dateObj)} 
                 </div>
             `;
         }
