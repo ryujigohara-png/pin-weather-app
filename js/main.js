@@ -1141,7 +1141,17 @@ function applyEnvVisuals() {
     let config = {};
 
     // ブラウザが現在ダークモードに設定されているかどうかの事実を判定
-    const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    let isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    // 【修正】画面テーマ設定（3択）が明示されている場合は、その設定に従って判定を上書き
+    if (typeof viewConfig !== 'undefined' && viewConfig.themeMode) {
+        if (viewConfig.themeMode === 'dark') {
+            isDarkMode = true;
+        } else if (viewConfig.themeMode === 'light') {
+            isDarkMode = false;
+        }
+        // 'system' の場合は、初期値の matchMedia 判定がそのまま活きます
+    }
 
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.includes("192.168.")) {
         config = {
