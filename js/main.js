@@ -2602,7 +2602,7 @@ async function updateLocation(lat, lon, label) {
 }
 
 
-const weatherIcons = { 0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️", 45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "🌦️", 61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "❄️", 73: "❄️", 75: "❄️", 80: "🌦️", 81: "🌦️", 82: "🌦️", 95: "⛈️", 96: "⛈️", 99: "⛈️" };
+const weatherIcons = { 0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️", 45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "🌦️", 61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "❄️", 73: "❄️", 75: "❄️", 80: "🌦️", 81: "🌦️", 82: "🌦️", 85: "❄️", 86: "❄️", 95: "⛈️", 96: "⛈️", 99: "⛈️" };
 function getWindDirText(deg) { return windDirs[Math.round(deg / 22.5) % 16]; }
 
 /**
@@ -3433,7 +3433,7 @@ function getMaxPrecipitation(hourly, startIndex) {
  * @param {string} unit - 風速の単位（省略時は viewConfig.windSpeedUnit）
  * @returns {Object} { fill: 塗りつぶし色コード, stroke: 枠線色コード }
  */
-function getWindColorStyles(speed, thLow=viewConfig.windSpeedThresholds.low, thMid=viewConfig.windSpeedThresholds.mid, thHigh=viewConfig.windSpeedThresholds.high, unit = viewConfig.windSpeedUnit) {
+function getWindColorStyles(speed, thLow=viewConfig.windThresholdLow, thMid=viewConfig.windThresholdMid, thHigh=viewConfig.windThresholdHigh, unit = viewConfig.windSpeedUnit) {
     // データの存在チェックと安全ガード（不正な値は最低風速のグレーとする）
     if (speed === undefined || speed === null || isNaN(speed)) {
         return { fill: "#cccccc", stroke: "#b3b3b3" };
@@ -4056,7 +4056,8 @@ async function draw() {
 
         for(let i = startIdx; i < totalDataCount; i++) {
             const x = (i - startIdx) * hScale; 
-            const icon = weatherIcons[allData.data.weather_code[i]] || "❓";
+            //const icon = weatherIcons[allData.data.weather_code[i]] || "❓";
+            const icon = weatherIcons[allData.data.weather_code[i]] || allData.data.weather_code[i];
             wHtml += `<text x="${x}" y="52" font-size="28" text-anchor="middle">${icon}</text>`; 
             const p = allData.data.precipitation ? allData.data.precipitation[i] : 0;
             if (p > 0) {
