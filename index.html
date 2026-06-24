@@ -498,42 +498,50 @@
 
 <script src="js/main.js"></script>
 
-<!-- 共通モーダル（完全版：地点登録・編集・ウィジェット対応） -->
 <div id="app-common-modal" class="modal-overlay" style="display: none;">
     <div class="modal-content" style="max-width: 450px; height: auto; min-height: 250px; position: relative;">
-        <!-- 閉じるボタン -->
         <div onclick="closeModal('app-common-modal')" style="position: absolute; top: 10px; right: 15px; font-size: 28px; cursor: pointer; color: #999; z-index: 100;">&times;</div>
 
-        <!-- ヘッダーエリア -->
         <div id="common-modal-header" style="padding: 20px 20px 10px 20px; text-align: center;">
             <div id="common-modal-title" style="font-size: 20px; font-weight: bold; color: #333;"></div>
         </div>
         
         <div class="view-settings-body" style="padding: 10px 20px 20px 20px; flex-grow: 1;">
-            <!-- メッセージ表示エリア -->
             <div id="common-modal-message" style="font-size: 13px; color: #666; text-align: center; line-height: 1.5; margin-bottom: 10px;"></div>
 
-            <!-- 【復元】地点名入力エリア：showAppDialogでの保存・編集に必須 -->
             <div id="common-modal-input-area" style="display: none; margin-bottom: 15px; padding: 0 10px;">
                 <input type="text" id="common-modal-input" 
                     style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 16px;">
             </div>
 
-            <!-- デバッグ情報表示エリア（既存機能を維持） -->
+            <div id="common-modal-notification-area" style="display: none; margin-bottom: 15px; padding: 0 10px; text-align: left;">
+                <div class="setting-group" style="margin-bottom: 14px;">
+                    <label id="label-notification-spot" class="setting-label" style="display: block; margin-bottom: 6px;"></label>
+                    <select id="select-notification-spot" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"></select>
+                </div>
+                <div class="setting-group" style="margin-bottom: 14px;">
+                    <label id="label-notification-time" class="setting-label" style="display: block; margin-bottom: 6px;"></label>
+                    <input type="time" id="input-notification-time" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                </div>
+                <div id="notification-error-area" style="display: none; color: #dc2626; background-color: #fef2f2; border: 1px solid #fee2e2; border-radius: 4px; padding: 8px 12px; margin-top: 12px; font-size: 13px; line-height: 1.4; text-align: left;"></div>
+                
+                <div id="notification-action-area" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
+                    <button type="button" id="notification-btn-close" class="btn btn-secondary">Cancel</button>
+                    <button type="button" id="notification-btn-save" class="btn btn-save">Save Settings</button>
+                </div>
+            </div>
+
             <div id="widget-debug-info" style="display: none; background: #fff3f3; border: 1px solid #ffc1c1; padding: 8px; margin-bottom: 10px; font-size: 10px; font-family: monospace; color: #d32f2f; word-break: break-all;">
                 <strong>DEBUG INFO:</strong><br>
                 <span id="debug-url"></span>
             </div>
 
-            <!-- widget-preview-area：軸固定を維持しつつ横スクロールを可能にする構造 -->
             <div id="widget-preview-area" style="display: none; text-align: left;">
                 <div style="margin-bottom: 15px;">
                     <div style="font-size: 11px; font-weight: bold; margin-bottom: 5px; color: #333;">Preview</div>
                     
-                    <!-- コンテナ：高さは指示通りの660px。横方向の強制スクロール（overflow-x: auto）を解除します -->
                     <div style="border: 1px solid #ddd; border-radius: 4px; overflow: hidden; background: #fff; height: 660px;">
                         
-                        <!-- iframe：幅を 100% に戻します。これにより内部の「軸固定」ロジックが正しく働きます -->
                         <iframe id="widget-preview-iframe" 
                                 width="100%" 
                                 height="660" 
@@ -545,26 +553,22 @@
                     </div>
                 </div>
 
-                <!-- Embed Code エリア（変更なし） -->
-                 <div style="margin-bottom: 15px;">
+                <div style="margin-bottom: 15px;">
                     <div style="font-size: 11px; font-weight: bold; margin-bottom: 5px; ">Embed Code</div>
                     <textarea id="widget-code-area" readonly 
                         style="width: 100%; height: 70px; font-size: 10px; font-family: monospace; padding: 5px; border: 1px solid #ccc; background: #f9f9f9; color: #333333 !important; box-sizing: border-box; resize: none;"
                     ></textarea>
                 </div>
 
-                <!-- コピーボタン（変更なし） -->
                 <button class="btn" onclick="copyWidgetCode()" 
                     style="width: 100%; background: #ef6c00; color: white; padding: 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">
                     <span id="widget-copy-btn-text">コードをコピー</span>
                 </button>
             </div>
 
-        <!-- フッターエリア（ボタンが動的に挿入される） -->
-        <div class="modal-footer" id="common-modal-footer" style="padding: 15px; background: #f8f9fa; gap: 8px; display: flex; justify-content: center;">
+        <div class="modal-footer" id="common-modal-footer" style="padding: 15px; background: #f8f9fa; gap: 12px; display: flex; justify-content: center; align-items: center;">
         </div>
     </div>
 </div>
-
 </body>
 </html>
