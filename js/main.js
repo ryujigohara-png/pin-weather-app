@@ -1496,23 +1496,26 @@ function finalizeInit() {
  * ※追加仕様：.legend-wind-container および #condition-summary-target をグラフと一体で表示・非表示にします。
  */
 function setupGeneralEvents() {
-    // --- 新設：概況ボタン左隣のGPS/Mapボタン (nav-action-bar内) ---
+    // --- text/graph表示切換トグルボタン ---
+    const modeToggleBtn = document.getElementById('modeToggleButton');
+    // --- 概況ボタン (nav-action-bar内) ---
+    const summaryBtn = document.getElementById('summaryButton');
+    // --- GPSボタン (nav-action-bar内) ---
     const navGpsBtn = document.getElementById('gps-btn-nav');
     if (navGpsBtn) navGpsBtn.onclick = () => handleGPSClick();
-
+    // --- Mapボタン (nav-action-bar内) ---
     const navMapBtn = document.getElementById('map-btn-nav');
     if (navMapBtn) navMapBtn.onclick = () => {
         openMap(currentLat, currentLon);
     };
 
-    // --- 新設：リアルタイム表示切換トグルボタン (HTML構造に完全適合版) ---
-    const modeToggleBtn = document.getElementById('modeToggleButton');
-    const summaryBtn = document.getElementById('summaryButton');
+    // --- グラフコンテナ ---
     const graphContainer = document.querySelector('.main-card');
+    // --- テキストコンテナ ---
     const textContainer = document.getElementById('textModeContainer');
-
-    // 【追加取得】グラフと一体に表示・非表示にするためのHTML要素
+    // --- 風向凡例コンテナ ---
     const legendContainer = document.querySelector('.legend-wind-container');
+    // --- 気象概況コンテナ ---
     const summaryTargetContainer = document.getElementById('condition-summary-target');
 
     // 内部処理：表示モードに応じて画面要素とボタンの「形・テキスト」をすべて整える
@@ -1522,26 +1525,22 @@ function setupGeneralEvents() {
         // HTML側でクラスが空なのを補うため、GPSボタン等と全く同じCSSクラスを動的に適用して形をそろえる
         modeToggleBtn.className = 'btn-mode-small'; 
         
-        if (mode === 'text') {
-            if (graphContainer) graphContainer.style.display = 'none';
-            if (textContainer) textContainer.style.display = 'block';
-            if (summaryBtn) summaryBtn.style.display = 'none'; // 新規ユーザー等、テキストモード時は概況ボタンを消す（仕様通り）
-            
-            // 【連動非表示】テキストモード時は風向凡例と気象概況コンテナを非表示にする
-            if (legendContainer) legendContainer.style.display = 'none';
-            if (summaryTargetContainer) summaryTargetContainer.style.display = 'none';
-
+        if (mode === 'text') {                                                      // テキストモード時のUI調整
             modeToggleBtn.innerText = typeof i18n !== 'undefined' ? i18n.t('btnTempView') || "グラフ表示" : "グラフ表示";
-        } else {
-            if (graphContainer) graphContainer.style.display = 'block';
-            if (textContainer) textContainer.style.display = 'none';
-            if (summaryBtn) summaryBtn.style.display = 'block'; // 既存ユーザー等、グラフモード時は概況ボタンを出す
-            
-            // 【連動表示】グラフモード時は風向凡例と気象概況コンテナを表示する（インラインスタイルを消去しCSS本来の横並びを復元）
-            if (legendContainer) legendContainer.style.display = '';
-            if (summaryTargetContainer) summaryTargetContainer.style.display = '';
+            if (graphContainer) graphContainer.style.display = 'none';                  // グラフコンテナを消す
+            if (textContainer) textContainer.style.display = 'block';                   // テキストコンテナを表示　
+            if (summaryBtn) summaryBtn.style.display = 'none';                          // 概況ボタンを消す
+            if (legendContainer) legendContainer.style.display = 'none';                // 風向凡例を消す
+            if (summaryTargetContainer) summaryTargetContainer.style.display = 'none';  // 気象概況コンテナを消す
 
+        } else {                                                                    // グラフモード時のUI調整
             modeToggleBtn.innerText = typeof i18n !== 'undefined' ? i18n.t('btnTextView') || "文字表示" : "文字表示";
+            if (graphContainer) graphContainer.style.display = 'block';                 // グラフコンテナを表示
+            if (textContainer) textContainer.style.display = 'none';                    // テキストコンテナを消す
+            if (summaryBtn) summaryBtn.style.display = 'block';                         // 概況ボタンを表示 
+            if (legendContainer) legendContainer.style.display = '';                    // 風向凡例を表示
+            if (summaryTargetContainer) summaryTargetContainer.style.display = '';      // 気象概況コンテナを表示
+
         }
     }
 
@@ -1553,26 +1552,22 @@ function setupGeneralEvents() {
         modeToggleBtn.onclick = () => {
             // 現在と反対のモードを判定
             const nextMode = viewConfig.displayMode === 'graph' ? 'text' : 'graph';
-            
             // 1. 「閉じたときと同じ条件で開く」思想に基づき、即時ローカルストレージへ保存
             viewConfig.displayMode = nextMode;
             localStorage.setItem('pin_weather_view_config', JSON.stringify(viewConfig));
-            
             // 2. 画面レイアウト、およびトグルボタン・概況ボタンの表示状態（形）をリアルタイム更新
             applyDisplayModeUI(nextMode);
-            
             // 3. 各モードに対応する描画処理の安全な呼び出し
             if (nextMode === 'text') {
                 if (typeof renderTextMode === 'function' && typeof allData !== 'undefined' && allData) {
-                    renderTextMode(allData);
+                    renderTextMode(allData);     // allData が未定義の場合、renderTextMode を呼び出さない
                 }
             } else {
                 if (typeof renderChartMode === 'function') {
-                    renderChartMode();
+                    renderChartMode();          // allData が未定義でも、グラフモードは描画可能な場合があるため呼び出す
                 }
                 // 【追加仕様】：グラフモードへの切り替え時、下方にスクロールしていれば最上部へ自動で戻す
                 window.scrollTo({ top: 0, behavior: 'smooth' });
-            
             }
         };
     }
@@ -1630,21 +1625,21 @@ function setupGeneralEvents() {
             draw(); 
         };
 
-        const footer = applyWindBtn.parentElement;
-        if (footer && !document.getElementById('wind-helper-group')) {
-            const helperGroup = document.createElement('div');
+        const footer = applyWindBtn.parentElement;  // 風向設定モーダルの下部にボタン群をまとめるための div を生成
+        if (footer && !document.getElementById('wind-helper-group')) {  // すでに存在する場合は再生成しない
+            const helperGroup = document.createElement('div');  // 風向設定モーダルの下部にボタン群をまとめるための div
             helperGroup.id = 'wind-helper-group';
             helperGroup.style.display = 'flex';
             helperGroup.style.width = '100%';
             helperGroup.style.gap = '6px';
             helperGroup.style.marginTop = '4px';
-
+            // ここでボタンのスタイルを統一するための基本スタイルを定義    
             const baseBtnStyle = "padding: 8px 4px; border-radius: 6px; font-size: 11px; font-weight: 500; border: none; cursor: pointer; transition: opacity 0.2s; flex: 1; white-space: nowrap;";
-
-            const btnLoadDef = document.createElement('button');
+            const btnLoadDef = document.createElement('button');    // デフォルト設定をロードするボタン
             btnLoadDef.style.cssText = baseBtnStyle + "background: #f1f3f5; color: #495057;";
             btnLoadDef.innerText = i18n.t('btnLoadDefault');
             btnLoadDef.onclick = () => {
+                // --- 追加仕様：ロード前に確認ダイアログを表示 ---
                 showAppDialog({ 
                     title: i18n.t('msgLoadConfirmTitle') || "確認", 
                     message: i18n.t('msgLoadConfirmDesc') || "デフォルト設定を読み込みますか？", 
@@ -1665,10 +1660,12 @@ function setupGeneralEvents() {
                 });
             };
 
+            //--- 追加仕様：デフォルト設定を保存するボタン
             const btnSaveDef = document.createElement('button');
             btnSaveDef.style.cssText = baseBtnStyle + "background: #f1f3f5; color: #495057;";
             btnSaveDef.innerText = i18n.t('btnSaveDefault');
             btnSaveDef.onclick = () => {
+                //--- 追加仕様：保存前に確認ダイアログを表示 ---
                 showAppDialog({ 
                     title: i18n.t('msgSaveConfirmTitle') || "保存の確認", 
                     message: i18n.t('msgSaveConfirmDesc') || "現在の設定をデフォルトとして保存しますか？", 
@@ -1677,18 +1674,21 @@ function setupGeneralEvents() {
                     } 
                 });
             };
-
+            
+            //--- 追加仕様：キャンセルボタン
             const cancelBtn = document.createElement('button');
             cancelBtn.id = "btnClose"; 
             cancelBtn.style.cssText = baseBtnStyle + "background: #6c757d; color: white;";
             cancelBtn.innerText = i18n.t('btnClose') || "Cancel";
             cancelBtn.onclick = () => closeModal('wind-modal');
 
+            //--- 追加仕様：確定ボタン
             const finalApplyBtn = document.createElement('button');
             finalApplyBtn.style.cssText = baseBtnStyle + "background: #007bff; color: white; flex: 1.2;";
             finalApplyBtn.innerText = i18n.t('btnSaveSettings') || "Apply Changes";
             finalApplyBtn.onclick = executeApply;
-
+            
+            // 既存のフッターをクリアして、新しいボタン群を追加 
             footer.innerHTML = ''; 
             footer.appendChild(btnLoadDef);
             footer.appendChild(btnSaveDef);
@@ -1697,11 +1697,11 @@ function setupGeneralEvents() {
         }
     }
 
-    // 5. 既存GPSボタン
+    // 5. 既存GPSボタン(nav-action-bar内に移動したが、キープ)
     const gpsBtn = document.getElementById('gps-btn');
     if (gpsBtn) gpsBtn.onclick = () => handleGPSClick();
     
-    // 6. 既存Mapボタン
+    // 6. 既存Mapボタン（nav-action-bar内に移動したが、キープ）
     const mapBtn = document.getElementById('map-btn');
     if (mapBtn) {
         mapBtn.onclick = () => { 
