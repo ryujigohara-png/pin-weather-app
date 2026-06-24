@@ -122,6 +122,13 @@ const i18n = {
 
             // --- 表示詳細設定モーダル ---
             settingsTitle: "グラフ表示詳細設定",
+            cfgWelcomeBarVisibility: "ウェルカムバーの表示",
+            optWelcomeBarShow: "表示する（デフォルト）",
+            optWelcomeBarHide: "表示しない",
+            cfgThemeMode: "画面モード",
+            optThemeSystem: "システム設定に従う",
+            optThemeDark: "ダークモード",
+            optThemeLight: "ライトモード",
             configLangTitle: "Language / 表示言語",
             cfgForecastDays: "予報日数 (最大16日)",
             btnOptionalOpen: "オプション設定 (表示倍率・サイズ等) ▼",
@@ -198,7 +205,8 @@ const i18n = {
             btnDelete: "削除",
             confirmDeletePrefix: "本当に削除しますか：",
 
-            summary_title: "【24時間概況】",
+            condition_summary_btn: "概況",
+            summary_title: "【概況】",
             as_of: "現在",
             analyzing: "解析中...",
             tomorrow: "明日",
@@ -312,6 +320,13 @@ const i18n = {
 
             // --- Detail Settings Modal ---
             settingsTitle: "Detailed Display Settings",
+            cfgWelcomeBarVisibility: "Welcome Bar Visibility",
+            optWelcomeBarShow: "Show (Default)",
+            optWelcomeBarHide: "Hide",
+            cfgThemeMode: "Theme Mode",
+            optThemeSystem: "System Default",
+            optThemeDark: "Dark Mode",
+            optThemeLight: "Light Mode",
             configLangTitle: "Language",
             cfgForecastDays: "Forecast Days (Max 16)",
             btnOptionalOpen: "Optional Settings (Scale, Size, etc.) ▼",
@@ -328,7 +343,7 @@ const i18n = {
             optShow: "Show",
             optHide: "Hide",
             optDefaultShow: "Show (Default)",
-            optDefaultHide: "Show (Default)",
+            optDefaultHide: "Hide (Default)",
             cfgTempUnit: "Temperature Unit",
             cfgWindUnit: "Wind Speed Unit",
             cfgWindThresholds: "Wind Coloring Thresholds",
@@ -388,7 +403,8 @@ const i18n = {
             btnDelete: "Delete",
             confirmDeletePrefix: "Are you sure you want to delete:",
 
-            summary_title: "[24-Hour Summary]", 
+            condition_summary_btn: "Summary",
+            summary_title: "[Summary]", 
             as_of: "As of",
             analyzing: "Analyzing...",
             tomorrow: "tomorrow",
@@ -770,16 +786,17 @@ function initViewSettings() {
                 thresholdUnitSpan.textContent = `(${windUnitInput.options[windUnitInput.selectedIndex].text})`;
             }
 
-            const toMs = { 'ms': 1.0, 'kn': 0.514444, 'kmh': 0.277778, 'mph': 0.44704 };
-            const fromMs = { 'ms': 1.0, 'kn': 1.94384, 'kmh': 3.6, 'mph': 2.23694 };
-
             const thIds = ['input-windThresholdHigh', 'input-windThresholdMid', 'input-windThresholdLow'];
             thIds.forEach(id => {
                 const el = document.getElementById(id);
                 if (el) {
                     const currentVal = parseFloat(el.value);
                     if (!isNaN(currentVal)) {
-                        let newVal = (currentVal * toMs[lastUnit]) * fromMs[nextUnit];
+                        // 1. 表示単位(lastUnit)からm/sへ逆算
+                        const speedInMs = convertWindSpeedValue(currentVal, lastUnit, true);
+                        // 2. m/sから次の表示単位(nextUnit)へ変換
+                        let newVal = convertWindSpeedValue(speedInMs, nextUnit, false);
+                        
                         // 全ての単位において、四捨五入して整数にする
                         el.value = Math.round(newVal);
                     }
@@ -789,6 +806,8 @@ function initViewSettings() {
             lastUnit = nextUnit;
         });
     }
+
+
 }
 
 /**
@@ -2843,16 +2862,11 @@ function isCalmWind(rawSpeed, wUnit) {
     // 【しきい値の一元管理箇所】 変更時はこの数値を直すだけで、すべての単位の計算が完全に連動します。
     let calmThresholdRaw = 1.5; 
     
-    // すべての単位（m/sを含む）において変数自体を割る計算式を網羅
-    if (wUnit === 'm/s') {
-        calmThresholdRaw = calmThresholdRaw / 1.0;       // 1.5 m/s 未満
-    } else if (wUnit === 'km/h') {
-        calmThresholdRaw = calmThresholdRaw / 3.6;       // 1.5 km/h 未満相当の m/s 値を算出
-    } else if (wUnit === 'kn') {
-        calmThresholdRaw = calmThresholdRaw / 1.94384;   // 1.5 kn 未満相当の m/s 値を算出
-    } else if (wUnit === 'mph') {
-        calmThresholdRaw = calmThresholdRaw / 2.23694;   // 1.5 mph 未満相当の m/s 値を算出
-    }
+    // 表記のゆれ（スラッシュの有無）を調整して、変換用単位キーを特定
+    const targetUnit = wUnit === 'm/s' ? 'ms' : (wUnit === 'km/h' ? 'kmh' : wUnit);
+    
+    // すべての単位（m/sを含む）において共通ヘルパー関数を使用し、設定単位の1.5に相当するm/s値を逆算
+    calmThresholdRaw = convertWindSpeedValue(calmThresholdRaw, targetUnit, true);
     
     return rawSpeed < calmThresholdRaw;
 }
@@ -2984,11 +2998,11 @@ function generateWindSummaryMultiLang(data, nowIdx, endIdx, now, wUnit) {
     for (let i = nowIdx; i <= endIdx; i++) {
         let rawSpd = data.wind_speed_10m[i];
         
-        // 現在の単位に換算
-        let convertedSpd = rawSpd;
-        if (wUnit === 'km/h') convertedSpd = rawSpd * 3.6;
-        else if (wUnit === 'kn') convertedSpd = rawSpd * 1.94384;
-        else if (wUnit === 'mph') convertedSpd = rawSpd * 2.23694;
+        // 表記のゆれ（スラッシュの有無）を調整して、変換用単位キーを特定
+        const targetUnit = wUnit === 'm/s' ? 'ms' : (wUnit === 'km/h' ? 'kmh' : wUnit);
+
+        // 現在の単位に換算（共通サブルーチンを使用）
+        let convertedSpd = convertWindSpeedValue(rawSpd, targetUnit, false);
 
         let spdFloor = Math.floor(convertedSpd); // 小数点以下を無視した整数値
         if (spdFloor > maxSpeedFloor) {
@@ -4545,20 +4559,6 @@ function updateWindLegend() {
             <span class="legend-wind-label">…</span>
         </div>
     `;
-}
-
-/**
- * 依存サブルーチン：風速の単位変換ヘルパー
- */
-function convertWindSpeedValue(value, unit, reverse = false) {
-    const factors = {
-        'kn': 1.94384,
-        'kmh': 3.6,
-        'mph': 2.23694,
-        'ms': 1.0
-    };
-    const factor = factors[unit] || 1.0;
-    return reverse ? (value / factor) : (value * factor);
 }
 
 /**
