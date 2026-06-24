@@ -221,7 +221,7 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
 
 /* テキスト予報全体コンテナ：幅が足りないスマホのために横スクロールを許可（安全策） */
 #textModeContainer {
-    overflow-x: auto;
+    overflow-x: avisible !important;
     -webkit-overflow-scrolling: touch; /* iOSでのスクロールを滑らかに */
 }
 
@@ -268,6 +268,9 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     margin-top: 8px;
     width: max-content; /* 行コンテナと同じ幅で横スクロールに合わせる */
     min-width: 100%; /* コンテナ幅が広い場合は100%広げる */
+    position: sticky;
+    top: 101px;            /* 上部で固定する位置 */
+    z-index: 10;       /* スクロール時に他のコンテンツの上に重ねるための設定 */
 }
 
 /* 日付ヘッダーの曜日色分け（ライトモード） */
@@ -1401,7 +1404,7 @@ html[data-theme="dark"] {
     }
     /* 4. 日付ヘッダーのダークモード対応（白背景の眩しさを解消） */
     & .text-mode-date-header {
-        background-color: #1e1e1e !important;    /* 周囲のカードと馴染むダークグレー */
+        background-color: #3d3d3d !important;    /* 周囲のカードと馴染むダークグレー */
         color: #f5f5f5 !important;                /* 通常の平日は目に優しい白系 */
         border-top: 1px solid #333333 !important;  /* 境界線も暗く変更 */
         border-bottom: 1px solid #333333 !important;
