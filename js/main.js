@@ -3426,16 +3426,23 @@ function getMaxPrecipitation(hourly, startIndex) {
 }
 
 /**
- * サブルーチン：風速（m/s）に応じて、既存の凡例（グレー ➔ 青 ➔ オレンジ ➔ 赤 ➔ 濃い赤）の
+ * サブルーチン：風速に応じて、既存の凡例（グレー ➔ 青 ➔ オレンジ ➔ 赤 ➔ 濃い赤）の
  * 間をRGB値で線形補間（計算）し、なめらかに変化するカラーコードを返す
- * * @param {number} speedMs - m/s単位の風速数値
+ * @param {number} speed - 各単位での風速数値
+ * @param {string} unit - 風速の単位（省略時は viewConfig.windSpeedUnit）
  * @returns {Object} { fill: 塗りつぶし色コード, stroke: 枠線色コード }
  */
-function getWindColorStyles(speedMs) {
+function getWindColorStyles(speed, unit = viewConfig.windSpeedUnit) {
     // データの存在チェックと安全ガード（不正な値は最低風速のグレーとする）
-    if (speedMs === undefined || speedMs === null || isNaN(speedMs)) {
+    if (speed === undefined || speed === null || isNaN(speed)) {
         return { fill: "#cccccc", stroke: "#b3b3b3" };
     }
+
+    // 表記のゆれ（スラッシュの有無）を調整して、変換用単位キーを特定
+    const targetUnit = unit === 'm/s' ? 'ms' : (unit === 'km/h' ? 'kmh' : unit);
+
+    // 共通サブルーチンを使用して、渡された各単位の風速値をm/s単位に逆算
+    const speedMs = convertWindSpeedValue(speed, targetUnit, true);
 
         // --- 1. カラーチェックポイント（ストップデータ）の定義 ---
         // 15m/s以上の警告レベル「濃い赤」のチェックポイントを確実に追加しました
