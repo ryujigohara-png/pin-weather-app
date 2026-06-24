@@ -3433,7 +3433,7 @@ function getMaxPrecipitation(hourly, startIndex) {
  * @param {string} unit - 風速の単位（省略時は viewConfig.windSpeedUnit）
  * @returns {Object} { fill: 塗りつぶし色コード, stroke: 枠線色コード }
  */
-function getWindColorStyles(speed, unit = viewConfig.windSpeedUnit) {
+function getWindColorStyles(speed, thLow=viewConfig.windSpeedThresholds.low, thMid=viewConfig.windSpeedThresholds.mid, thHigh=viewConfig.windSpeedThresholds.high, unit = viewConfig.windSpeedUnit) {
     // データの存在チェックと安全ガード（不正な値は最低風速のグレーとする）
     if (speed === undefined || speed === null || isNaN(speed)) {
         return { fill: "#cccccc", stroke: "#b3b3b3" };
@@ -3449,9 +3449,9 @@ function getWindColorStyles(speed, unit = viewConfig.windSpeedUnit) {
         // 15m/s以上の警告レベル「濃い赤」のチェックポイントを確実に追加しました
         const colorStops = [
             { speed: 0,  r: 204, g: 204, b: 204 }, // 0m/s基準：グレー   (#ccc)
-            { speed: 3,  r: 135, g: 206, b: 235 }, // 3m/s基準：青       (#87ceeb)
-            { speed: 5,  r: 255, g: 165, b: 0   }, // 5m/s基準：オレンジ (#ffa500)
-            { speed: 10, r: 220, g: 20,  b: 60  }, // 10m/s基準：赤       (#dc143c)
+            { speed: thLow,  r: 135, g: 206, b: 235 }, // 3m/s基準：青       (#87ceeb)
+            { speed: thMid,  r: 255, g: 165, b: 0   }, // 5m/s基準：オレンジ (#ffa500)
+            { speed: thHigh, r: 220, g: 20,  b: 60  }, // 10m/s基準：赤       (#dc143c)
             { speed: 15, r: 139, g: 0,   b: 0   }  // 15m/s基準：濃い赤   (#8b0000)
         ];
 
@@ -4219,21 +4219,22 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                 if (currentDirIdx === -1) currentDirIdx = enDirs.indexOf(dirText);
                 
                 const isTargetDir = filterIndices.includes(currentDirIdx);
+                const colors = getWindColorStyles(val,thLow,thMid,thHigh);
                 
                 let color = '#ccc'; 
 
                 if (isTargetDir) {
-                    if (val >= thHigh) color = '#dc143c';
-                    else if (val >= thMid) color = '#ffa500';
-                    else if (val >= thLow) color = '#87CEEB';
-                } else {
-                    if (val >= thHigh) color = 'rgba(220, 20, 60, 0.4)';
+                    color = colors.fill
                 }
 
                 html += `<rect x="${x - (hScale*0.4)}" y="${plotHeight-h}" width="${hScale*0.8}" height="${h}" fill="${color}" />`;
                 if (isWind) {
-                    html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-30}) rotate(${(deg+180)%360}) scale(${1.4 * iScale})" class="wind-arrow" />`;
-                    
+                    html += 
+                        `<path d="M0,-12 L6,6 L0,2 L-6,6 Z"
+                            transform="translate(${x}, ${plotHeight-h-30}) rotate(${(deg+180)%360}) scale(${1.4 * iScale})" 
+                            style="fill: ${colors.fill}; stroke: ${colors.stroke};" 
+                            stroke-width="1" 
+                            class="wind-arrow" />`;                                          
                     // 【風速：数値を45度左回りで傾け、アンカー位置を調整して等間隔に並べる修正】
                     if (viewConfig.graphValuesVisibility !== 'hide') {
                         // 棒の先端から5px上に一律配置（上下の交互ずらしは廃止）
@@ -4449,13 +4450,27 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
         const isDarkForPrecip = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         // ダークモード時は黒背景に映える鮮やかなスカイブルー、通常時は既存の青
         const precipColor = isDarkForPrecip ? "#388ef8" : "#0000FF";
+        
+        // 【修正・安全対策】関数のスコープ未定義や内部エラーによるツールチップ全体の停止を100%回避するガード処理
+        let colors = { fill: "#cccccc", stroke: "#b3b3b3" }; // デフォルト色（安全なフォールバック用）
+        try {
+            if (typeof getWindColorStyles === 'function') {
+                const rawWindSpeed = allData.data.wind_speed_10m ? allData.data.wind_speed_10m[validIdx] : null;
+                // 現在の設定単位を明示的に第2引数へ渡し、計算の安全性を強化
+                colors = getWindColorStyles(rawWindSpeed, viewConfig.windSpeedUnit);
+            } else {
+                console.warn("getWindColorStyles is not defined or accessible in this scope.");
+            }
+        } catch (err) {
+            console.error("Error occurred while executing getWindColorStyles:", err);
+        }
 
         tooltip.innerHTML = `
             <span class="spot-name-tip">📍 ${currentLabel}</span>
             <span class="coord-tip notranslate">${currentLat.toFixed(3)}, ${currentLon.toFixed(3)}</span>
             <b class="notranslate">${localizedDateStr} ${d.getHours()}:00 ${wIcon}</b>
             <div class="icon-box"><span class="legend-bar" style="background:${precipColor}; margin-right:0;"></span></div>${i18n.t('precip')}: ${precipVal}<br>
-            <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${rotateDeg})"/></svg></div>${i18n.t('windDir')}: ${deg !== null && !isNaN(deg) ? getWindDirText(deg) + ' (' + deg + '°)' : '---'}<br>
+            <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" style="fill: ${colors.fill}; stroke: ${colors.stroke}; stroke-width:1;" transform="rotate(${rotateDeg})"/></svg></div>${i18n.t('windDir')}: ${deg !== null && !isNaN(deg) ? getWindDirText(deg) + ' (' + deg + '°)' : '---'}<br>
             <div class="icon-box">🚩</div>${i18n.t('windSpeed')}: ${windVal}<br>
             <div class="icon-box"><span class="legend-line" style="background: linear-gradient(to right, #ff4500 50%, transparent 50%); background-size: 8px 100%; height: 2px; margin-right: 0; display: inline-block; vertical-align: middle; width: 14px;"></span></div>${i18n.t('gust')}: ${gustVal}<br>
             <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>${i18n.t('temp')}: ${tempVal}<br>
