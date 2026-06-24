@@ -90,8 +90,8 @@ const i18n = {
             widgetCopy: "コードをコピー",
 
             // --- 通知設定 ---
-            btnNotificationSettings: "🔔 朝の通知設定",
-            notificationModalTitle: "毎朝の気象概況通知設定",
+            btnNotificationSettings: "🔔 毎日の通知設定",
+            notificationModalTitle: "毎日の通知設定",
             notificationSelectSpot: "通知する場所：",
             notificationSelectTime: "通知時刻：",
             notificationSaveBtn: "設定を保存",
@@ -288,8 +288,8 @@ const i18n = {
             widgetCopy: "Copy Code",
 
             // --- Notification Settings ---
-            btnNotificationSettings: "🔔 Morning Notification",
-            notificationModalTitle: "Daily Morning Weather Notification",
+            btnNotificationSettings: "🔔 Daily Notification",
+            notificationModalTitle: "Daily Notification",
             notificationSelectSpot: "Notification Location:",
             notificationSelectTime: "Notification Time:",
             notificationSaveBtn: "Save Settings",
@@ -1049,6 +1049,8 @@ function openWidgetPreview() {
     }
 
     if (typeof viewConfig !== 'undefined') {
+        if (viewConfig.themeMode) params.set('theme', viewConfig.themeMode);
+        if (viewConfig.displayMode) params.set('display', viewConfig.displayMode);
         if (viewConfig.windSpeedUnit) params.set('wUnit', viewConfig.windSpeedUnit);
         if (viewConfig.temperatureUnit) params.set('tUnit', viewConfig.temperatureUnit);
         if (viewConfig.windThresholdHigh !== undefined) params.set('thH', Math.round(viewConfig.windThresholdHigh));
@@ -1057,7 +1059,7 @@ function openWidgetPreview() {
     }
     
     const widgetUrl = `${currentUrl}?${params.toString()}`;
-    const embedCode = `<iframe src="${widgetUrl}" width="100%" height="660" frameborder="0" style="border:1px solid #eee; border-radius:8px;"></iframe>`;
+    const embedCode = `<iframe src="${widgetUrl}" width="500" height="660" frameborder="0" style="border:1px solid #eee; border-radius:8px;"></iframe>`;
 
     if (codeArea) codeArea.value = embedCode;
 
@@ -1140,7 +1142,8 @@ function setupWidgetHeader() {
 
     const header = document.createElement('div');
     header.className = 'widget-only-header';
-    header.style.cssText = "padding: 10px 15px; background: #fff; border-bottom: 1px solid #eee; font-family: sans-serif; display: block; position: relative; z-index: 9999;";
+    // 【修正】position: relative を sticky に変更し、top: 0 を指定。さらに高さを 44px (box-sizing: border-box) で固定します。
+    header.style.cssText = "padding: 10px 15px; height: 44px; box-sizing: border-box; background: #fff; border-bottom: 1px solid #eee; font-family: sans-serif; display: block; position: sticky; top: 0; z-index: 9999;";
 
     // HTMLの構築
     const coordsHtml = (latNum && lonNum) 
@@ -3921,6 +3924,9 @@ async function draw() {
         
         // --- 1. ウィジェットモード時のパラメータ反映（確実に最新を反映） ---
         if (isWidget) {
+            document.body.classList.add('widget-mode'); // 【追加】親要素（body）にwidgetモードの目印クラスを付与
+            if (params.get('theme')!== null) viewConfig.themeMode = params.get('theme');
+            if (params.get('display')!== null) viewConfig.displayMode = params.get('display');
             if (params.get('tUnit')) viewConfig.temperatureUnit = params.get('tUnit');
             if (params.get('wUnit')) viewConfig.windSpeedUnit = params.get('wUnit');
             if (params.get('thH') !== null) viewConfig.windThresholdHigh = parseFloat(params.get('thH'));
@@ -3928,12 +3934,14 @@ async function draw() {
             if (params.get('thL') !== null) viewConfig.windThresholdLow  = parseFloat(params.get('thL'));
 
             // 【追加仕様】widget表示の時はツールチップ非表示、グラフ内数値表示設定にする
+            viewConfig.welcomeBarVisibility = 'hide';
             viewConfig.tooltipVisibility = 'hide';
             viewConfig.graphValuesVisibility = 'show';
 
-            // ナび表示制御
+            // ナビ表示制御
             const nav = document.querySelector('.nav-container') || document.querySelector('nav');
             if (nav) nav.style.display = 'none';
+            applyEnvVisuals(); // ウィジェットモードのテーマ・背景色を即座に反映
         }
 
         // --- 2. 【重要】反映されない単位テキストの再計算と辞書の更新 ---
@@ -5004,8 +5012,8 @@ function openNotificationModalGeneral() {
 
     // 4. 既存の汎用ダイアログの仕組み（onSave）に、実際の保存処理を渡して呼び出す
     showAppDialog({
-        title: "毎朝の気象概況通知設定",
-        message: "",
+        title: i18n.t('notificationModalTitle'),
+        messageKey: 'notificationModalTitle',
         customElement: container, // 中央エリアに上記の入力欄を流し込む
         saveBtnKey: "notificationSaveBtn", // フッターの青いボタンのテキストに既存辞書キーを指定
         onSave: async () => {

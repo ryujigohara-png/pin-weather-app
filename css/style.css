@@ -273,6 +273,11 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     z-index: 10;       /* スクロール時に他のコンテンツの上に重ねるための設定 */
 }
 
+/* 【追加】widgetモードの時だけ上書き（親要素に .widget-mode がある場合） */
+.widget-mode .text-mode-date-header {
+    top: 44px; /* widgetモードではナビバーがないため、固定位置を下げる */
+}
+
 /* 日付ヘッダーの曜日色分け（ライトモード） */
 .text-mode-date-header.is-sunday {
     color: #dc3545 !important; /* 日曜日は鮮やかな赤 */
