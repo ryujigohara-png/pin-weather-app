@@ -3513,6 +3513,82 @@ function getWindColorStyles(speed, unit = viewConfig.windSpeedUnit) {
 }
 
 /**
+ * サブルーチン：気温（℃または℉）と単位に応じて、なめらかに変化する文字用カラーコードを返す
+ * （ライト/ダーク共通：青 ➔ 水色 ➔ 橙 ➔ 濃い赤 のシームレス完全統一バージョン）
+ * @param {number} temp - 気温の数値
+ * @param {string} unit - 単位 ('℃' または '℉')。未指定の場合は '℃' として処理
+ * @returns {string} 16進数カラーコード文字列（#rrggbb）
+ */
+function getTemperatureColorStyles(temp, unit = '℃') {
+    // データの存在チェックと安全ガード（不正な値は視認性の高いグレーとする）
+    if (temp === undefined || temp === null || isNaN(temp)) {
+        return "#8a8a8a";
+    }
+
+    // ℉（華氏）から ℃（摂氏）への自動単位変換
+    let tempC = temp;
+    if (unit === '℉') {
+        tempC = (temp - 32) * 5 / 9;
+    }
+
+    // --- 1. ユーザー提案に基づく4つのカラーチェックポイント定義 ---
+    // ライト/ダークどちらの背景でも100%文字が読めるRGB値を厳選
+    const colorStops = [
+        { temp: -5,  r: 0,   g: 102, b: 255 }, // -5℃以下：青（両画面で沈まない鮮やかな青）
+        { temp: 0,   r: 0,   g: 145, b: 195 }, // 0℃基準 ：水色（白背景でも読める濃さのしっかりした水色）
+        { temp: 25,  r: 255, g: 110, b: 0   }, // 25℃基準：橙（視認性抜群のオレンジ）
+        { temp: 35,  r: 215, g: 0,   b: 40  }  // 35℃以上：赤（少し濃い赤、黒背景でも沈まない絶妙な濃さ）
+    ];
+
+    let targetR = 0;
+    let targetG = 0;
+    let targetB = 0;
+
+    // --- 2. 気温(摂氏換算後)が位置する区間の特定とRGBの線形補間計算 ---
+    if (tempC <= colorStops[0].temp) {
+        // 下限（-5℃以下）の場合は青固定
+        targetR = colorStops[0].r;
+        targetG = colorStops[0].g;
+        targetB = colorStops[0].b;
+    } else if (tempC >= colorStops[colorStops.length - 1].temp) {
+        // 上限（35℃以上）の場合は少し濃い赤固定
+        targetR = colorStops[colorStops.length - 1].r;
+        targetG = colorStops[colorStops.length - 1].g;
+        targetB = colorStops[colorStops.length - 1].b;
+    } else {
+        // 中間区間の計算
+        for (let i = 0; i < colorStops.length - 1; i++) {
+            const startStop = colorStops[i];
+            const endStop = colorStops[i + 1];
+
+            // 現在の気温がこの2つのチェックポイントの間にある場合
+            if (tempC >= startStop.temp && tempC <= endStop.temp) {
+                // 区間内での進捗比率（0.0 〜 1.0）を算出
+                const t = (tempC - startStop.temp) / (endStop.temp - startStop.temp);
+
+                // RGBの各成分を線形補間
+                targetR = Math.round(startStop.r + (endStop.r - startStop.r) * t);
+                targetG = Math.round(startStop.g + (endStop.g - startStop.g) * t);
+                targetB = Math.round(startStop.b + (endStop.b - startStop.b) * t);
+                break;
+            }
+        }
+    }
+
+    // --- 3. RGB数値を16進数カラーコード文字列（#rrggbb）に変換する内部ヘルパー ---
+    const toHex = (r, g, b) => {
+        const hexComponent = (c) => {
+            const hex = c.toString(16);
+            return hex.length === 1 ? "0" + hex : hex;
+        };
+        return "#" + hexComponent(r) + hexComponent(g) + hexComponent(b);
+    };
+
+    return toHex(targetR, targetG, targetB);
+}
+
+
+/**
  * サブルーチン：3時間ブロックの開始時間帯に応じて、最高気温または最低気温を動的に判定して抽出する
  * * 【時間帯ルールの仕様】
  * ・00:00-, 03:00- (深夜・明け方) ➔ 最低気温 (Math.min)
@@ -3625,7 +3701,9 @@ function generateTextModeLine(hourly, startIndex, startHour) {
         <div class="text-mode-row">
             <div class="text-cell-time">${timeText}</div>
             <div class="text-cell-weather">${weatherEmojis}</div>
-            <div class="text-cell-temp">${temperature}${tempUnit}</div>
+            <div class="text-cell-temp" style="color: ${getTemperatureColorStyles(temperature, tempUnit)};">
+                ${temperature}${tempUnit}
+            </div>
             <div class="text-cell-precip">${maxPrecipitation}</div>
             <div class="text-cell-wind-dir">${windIconsHtml}</div>
             <div class="text-cell-wind-speed">${windSpeedText}</div>
