@@ -220,7 +220,7 @@ const i18n = {
             EARLY_EVENING: "夜のはじめ頃",
             LATE_NIGHT: "夜遅く",
             weather_now: "現在は{weather}ですが、",
-            stable_weather: "今後は比較的安定した天気が続くでしょう。",
+            stable_weather: "今後はこのような天気が続くでしょう。",
             weather_unstable: "天気が変わりやすい見込みです。",
             status_clear: "晴れる",
             status_cloud: "曇る",
