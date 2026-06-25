@@ -53,13 +53,6 @@
 </head>
 <body>
 
-<div id="welcome-bar" style="display: none; background: #e3f2fd; padding: 12px; border-bottom: 1px solid #022410; text-align: center; font-size: 0.9em; z-index: 1000; position: relative;">
-  <span id="welcome-text" data-i18n="welcomeMsg">現在地の16日間・海上気象予報を表示中。地点追加やグラフのドラッグで未来の状況を確認できます。</span>
-  <button id="close-welcome" onclick="hideWelcomeBar()" style="margin-left: 15px; padding: 4px 12px; cursor: pointer; border: 1px solid #007bff; border-radius: 4px; background: white; color: #007bff;">
-    <span data-i18n="btnHide">閉じる</span>
-  </button>
-</div>
-
 <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
 
 <div id="sidebar" class="sidebar">
@@ -111,11 +104,6 @@
     <button class="btn" id="copy-url-btn" style="background-color: #e3f2fd; color: #1976d2; border: 1px solid #bbdefb;" data-i18n="btnCopyUrl">🔗 URLをコピー</button>
 </div>
 
-<div class="control-wrapper">
-    <button class="menu-trigger" onclick="toggleSidebar()">☰</button>
-    <div class="scroll-tabs" id="spot-tabs"></div>
-    <span class="current-pos-label" id="pos-display" style="display:none;"></span>
-</div>
 
 <div id="map-modal" class="modal-overlay">
     <div class="modal-content" style="display: flex; flex-direction: column; max-width: 600px; width: 90%;">
@@ -336,14 +324,30 @@
     </div>
 </div>
 
-<div class="nav-action-bar" style="display: flex; gap: 6px; align-items: center; white-space: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;">
-    <button id="modeToggleButton" class="btn-mode-small"></button>
-    <button id="summaryButton" class="nav-summary-btn" onclick="scrollToSummary()" style="flex-shrink: 0;">
-        <span id="summary-btn-location"></span> <span data-i18n="condition_summary_btn">概況</span>
-    </button>
-    <button id="gps-btn-nav" class="btn-gps-small">GPS</button>
-    <button id="map-btn-nav" class="btn-map-small">Map</button>
+<div class="nav-fixed-container">
+    <div id="welcome-bar" style="display: none; background: #e3f2fd; padding: 12px; border-bottom: 1px solid #022410; text-align: center; font-size: 0.9em; z-index: 1000; position: relative;">
+        <span id="welcome-text" data-i18n="welcomeMsg">現在地の16日間・海上気象予報を表示中。地点追加やグラフのドラッグで未来の状況を確認できます。</span>
+        <button id="close-welcome" onclick="hideWelcomeBar()" style="margin-left: 15px; padding: 4px 12px; cursor: pointer; border: 1px solid #007bff; border-radius: 4px; background: white; color: #007bff;">
+            <span data-i18n="btnHide">閉じる</span>
+        </button>
+    </div>
+
+    <div class="control-wrapper">
+        <button class="menu-trigger" onclick="toggleSidebar()">☰</button>
+        <div class="scroll-tabs" id="spot-tabs"></div>
+        <span class="current-pos-label" id="pos-display" style="display:none;"></span>
+    </div>
+    <div class="nav-action-bar" style="display: flex; gap: 6px; align-items: center; white-space: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;">
+        <button id="modeToggleButton" class="btn-mode-small"></button>
+        <button id="summaryButton" class="nav-summary-btn" onclick="scrollToSummary()" style="flex-shrink: 0;">
+            <span id="summary-btn-location"></span> <span data-i18n="condition_summary_btn">概況</span>
+        </button>
+        <button id="gps-btn-nav" class="btn-gps-small">GPS</button>
+        <button id="map-btn-nav" class="btn-map-small">Map</button>
+    </div>
+    
 </div>
+
 
 <div id="textModeContainer" style="display: none;"></div>
 

@@ -3743,7 +3743,7 @@ function generateTextModeLine(hourly, startIndex, startHour) {
         const speed = hourly.wind_speed_10m && hourly.wind_speed_10m[idx] !== undefined ? hourly.wind_speed_10m[idx] : 0;
         
         const colors = getWindColorStyles(speed);
-        const rotateDeg = deg !== null && !isNaN(deg) ? deg : 0;
+        const rotateDeg = (deg !== null && !isNaN(deg)) ? (deg + 180) % 360 : 0;
 
         // 【修正】改行と空白を完全除去して密着させ、transformで2px上に引き上げます
         windIconsHtml += `
@@ -4530,7 +4530,7 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
             if (typeof getWindColorStyles === 'function') {
                 const rawWindSpeed = allData.data.wind_speed_10m ? allData.data.wind_speed_10m[validIdx] : null;
                 // 現在の設定単位を明示的に第2引数へ渡し、計算の安全性を強化
-                colors = getWindColorStyles(rawWindSpeed, viewConfig.windSpeedUnit);
+                colors = getWindColorStyles(rawWindSpeed);
             } else {
                 console.warn("getWindColorStyles is not defined or accessible in this scope.");
             }

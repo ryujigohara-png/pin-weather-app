@@ -14,6 +14,9 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     padding: 0 4px; /* 左パディングを詰め、📌マークによる空白感を解消 */
     display: flex; gap: 4px; align-items: center; z-index: 1000;
     overflow: hidden; 
+    /* モバイルブラウザでのスクロール引きずり・ガタつき・上に動く現象を防止する補強 */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
 }
 
 /* スクロール可能なタブエリア（修正） */
