@@ -4223,8 +4223,8 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
             html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight}" class="grid-day" />`;
             const dayIdx = d.getDay();
             
-            // 【修正】現在の環境がダークモードかどうかを自動判定
-            const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            // 【修正】現在の環境がダークモードかどうかを自動判定（PWAアプリのdata-theme属性を基準に判定するよう修正）
+            const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
             let dayColor;
             if (isDarkMode) {
                 // ダークモード時は背景と同化しない明るい色相を割り当て
@@ -4307,7 +4307,7 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                             transform="translate(${x}, ${plotHeight-h-30}) rotate(${(deg+180)%360}) scale(${1.4 * iScale})" 
                             style="fill: ${colors.fill}; stroke: ${colors.stroke};" 
                             stroke-width="1" 
-                            class="wind-arrow" />`;                                          
+                            class="wind-arrow" />`;                                           
                     // 【風速：数値を45度左回りで傾け、アンカー位置を調整して等間隔に並べる修正】
                     if (viewConfig.graphValuesVisibility !== 'hide') {
                         // 棒の先端から5px上に一律配置（上下の交互ずらしは廃止）
@@ -4367,7 +4367,7 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                 
                 const px = (i - startIdx) * hScale;
                 const py = plotHeight - (((v - min) / range) * plotHeight);
-                points.push(`${px},${py}`);
+                const points_pushed = points.push(`${px},${py}`);
 
                 if (viewConfig.graphValuesVisibility !== 'hide' && !isGust) {
                     let shouldShowValue = false;

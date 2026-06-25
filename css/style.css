@@ -373,13 +373,32 @@ svg { width: 100%; display: block; overflow: visible; }
 .grid-y-sub { stroke: #e0e0e0; stroke-width: 1; } 
 .label-time { font-size: 16px; fill: #333; font-weight: bold; }
 
-.date-container { position: absolute; height: 30px; bottom: -30px; left: 0; width: 100%; pointer-events: none; z-index: 10; }
-/* 共通のスティッキー用スタイル */
+/* ============================================================
+    修正版：PWAダークモード時の日付文字色バグ修正
+   ============================================================ */
+
+.date-container { 
+    position: absolute; 
+    height: 30px; 
+    bottom: -30px; 
+    left: 0; 
+    width: 100%; 
+    pointer-events: none; 
+    z-index: 10; 
+}
+
+/* 1. 共通のスティッキー用スタイル（ベース） */
 .sticky-date-top,
 .sticky-date-bottom {
-    position: absolute; bottom: 0; font-size: 22px; font-weight: bold;
-    background: rgba(255,255,255,0.0); padding: 0 10px; border-radius: 4px;
-    color: #000; white-space: nowrap;
+    position: absolute; 
+    bottom: 0; 
+    font-size: 22px; 
+    font-weight: bold;
+    background: rgba(255,255,255,0.0); 
+    padding: 0 10px; 
+    border-radius: 4px;
+    color: #000; /* 通常時は黒 */
+    white-space: nowrap;
 }
 
 .line-temp-air { stroke: #ff4500; stroke-width: 4; fill: none; }
@@ -1064,7 +1083,7 @@ html[data-theme="dark"] {
     
     & .sticky-date-top,
     & .sticky-date-bottom {
-        color: #fff;
+        color: #fff !important;
     }
     & .y-axis-values { color: #cbd5e1; }
 
