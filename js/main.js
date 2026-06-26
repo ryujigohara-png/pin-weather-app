@@ -4072,14 +4072,16 @@ async function draw() {
         if (titles.length >= 4) {
             titles[0].innerHTML = i18n.t('yAxisWeather');
             titles[1].innerHTML = `${baseWindIcon}${i18n.t('windDir')}<br>(${currentWUnit})`;
-            titles[2].innerHTML = `${i18n.t('temp')}(${currentTUnit})<br>${i18n.t('seawater')}(${currentTUnit})`;
+            //titles[2].innerHTML = `${i18n.t('temp')}(${currentTUnit})<br>${i18n.t('seawater')}(${currentTUnit})`;
+            titles[2].innerHTML = `${i18n.t('temp')}(${currentTUnit})<br>`;
             
             const waveData = allData.data.wave_height ? allData.data.wave_height.slice(startIdx) : [];
             const tideData = allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl.slice(startIdx) : [];
             const hasMarineData = waveData.some(v => v !== 0 && v !== null) || tideData.some(v => v !== 0 && v !== null);
             
-            let marineTitle = hasMarineData ? i18n.t('yAxisMarine') : `<br><span style="color:#FF0000; font-weight:bold; font-size:14px; display:block; margin-top:2px;">No Marine Data</span>`;
-            titles[3].innerHTML = marineTitle;
+            //let marineTitle = hasMarineData ? i18n.t('yAxisMarine') : `<br><span style="color:#FF0000; font-weight:bold; font-size:14px; display:block; margin-top:2px; background-color:transparent;">No Marine Data</span>`;
+            let marineTitle = hasMarineData ? i18n.t('seawater') : `<span style="color:#FF0000; font-weight:bold; font-size:14px; display:block; margin-top:2px; background-color:transparent;">No Marine Data</span>`;
+            titles[2].innerHTML += marineTitle;
         }
 
         const labelFS = viewConfig.fontSize;
@@ -4124,7 +4126,7 @@ async function draw() {
 
         // 【追加】ブラウザが現在ダークモードであるかどうかの事実を判定
         const isDarkForPrecip = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        // ダークモード時は黒背景に映える鮮やかなスカイブルー、通常時は既存の青
+        // ダークモード時は黒背景に映える鮮やかなスカイブルー、通常時は既存의 青
         const precipColor = isDarkForPrecip ? "#388ef8" : "#0000FF";
 
         for(let i = startIdx; i < totalDataCount; i++) {
@@ -4159,8 +4161,18 @@ async function draw() {
         const hasMarineData = (allData.data.wave_height && allData.data.wave_height.slice(startIdx).some(v => v !== 0 && v !== null));
         renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], subH, 5.0, false, !hasMarineData, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, null);
         
+        // 【追加】マリンデータの有無に応じて、重なっているsticky-labelの表示/非表示をピンポイントで制御
+        const marineLabel = document.querySelector('.section-marine .sticky-label');
+
         if (hasMarineData) {
+            if (marineLabel) marineLabel.style.display = ''; // 通常時は表示を元に戻す
             renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], subH, 0.5, false, true, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, null);
+        } else {
+            if (marineLabel) marineLabel.style.display = 'none'; // マリンデータがない時は完全に非表示
+            const svgM = document.getElementById('svg-marine');
+            const dateM = document.getElementById('date-marine');
+            if (svgM) svgM.innerHTML = "";
+            if (dateM) dateM.innerHTML = "";
         }
 
         updateWindLegend();
