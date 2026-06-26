@@ -4491,10 +4491,10 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
 
     const updateTooltipContent = (hourIdx, clientX, clientY, isAutoScroll = false, currentScrollLeft = 0) => {
         // 【制御の組み込み】tooltipVisibility が 'hide' の場合は、ツールチップおよびガイドを表示せず、非表示を確定させる
-        if (viewConfig.tooltipVisibility === 'hide') {
+        /*if (viewConfig.tooltipVisibility === 'hide') {
             hideTooltipUI();
             return;
-        }
+        }*/
 
         if (!allData || !allData.data || !allData.data.time) return;
         
@@ -4628,10 +4628,10 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
 
     stage.onclick = (e) => {
         // 【制御の組み込み】tooltipVisibility が 'hide' の場合はイベントをバイパスして非表示を維持
-        if (viewConfig.tooltipVisibility === 'hide') {
+        /*if (viewConfig.tooltipVisibility === 'hide') {
             hideTooltipUI();
             return;
-        }
+        }*/
         const rect = stage.getBoundingClientRect();
         const graphX = (e.clientX - rect.left) - 100;
         if (graphX < 0 || graphX > totalW) return;
