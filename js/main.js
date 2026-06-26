@@ -9,15 +9,17 @@ const defaultViewConfig = {
     windSpeedUnit: 'ms',        // 風速単位
     
     // --- 新設：表示フラグの既定値（デフォルトに戻すボタンとも連動） ---
+    themeMode: 'dark',             // テーマモード ('light' or 'dark')
+    displayMode: 'text',           // 【追加】初期表示モード ('text' or 'graph')
     tooltipVisibility: 'show',     // ツールチップ表示設定 ('show' or 'hide')
     graphValuesVisibility: 'show', // グラフ内数値表示設定 ('show' or 'hide')
     welcomeBarVisibility: 'show',  // 【追加】ウェルカムバー表示設定 ('show' or 'hide')
     // ----------------------------------------------------------
 
     // --- 風速色付け閾値（初期値） ---
-    windThresholdHigh: 10.0,
-    windThresholdMid: 5.0,
-    windThresholdLow: 3.0,
+    windThresholdHigh: 12.0,
+    windThresholdMid: 8.0,
+    windThresholdLow: 4.0,
     // ----------------------------
     iconScale: 0.7,             // 風向アイコン倍率
     hourWidth: 18,              // 1時間の幅
@@ -88,8 +90,8 @@ const i18n = {
             widgetCopy: "コードをコピー",
 
             // --- 通知設定 ---
-            btnNotificationSettings: "🔔 朝の通知設定",
-            notificationModalTitle: "毎朝の気象概況通知設定",
+            btnNotificationSettings: "🔔 毎日の通知設定",
+            notificationModalTitle: "毎日の通知設定",
             notificationSelectSpot: "通知する場所：",
             notificationSelectTime: "通知時刻：",
             notificationSaveBtn: "設定を保存",
@@ -102,6 +104,7 @@ const i18n = {
             btnSearch: "検索",
             btnSaveSpot: "MySpotsに登録",
             btnTempView: "グラフ表示",
+            btnTextView: "文字表示", // 【追加】テキストモード切り替えボタン用（日本語）
             btnClose: "キャンセル", 
             limitReached: "10箇所までしか登録できません。これ以上追加する場合は、既存の地点を長押しまたは右クリックして削除してください。",
             mapStatusFetching: "地点情報を取得中...",
@@ -120,6 +123,13 @@ const i18n = {
 
             // --- 表示詳細設定モーダル ---
             settingsTitle: "グラフ表示詳細設定",
+            cfgWelcomeBarVisibility: "ウェルカムバーの表示",
+            optWelcomeBarShow: "表示する（デフォルト）",
+            optWelcomeBarHide: "表示しない",
+            cfgThemeMode: "画面モード",
+            optThemeSystem: "システム設定に従う",
+            optThemeDark: "ダークモード",
+            optThemeLight: "ライトモード",
             configLangTitle: "Language / 表示言語",
             cfgForecastDays: "予報日数 (最大16日)",
             btnOptionalOpen: "オプション設定 (表示倍率・サイズ等) ▼",
@@ -130,7 +140,7 @@ const i18n = {
             cfgMargin: "グラフ間の余白",
             cfgFontSize: "ラベル文字サイズ",
             cfgIconScale: "風向アイコン倍率",
-            cfgGraphValuesVisibility: "グラフ内への数値表示",
+            cfgGraphValuesVisibility: "グラフ内数値表示",
             cfgTooltipVisibility: "詳細情報（ツールチップ）のポップアップ",
             cfgTooltipDuration: "詳細情報（ツールチップ）の表示時間", 
             optShow: "表示する",
@@ -196,7 +206,8 @@ const i18n = {
             btnDelete: "削除",
             confirmDeletePrefix: "本当に削除しますか：",
 
-            summary_title: "【24時間概況】",
+            condition_summary_btn: "概況",
+            summary_title: "【概況】",
             as_of: "現在",
             analyzing: "解析中...",
             tomorrow: "明日",
@@ -209,8 +220,8 @@ const i18n = {
             LATE_AFTERNOON: "夕方",
             EARLY_EVENING: "夜のはじめ頃",
             LATE_NIGHT: "夜遅く",
-            weather_now: "現在は{weather}ですが、",
-            stable_weather: "今後は比較的安定した天気が続くでしょう。",
+            weather_now: "現在は{weather}で、",
+            stable_weather: "しばらくはこのような天気が続くでしょう。",
             weather_unstable: "天気が変わりやすい見込みです。",
             status_clear: "晴れる",
             status_cloud: "曇る",
@@ -230,16 +241,16 @@ const i18n = {
             temp_info: "気温は最高{max}{unit}、最低は{min}{unit}で、",
             temp_diff_warn: "一日の寒暖差が大きくなるため体調管理にご注意ください。",
             temp_stable: "落ち着いた推移となるでしょう。",
-            wind_summary_peak: "風は現在、{current_dir}{current_speed}{unit}ですが、{max_time_label}は{peak_dir}が吹き、{min_time_label}は風は弱く風向は定まらない見込みです。その後は{after_dir}が吹く見込みです。",
+            wind_summary_peak: "風は現在、{current_dir}{current_speed}{unit}で、{max_time_label}は{peak_dir}が吹き、{min_time_label}は弱く風向は定まらない見込みです。その後は{after_dir}が吹く見込みです。",
             wind_summary_variable: "風は現在、{current_dir}{current_speed}{unit}です。今後24時間、風は弱く風向は定まらない見込みです。",
-            wind_summary_calm: "風は現在、{current_dir}{current_speed}{unit}ですが、{tomorrow}{calm_start_slot}から風は弱く風向は定まらない見込みです。その後は{next_dir}が吹く見込みです。",
-            wind_summary_shift: "風は現在、{current_dir}{current_speed}{unit}ですが、{pre_peak}{tomorrow}{shift_slot}頃からは{next_dir}に変わる見込みです。",
+            wind_summary_calm: "風は現在、{current_dir}{current_speed}{unit}で、{tomorrow}{calm_start_slot}からは弱く風向は定まらない見込みです。その後は{next_dir}が吹く見込みです。",
+            wind_summary_shift: "風は現在、{current_dir}{current_speed}{unit}で、{pre_peak}{tomorrow}{shift_slot}頃からは{next_dir}に変わる見込みです。",
             wind_summary_shift_pre_peak: "しばらくは{pre_peak_dir}が強く吹き、",
             wind_summary_stable: "風は現在、{current_dir}{current_speed}{unit}です。今後24時間は{trend_dir}が続く見込みです。",
-            wave_current: "波高は現在{current}mですが、",
+            wave_current: "波高は現在{current}mで、",
             wave_rise: "今後は{future}mまで高まる見込みです。",
             wave_fall: "今後は{future}mまで落ち着く見込みです。",
-            wave_stable: "明日まで大きな変化はなく、概ね安定した海面コンディションが続くでしょう。"
+            wave_stable: "明日まで大きな変化はなく、しばらくはこのような海面コンディションが続くでしょう。"
         },
         'en': {
             welcomeMsg: "Displaying %DAYS%-day weather and marine forecast for %SPOT%. You can register up to 10 favorite spots using +MySpots, GPS, and Map. Drag the chart to check forecasts up to 16 days.",
@@ -277,8 +288,8 @@ const i18n = {
             widgetCopy: "Copy Code",
 
             // --- Notification Settings ---
-            btnNotificationSettings: "🔔 Morning Notification",
-            notificationModalTitle: "Daily Morning Weather Notification",
+            btnNotificationSettings: "🔔 Daily Notification",
+            notificationModalTitle: "Daily Notification",
             notificationSelectSpot: "Notification Location:",
             notificationSelectTime: "Notification Time:",
             notificationSaveBtn: "Save Settings",
@@ -291,6 +302,7 @@ const i18n = {
             btnSearch: "Search",
             btnSaveSpot: "Save to MySpots",
             btnTempView: "View Graph",
+            btnTextView: "View Text", // 【追加】テキストモード切り替えボタン用（英語）
             btnClose: "Cancel",
             limitReached: "Maximum of 10 spots allowed. Please delete an existing spot to add a new one.",
             mapStatusFetching: "Fetching location info...",
@@ -309,6 +321,13 @@ const i18n = {
 
             // --- Detail Settings Modal ---
             settingsTitle: "Detailed Display Settings",
+            cfgWelcomeBarVisibility: "Welcome Bar Visibility",
+            optWelcomeBarShow: "Show (Default)",
+            optWelcomeBarHide: "Hide",
+            cfgThemeMode: "Theme Mode",
+            optThemeSystem: "System Default",
+            optThemeDark: "Dark Mode",
+            optThemeLight: "Light Mode",
             configLangTitle: "Language",
             cfgForecastDays: "Forecast Days (Max 16)",
             btnOptionalOpen: "Optional Settings (Scale, Size, etc.) ▼",
@@ -325,7 +344,7 @@ const i18n = {
             optShow: "Show",
             optHide: "Hide",
             optDefaultShow: "Show (Default)",
-            optDefaultHide: "Show (Default)",
+            optDefaultHide: "Hide (Default)",
             cfgTempUnit: "Temperature Unit",
             cfgWindUnit: "Wind Speed Unit",
             cfgWindThresholds: "Wind Coloring Thresholds",
@@ -385,7 +404,8 @@ const i18n = {
             btnDelete: "Delete",
             confirmDeletePrefix: "Are you sure you want to delete:",
 
-            summary_title: "[24-Hour Summary]", 
+            condition_summary_btn: "Summary",
+            summary_title: "[Summary]", 
             as_of: "As of",
             analyzing: "Analyzing...",
             tomorrow: "tomorrow",
@@ -767,16 +787,17 @@ function initViewSettings() {
                 thresholdUnitSpan.textContent = `(${windUnitInput.options[windUnitInput.selectedIndex].text})`;
             }
 
-            const toMs = { 'ms': 1.0, 'kn': 0.514444, 'kmh': 0.277778, 'mph': 0.44704 };
-            const fromMs = { 'ms': 1.0, 'kn': 1.94384, 'kmh': 3.6, 'mph': 2.23694 };
-
             const thIds = ['input-windThresholdHigh', 'input-windThresholdMid', 'input-windThresholdLow'];
             thIds.forEach(id => {
                 const el = document.getElementById(id);
                 if (el) {
                     const currentVal = parseFloat(el.value);
                     if (!isNaN(currentVal)) {
-                        let newVal = (currentVal * toMs[lastUnit]) * fromMs[nextUnit];
+                        // 1. 表示単位(lastUnit)からm/sへ逆算
+                        const speedInMs = convertWindSpeedValue(currentVal, lastUnit, true);
+                        // 2. m/sから次の表示単位(nextUnit)へ変換
+                        let newVal = convertWindSpeedValue(speedInMs, nextUnit, false);
+                        
                         // 全ての単位において、四捨五入して整数にする
                         el.value = Math.round(newVal);
                     }
@@ -786,6 +807,8 @@ function initViewSettings() {
             lastUnit = nextUnit;
         });
     }
+
+
 }
 
 /**
@@ -796,7 +819,8 @@ function syncSliderValues() {
         'hourWidth', 'windHeight', 'subHeight', 'margin', 'fontSize', 
         'iconScale', 'tooltipDuration', 'forecastDays', 'tempUnit', 'windUnit',
         'windThresholdHigh', 'windThresholdMid', 'windThresholdLow',
-        'tooltipVisibility', 'graphValuesVisibility', 'welcomeBarVisibility' // 【追加】新設セレクトボックスのキー
+        'tooltipVisibility', 'graphValuesVisibility', 'welcomeBarVisibility',
+        'themeMode' // 【追加】新設テーマ設定コンボボックスのキー
     ];
 
     const windUnitInput = document.getElementById('input-windUnit');
@@ -818,6 +842,7 @@ function syncSliderValues() {
         let val = viewConfig[configKey];
         // 【追加】ウェルカムバーのデフォルト値（未定義時）の考慮
         if (id === 'welcomeBarVisibility' && val === undefined) val = 'show';
+        if (id === 'themeMode' && val === undefined) val = 'system'; // 【追加】画面テーマのデフォルト値（未定義時）の考慮
         if (id === 'forecastDays' && val === undefined) val = 9;
 
         const input = document.getElementById(`input-${id}`);
@@ -844,26 +869,27 @@ function syncSliderValues() {
  * サブルーチン：設定の保存と適用
  */
 async function saveViewSettings() {
+    viewConfig.welcomeBarVisibility = document.getElementById('input-welcomeBarVisibility').value; // 【追加】ウェルカムバーの表示状態を保存
+    viewConfig.themeMode = document.getElementById('input-themeMode').value; // 【追加】画面テーマ設定の保存
+    // 【追加】新設セレクトボックスの選択状態を viewConfig へ保存
     viewConfig.forecastDays = parseInt(document.getElementById('input-forecastDays').value);
+    viewConfig.graphValuesVisibility = document.getElementById('input-graphValuesVisibility').value;
+    viewConfig.tooltipVisibility = document.getElementById('input-tooltipVisibility').value;
+    viewConfig.tooltipDuration = parseInt(document.getElementById('input-tooltipDuration').value);
+    
+    viewConfig.temperatureUnit = document.getElementById('input-tempUnit').value;
+    viewConfig.windSpeedUnit = document.getElementById('input-windUnit').value;
+
+    viewConfig.windThresholdHigh = Math.round(parseFloat(document.getElementById('input-windThresholdHigh').value));
+    viewConfig.windThresholdMid = Math.round(parseFloat(document.getElementById('input-windThresholdMid').value));
+    viewConfig.windThresholdLow = Math.round(parseFloat(document.getElementById('input-windThresholdLow').value));
+
     viewConfig.hourWidth = parseInt(document.getElementById('input-hourWidth').value);
     viewConfig.windHeight = parseInt(document.getElementById('input-windHeight').value);
     viewConfig.subHeight = parseInt(document.getElementById('input-subHeight').value);
     viewConfig.graphMargin = parseInt(document.getElementById('input-margin').value);
     viewConfig.fontSize = parseInt(document.getElementById('input-fontSize').value);
     viewConfig.iconScale = parseFloat(document.getElementById('input-iconScale').value);
-    viewConfig.tooltipDuration = parseInt(document.getElementById('input-tooltipDuration').value);
-    
-    viewConfig.temperatureUnit = document.getElementById('input-tempUnit').value;
-    viewConfig.windSpeedUnit = document.getElementById('input-windUnit').value;
-
-    // 【追加】新設セレクトボックスの選択状態を viewConfig へ保存
-    viewConfig.tooltipVisibility = document.getElementById('input-tooltipVisibility').value;
-    viewConfig.graphValuesVisibility = document.getElementById('input-graphValuesVisibility').value;
-    viewConfig.welcomeBarVisibility = document.getElementById('input-welcomeBarVisibility').value; // 【追加】ウェルカムバーの表示状態を保存
-
-    viewConfig.windThresholdHigh = Math.round(parseFloat(document.getElementById('input-windThresholdHigh').value));
-    viewConfig.windThresholdMid = Math.round(parseFloat(document.getElementById('input-windThresholdMid').value));
-    viewConfig.windThresholdLow = Math.round(parseFloat(document.getElementById('input-windThresholdLow').value));
 
     const savedSpots = localStorage.getItem('pin_weather_spots');
     let hasSpots = false;
@@ -1023,6 +1049,8 @@ function openWidgetPreview() {
     }
 
     if (typeof viewConfig !== 'undefined') {
+        if (viewConfig.themeMode) params.set('theme', viewConfig.themeMode);
+        if (viewConfig.displayMode) params.set('display', viewConfig.displayMode);
         if (viewConfig.windSpeedUnit) params.set('wUnit', viewConfig.windSpeedUnit);
         if (viewConfig.temperatureUnit) params.set('tUnit', viewConfig.temperatureUnit);
         if (viewConfig.windThresholdHigh !== undefined) params.set('thH', Math.round(viewConfig.windThresholdHigh));
@@ -1031,7 +1059,7 @@ function openWidgetPreview() {
     }
     
     const widgetUrl = `${currentUrl}?${params.toString()}`;
-    const embedCode = `<iframe src="${widgetUrl}" width="100%" height="660" frameborder="0" style="border:1px solid #eee; border-radius:8px;"></iframe>`;
+    const embedCode = `<iframe src="${widgetUrl}" width="500" height="660" frameborder="0" style="border:1px solid #eee; border-radius:8px;"></iframe>`;
 
     if (codeArea) codeArea.value = embedCode;
 
@@ -1114,7 +1142,8 @@ function setupWidgetHeader() {
 
     const header = document.createElement('div');
     header.className = 'widget-only-header';
-    header.style.cssText = "padding: 10px 15px; background: #fff; border-bottom: 1px solid #eee; font-family: sans-serif; display: block; position: relative; z-index: 9999;";
+    // 【修正】position: relative を sticky に変更し、top: 0 を指定。さらに高さを 44px (box-sizing: border-box) で固定します。
+    header.style.cssText = "padding: 10px 15px; height: 44px; box-sizing: border-box; background: #fff; border-bottom: 1px solid #eee; font-family: sans-serif; display: block; position: sticky; top: 0; z-index: 9999;";
 
     // HTMLの構築
     const coordsHtml = (latNum && lonNum) 
@@ -1135,7 +1164,24 @@ function applyEnvVisuals() {
     let config = {};
 
     // ブラウザが現在ダークモードに設定されているかどうかの事実を判定
-    const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    let isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    // 画面テーマ設定（3択）が明示されている場合は、その設定に従って判定を上書き
+    if (typeof viewConfig !== 'undefined' && viewConfig.themeMode) {
+        if (viewConfig.themeMode === 'dark') {
+            isDarkMode = true;
+        } else if (viewConfig.themeMode === 'light') {
+            isDarkMode = false;
+        }
+        // 'system' の場合は、初期値の matchMedia 判定がそのまま活きます
+    }
+
+    // クラスではなく、属性(data-theme)を設定する
+    if (isDarkMode) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+    }
 
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.includes("192.168.")) {
         config = {
@@ -1439,24 +1485,92 @@ function finalizeInit() {
     updateLocation(currentLat, currentLon, currentLabel);
     generateSidebarQRCode();
     setupGeneralEvents(); // UIイベント登録
+    initScrollHelper();
 }
 
 /**
  * サブルーチン：UIイベントの登録
  * 既存のユーザーデータ「pin_weather_spots」および「pin_weather_wind_filter」を厳守。
- * 修正内容：地図ボタン押下時のrenderTabs("Map")呼び出しを削除。
- * サイドバー内「🔔 朝の通知設定ボタン」のイベント登録を追加。
+ * 【修正確定版】：HTML上の実際の要素（modeToggleButton, textModeContainer, main-card）に完全対応。
+ * ボタンにクラスを自動適用して形をそろえ、モード変更時に「概況」ボタンの表示・非表示も完全に連動させます。
+ * ※追加仕様：.legend-wind-container および #condition-summary-target をグラフと一体で表示・非表示にします。
  */
 function setupGeneralEvents() {
-    // --- 新設：概況ボタン左隣のGPS/Mapボタン (nav-action-bar内) ---
+    // --- text/graph表示切換トグルボタン ---
+    const modeToggleBtn = document.getElementById('modeToggleButton');
+    // --- 概況ボタン (nav-action-bar内) ---
+    const summaryBtn = document.getElementById('summaryButton');
+    // --- GPSボタン (nav-action-bar内) ---
     const navGpsBtn = document.getElementById('gps-btn-nav');
     if (navGpsBtn) navGpsBtn.onclick = () => handleGPSClick();
-
+    // --- Mapボタン (nav-action-bar内) ---
     const navMapBtn = document.getElementById('map-btn-nav');
     if (navMapBtn) navMapBtn.onclick = () => {
         openMap(currentLat, currentLon);
-        // renderTabs("Map") を削除（タブの色が消える不具合対策）
     };
+
+    // --- グラフコンテナ ---
+    const graphContainer = document.querySelector('.main-card');
+    // --- テキストコンテナ ---
+    const textContainer = document.getElementById('textModeContainer');
+    // --- 風向凡例コンテナ ---
+    const legendContainer = document.querySelector('.legend-wind-container');
+    // --- 気象概況コンテナ ---
+    const summaryTargetContainer = document.getElementById('condition-summary-target');
+
+    // 内部処理：表示モードに応じて画面要素とボタンの「形・テキスト」をすべて整える
+    function applyDisplayModeUI(mode) {
+        if (!modeToggleBtn) return;
+        
+        // HTML側でクラスが空なのを補うため、GPSボタン等と全く同じCSSクラスを動的に適用して形をそろえる
+        modeToggleBtn.className = 'btn-mode-small'; 
+        
+        if (mode === 'text') {                                                      // テキストモード時のUI調整
+            modeToggleBtn.innerText = typeof i18n !== 'undefined' ? i18n.t('btnTempView') || "グラフ表示" : "グラフ表示";
+            if (graphContainer) graphContainer.style.display = 'none';                  // グラフコンテナを消す
+            if (textContainer) textContainer.style.display = 'block';                   // テキストコンテナを表示　
+            if (summaryBtn) summaryBtn.style.display = 'none';                          // 概況ボタンを消す
+            if (legendContainer) legendContainer.style.display = 'none';                // 風向凡例を消す
+            if (summaryTargetContainer) summaryTargetContainer.style.display = 'none';  // 気象概況コンテナを消す
+
+        } else {                                                                    // グラフモード時のUI調整
+            modeToggleBtn.innerText = typeof i18n !== 'undefined' ? i18n.t('btnTextView') || "文字表示" : "文字表示";
+            if (graphContainer) graphContainer.style.display = 'block';                 // グラフコンテナを表示
+            if (textContainer) textContainer.style.display = 'none';                    // テキストコンテナを消す
+            if (summaryBtn) summaryBtn.style.display = 'block';                         // 概況ボタンを表示 
+            if (legendContainer) legendContainer.style.display = '';                    // 風向凡例を表示
+            if (summaryTargetContainer) summaryTargetContainer.style.display = '';      // 気象概況コンテナを表示
+
+        }
+    }
+
+    // 起動時：現在の保存状態（未定義ならデフォルトの'text'）に従ってUIの形を初期化
+    if (viewConfig.displayMode === undefined) viewConfig.displayMode = 'text';
+    applyDisplayModeUI(viewConfig.displayMode);
+
+    if (modeToggleBtn) {
+        modeToggleBtn.onclick = () => {
+            // 現在と反対のモードを判定
+            const nextMode = viewConfig.displayMode === 'graph' ? 'text' : 'graph';
+            // 1. 「閉じたときと同じ条件で開く」思想に基づき、即時ローカルストレージへ保存
+            viewConfig.displayMode = nextMode;
+            localStorage.setItem('pin_weather_view_config', JSON.stringify(viewConfig));
+            // 2. 画面レイアウト、およびトグルボタン・概況ボタンの表示状態（形）をリアルタイム更新
+            applyDisplayModeUI(nextMode);
+            // 3. 各モードに対応する描画処理の安全な呼び出し
+            if (nextMode === 'text') {
+                if (typeof renderTextMode === 'function' && typeof allData !== 'undefined' && allData) {
+                    renderTextMode(allData);     // allData が未定義の場合、renderTextMode を呼び出さない
+                }
+            } else {
+                if (typeof renderChartMode === 'function') {
+                    renderChartMode();          // allData が未定義でも、グラフモードは描画可能な場合があるため呼び出す
+                }
+                // 【追加仕様】：グラフモードへの切り替え時、下方にスクロールしていれば最上部へ自動で戻す
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        };
+    }
 
     // 1. 地図検索入力欄
     const searchInput = document.getElementById('map-search-input');
@@ -1483,12 +1597,11 @@ function setupGeneralEvents() {
         };
     }
    
-    // 【修正版】10. 通知設定ボタン（サイドバー）
-    // 履歴の競合を回避し、一本化された汎用モーダルを安全に起動します。
+    // 10. 通知設定ボタン（サイドバー）
     const openNotificationBtn = document.getElementById('openNotificationBtn');
     if (openNotificationBtn) {
         openNotificationBtn.onclick = () => {
-            openNotificationModalGeneral(); // 安全な画面遷移ロジックを内包したサブルーチンを直接実行
+            openNotificationModalGeneral(); 
         };
     }
 
@@ -1512,21 +1625,21 @@ function setupGeneralEvents() {
             draw(); 
         };
 
-        const footer = applyWindBtn.parentElement;
-        if (footer && !document.getElementById('wind-helper-group')) {
-            const helperGroup = document.createElement('div');
+        const footer = applyWindBtn.parentElement;  // 風向設定モーダルの下部にボタン群をまとめるための div を生成
+        if (footer && !document.getElementById('wind-helper-group')) {  // すでに存在する場合は再生成しない
+            const helperGroup = document.createElement('div');  // 風向設定モーダルの下部にボタン群をまとめるための div
             helperGroup.id = 'wind-helper-group';
             helperGroup.style.display = 'flex';
             helperGroup.style.width = '100%';
             helperGroup.style.gap = '6px';
             helperGroup.style.marginTop = '4px';
-
+            // ここでボタンのスタイルを統一するための基本スタイルを定義    
             const baseBtnStyle = "padding: 8px 4px; border-radius: 6px; font-size: 11px; font-weight: 500; border: none; cursor: pointer; transition: opacity 0.2s; flex: 1; white-space: nowrap;";
-
-            const btnLoadDef = document.createElement('button');
+            const btnLoadDef = document.createElement('button');    // デフォルト設定をロードするボタン
             btnLoadDef.style.cssText = baseBtnStyle + "background: #f1f3f5; color: #495057;";
             btnLoadDef.innerText = i18n.t('btnLoadDefault');
             btnLoadDef.onclick = () => {
+                // --- 追加仕様：ロード前に確認ダイアログを表示 ---
                 showAppDialog({ 
                     title: i18n.t('msgLoadConfirmTitle') || "確認", 
                     message: i18n.t('msgLoadConfirmDesc') || "デフォルト設定を読み込みますか？", 
@@ -1547,10 +1660,12 @@ function setupGeneralEvents() {
                 });
             };
 
+            //--- 追加仕様：デフォルト設定を保存するボタン
             const btnSaveDef = document.createElement('button');
             btnSaveDef.style.cssText = baseBtnStyle + "background: #f1f3f5; color: #495057;";
             btnSaveDef.innerText = i18n.t('btnSaveDefault');
             btnSaveDef.onclick = () => {
+                //--- 追加仕様：保存前に確認ダイアログを表示 ---
                 showAppDialog({ 
                     title: i18n.t('msgSaveConfirmTitle') || "保存の確認", 
                     message: i18n.t('msgSaveConfirmDesc') || "現在の設定をデフォルトとして保存しますか？", 
@@ -1559,18 +1674,21 @@ function setupGeneralEvents() {
                     } 
                 });
             };
-
+            
+            //--- 追加仕様：キャンセルボタン
             const cancelBtn = document.createElement('button');
             cancelBtn.id = "btnClose"; 
             cancelBtn.style.cssText = baseBtnStyle + "background: #6c757d; color: white;";
             cancelBtn.innerText = i18n.t('btnClose') || "Cancel";
             cancelBtn.onclick = () => closeModal('wind-modal');
 
+            //--- 追加仕様：確定ボタン
             const finalApplyBtn = document.createElement('button');
             finalApplyBtn.style.cssText = baseBtnStyle + "background: #007bff; color: white; flex: 1.2;";
             finalApplyBtn.innerText = i18n.t('btnSaveSettings') || "Apply Changes";
             finalApplyBtn.onclick = executeApply;
-
+            
+            // 既存のフッターをクリアして、新しいボタン群を追加 
             footer.innerHTML = ''; 
             footer.appendChild(btnLoadDef);
             footer.appendChild(btnSaveDef);
@@ -1579,16 +1697,15 @@ function setupGeneralEvents() {
         }
     }
 
-    // 5. 既存GPSボタン
+    // 5. 既存GPSボタン(nav-action-bar内に移動したが、キープ)
     const gpsBtn = document.getElementById('gps-btn');
     if (gpsBtn) gpsBtn.onclick = () => handleGPSClick();
     
-    // 6. 既存Mapボタン
+    // 6. 既存Mapボタン（nav-action-bar内に移動したが、キープ）
     const mapBtn = document.getElementById('map-btn');
     if (mapBtn) {
         mapBtn.onclick = () => { 
             openMap(); 
-            // renderTabs("Map") を削除（タブの色が消える不具合対策）
         };
     }
 
@@ -1761,7 +1878,7 @@ function initCompassUI() {
 }
 
 /**
- * サブローチン：環境色を反映した汎用ダイアログを表示
+ * サブルーチン：環境色を反映した汎用ダイアログを表示
  * 修正内容：通知専用の引数 onOk を追加。これが存在する場合は、他のボタンを排除してOKボタンのみを表示する。
  * 【今回追加】：customElement 引数を追加し、外部から組み立てられたフォーム要素を中央に流し込めるように拡張。
  * 修正内容2：モーダルヘッダーもトップバーと同様に、ダークモード時は環境色を維持したディープトーンに切り替え、見ぐるしさを解消。
@@ -1783,15 +1900,27 @@ function showAppDialog({ title, message = null, messageKey = null, inputValue = 
         closeBtn.onclick = () => { modal.style.display = 'none'; };
     }
 
-    // ウィジェット関連リセット
+    // 操作対象の各動的エリアを一括取得
     const widgetArea = document.getElementById('widget-preview-area');
     const widgetActionArea = document.getElementById('widget-action-area');
-    if (widgetArea) widgetArea.style.display = 'none';
-    if (widgetActionArea) widgetActionArea.style.display = 'none';
+    const notificationArea = document.getElementById('common-modal-notification-area');
+
+    // 【一発で仕留めるための追加】：通知用の個別構成要素をすべて取得（HTML構造のすり抜けを100%防止）
+    const labelSpot = document.getElementById('label-notification-spot');
+    const selectSpot = document.getElementById('select-notification-spot');
+    const labelTime = document.getElementById('label-notification-time');
+    const inputTime = document.getElementById('input-notification-time');
+    const btnNotifCancel = document.getElementById('notification-btn-close');
+    const btnNotifSave = document.getElementById('notification-btn-save');
+    const errorArea = document.getElementById('notification-error-area');
 
     // 環境色の反映（既存維持しつつダークモード適合に拡張）
     const hostname = window.location.hostname;
-    const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    // 【修正点】：OS性判定だけでなく、アプリの設定（bodyの .dark-mode クラス、または viewConfig.themeMode）を最優先で見て正しく同期させます
+    const isDarkMode = (document.body && document.body.classList.contains('dark-mode')) || 
+                       (typeof viewConfig !== 'undefined' && viewConfig.themeMode === 'dark') ||
+                       (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches && (typeof viewConfig !== 'undefined' && viewConfig.themeMode === 'system'));
     
     let bgColor = isDarkMode ? "#0f172a" : "#007bff"; 
     let textColor = "#ffffff";
@@ -1810,40 +1939,91 @@ function showAppDialog({ title, message = null, messageKey = null, inputValue = 
     titleEl.innerText = title;
     msgEl.innerText = messageKey ? i18n.t(messageKey) : (message || "");
     
-    if (inputArea && input) {
-        // --- 【追加】外部からカスタム要素が渡された場合は、既存の1行入力欄をクリアして流し込む ---
-        if (customElement) {
-            inputArea.style.display = 'block';
-            inputArea.innerHTML = ""; 
-            inputArea.appendChild(customElement);
-        } else {
-            // --- 通常時は既存の1行入力欄のロジックを1文字も変えず完全維持（既存の13か所はここを通る） ---
-            inputArea.style.display = (inputValue !== null) ? 'block' : 'none';
-            if (inputValue !== null) input.value = inputValue;
-        }
-    }
+    // モード判定の定義（辞書キーと生文字列の両方を検証し、判定のすり抜けを100%防止）
+    const isWidgetMode = (!onDelete && !onMap && !onSave && (title === i18n.t('widgetTitle') || title === "Widget Embedding Settings"));
+    const isNotificationMode = (title === i18n.t('notificationModalTitle') || title === "Daily Notification");
 
-    // ボタンの生成
+    // ボタンの生成エリアを初期化
     footer.innerHTML = "";
-    footer.style.display = 'flex';
 
-    if (onOk) {
-        // --- 通知モード（onOkが渡された場合） ---
-        // 他のボタンは一切作らず、OKボタン1つだけを全幅で生成
-        const btnOk = document.createElement('button');
-        btnOk.className = "btn btn-save"; // 決定を表す青色スタイル
-        btnOk.innerText = i18n.t('btnOK') || "OK";
-        btnOk.onclick = () => {
-            onOk();
-            modal.style.display = 'none';
-        };  
-        footer.appendChild(btnOk);
+    // 構造化プログラミングに基づく各モードごとの各エリア表示状態の完全制御
+    if (isNotificationMode) {
+        // --- 1. 通知設定モード時の振る舞い ---
+        if (inputArea) inputArea.style.display = 'none';         
+        if (widgetArea) widgetArea.style.display = 'none';         
+        if (widgetActionArea) widgetActionArea.style.display = 'none';
+        
+        // 通知用のコンテナおよび個別構成要素をすべて「明示的に表示」
+        if (notificationArea) notificationArea.style.display = 'block';
+        if (labelSpot) labelSpot.style.display = 'block';
+        if (selectSpot) selectSpot.style.display = 'block';
+        if (labelTime) labelTime.style.display = 'block';
+        if (inputTime) inputTime.style.display = 'block';
+        if (btnNotifCancel) btnNotifCancel.style.display = 'inline-block';
+        if (btnNotifSave) btnNotifSave.style.display = 'inline-block';
+        
+        footer.style.display = 'none'; // HTML側の独自ボタンを使用するため共通フッターは完全に隠す
+
+    } else if (isWidgetMode) {
+        // --- 2. ウィジェット埋め込み設定モード時の振る舞い ---
+        if (inputArea) inputArea.style.display = 'none';         
+        if (widgetArea) widgetArea.style.display = 'block';       
+        if (widgetActionArea) widgetActionArea.style.display = 'block';
+        
+        // 【バグ修正】通知用のコンテナ、および個別のUI要素・独自ボタンまで根こそぎ完全に「非表示」にする
+        if (notificationArea) notificationArea.style.display = 'none';
+        if (labelSpot) labelSpot.style.display = 'none';
+        if (selectSpot) selectSpot.style.display = 'none';
+        if (labelTime) labelTime.style.display = 'none';
+        if (inputTime) inputTime.style.display = 'none';
+        if (btnNotifCancel) btnNotifCancel.style.display = 'none';
+        if (btnNotifSave) btnNotifSave.style.display = 'none';
+        if (errorArea) errorArea.style.display = 'none';
+        
+        footer.style.display = 'none'; // ウィジェット側の独自ボタンを使用するため共通フッターは完全に隠す
+
     } else {
-        // --- 通常モード（既存ロジックを1文字も変えず完全維持） ---
-        const isWidgetMode = (!onDelete && !onMap && !onSave && title === i18n.t('widgetTitle'));
-        if (isWidgetMode) {
-            footer.style.display = 'none';
+        // --- 3. 通常のダイアログモード（既存の13か所の挙動を完全維持） ---
+        if (widgetArea) widgetArea.style.display = 'none';
+        if (widgetActionArea) widgetActionArea.style.display = 'none';
+
+        // 通常モードの際にも通知用のUI一式が絶対に露出しないよう、網羅的に「非表示」にする
+        if (notificationArea) notificationArea.style.display = 'none';
+        if (labelSpot) labelSpot.style.display = 'none';
+        if (selectSpot) selectSpot.style.display = 'none';
+        if (labelTime) labelTime.style.display = 'none';
+        if (inputTime) inputTime.style.display = 'none';
+        if (btnNotifCancel) btnNotifCancel.style.display = 'none';
+        if (btnNotifSave) btnNotifSave.style.display = 'none';
+        if (errorArea) errorArea.style.display = 'none';
+
+        if (inputArea && input) {
+            if (customElement) {
+                // 外部からカスタム要素が渡された場合は、既存の1行入力欄をクリアして流し込む
+                inputArea.style.display = 'block';
+                inputArea.innerHTML = ""; 
+                inputArea.appendChild(customElement);
+            } else {
+                // 通常時は既存の1行入力欄のロジックを1文字も変えず完全維持
+                inputArea.style.display = (inputValue !== null) ? 'block' : 'none';
+                if (inputValue !== null) input.value = inputValue;
+            }
+        }
+
+        footer.style.display = 'flex';
+
+        if (onOk) {
+            // 通常ダイアログのOKボタン単体生成モード
+            const btnOk = document.createElement('button');
+            btnOk.className = "btn btn-save"; 
+            btnOk.innerText = i18n.t('btnOK') || "OK";
+            btnOk.onclick = () => {
+                onOk();
+                modal.style.display = 'none';
+            };  
+            footer.appendChild(btnOk);
         } else {
+            // 通常の複数ボタン生成モード
             if (onDelete) {
                 const btnDelete = document.createElement('button');
                 btnDelete.className = "btn btn-danger-outline";
@@ -1858,7 +2038,8 @@ function showAppDialog({ title, message = null, messageKey = null, inputValue = 
                 btnMap.onclick = () => { onMap(); modal.style.display = 'none'; };
                 footer.appendChild(btnMap);
             }
-            // 通常時は必ずキャンセル（閉じる）を表示
+            
+            // キャンセルボタン（閉じる）を表示
             const btnCancel = document.createElement('button');
             btnCancel.className = "btn btn-secondary";
             btnCancel.innerText = i18n.t('btnClose');
@@ -2488,7 +2669,7 @@ async function updateLocation(lat, lon, label) {
 }
 
 
-const weatherIcons = { 0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️", 45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "🌦️", 61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "❄️", 73: "❄️", 75: "❄️", 80: "🌦️", 81: "🌦️", 82: "🌦️", 95: "⛈️", 96: "⛈️", 99: "⛈️" };
+const weatherIcons = { 0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️", 45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "🌦️", 61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "❄️", 73: "❄️", 75: "❄️", 80: "🌦️", 81: "🌦️", 82: "🌦️", 85: "❄️", 86: "❄️", 95: "⛈️", 96: "⛈️", 99: "⛈️" };
 function getWindDirText(deg) { return windDirs[Math.round(deg / 22.5) % 16]; }
 
 /**
@@ -2749,16 +2930,11 @@ function isCalmWind(rawSpeed, wUnit) {
     // 【しきい値の一元管理箇所】 変更時はこの数値を直すだけで、すべての単位の計算が完全に連動します。
     let calmThresholdRaw = 1.5; 
     
-    // すべての単位（m/sを含む）において変数自体を割る計算式を網羅
-    if (wUnit === 'm/s') {
-        calmThresholdRaw = calmThresholdRaw / 1.0;       // 1.5 m/s 未満
-    } else if (wUnit === 'km/h') {
-        calmThresholdRaw = calmThresholdRaw / 3.6;       // 1.5 km/h 未満相当の m/s 値を算出
-    } else if (wUnit === 'kn') {
-        calmThresholdRaw = calmThresholdRaw / 1.94384;   // 1.5 kn 未満相当の m/s 値を算出
-    } else if (wUnit === 'mph') {
-        calmThresholdRaw = calmThresholdRaw / 2.23694;   // 1.5 mph 未満相当の m/s 値を算出
-    }
+    // 表記のゆれ（スラッシュの有無）を調整して、変換用単位キーを特定
+    const targetUnit = wUnit === 'm/s' ? 'ms' : (wUnit === 'km/h' ? 'kmh' : wUnit);
+    
+    // すべての単位（m/sを含む）において共通ヘルパー関数を使用し、設定単位の1.5に相当するm/s値を逆算
+    calmThresholdRaw = convertWindSpeedValue(calmThresholdRaw, targetUnit, true);
     
     return rawSpeed < calmThresholdRaw;
 }
@@ -2890,11 +3066,11 @@ function generateWindSummaryMultiLang(data, nowIdx, endIdx, now, wUnit) {
     for (let i = nowIdx; i <= endIdx; i++) {
         let rawSpd = data.wind_speed_10m[i];
         
-        // 現在の単位に換算
-        let convertedSpd = rawSpd;
-        if (wUnit === 'km/h') convertedSpd = rawSpd * 3.6;
-        else if (wUnit === 'kn') convertedSpd = rawSpd * 1.94384;
-        else if (wUnit === 'mph') convertedSpd = rawSpd * 2.23694;
+        // 表記のゆれ（スラッシュの有無）を調整して、変換用単位キーを特定
+        const targetUnit = wUnit === 'm/s' ? 'ms' : (wUnit === 'km/h' ? 'kmh' : wUnit);
+
+        // 現在の単位に換算（共通サブルーチンを使用）
+        let convertedSpd = convertWindSpeedValue(rawSpd, targetUnit, false);
 
         let spdFloor = Math.floor(convertedSpd); // 小数点以下を無視した整数値
         if (spdFloor > maxSpeedFloor) {
@@ -3279,17 +3455,6 @@ function getAzimuth(degrees) {
     return isJa ? directionsJa[idx] : directionsEn[idx];
 }
 
-function getLocalizedDate(date) {
-    const m = date.getMonth() + 1;
-    const d = date.getDate();
-    const daysJa = ["日", "月", "火", "水", "木", "金", "土"];
-    const daysEn = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    if (typeof i18n !== 'undefined' && i18n._currentLang === 'ja') {
-        return `${m}/${d}(${daysJa[date.getDay()]})`;
-    }
-    return `${m}/${d} (${daysEn[date.getDay()]})`;
-}
-
 /**
  * weatherMasterオブジェクトから現在の言語に対応する正確な天気名を取得するサブルーチン
  */
@@ -3301,6 +3466,519 @@ function getI18nWeatherName(code) {
     return `weather_code_${code}`;
 }
 
+/////テキストモード//////////////////////////////////////////////////////////////////////////////////
+/**
+ * サブルーチン：3時間ブロックの中から「最大1時間雨量」を抽出し、小数点以下を切り捨てる
+ * （通知ロジックの計算結果と100%一貫性を保ちます）
+ * * @param {Object} hourly - Open-Meteoのhourlyデータオブジェクト
+ * @param {number} startIndex - 3時間ブロックの開始インデックス (0, 3, 6, 9, ...)
+ * @returns {number} 切り捨てられた最大降水量（mm）
+ */
+function getMaxPrecipitation(hourly, startIndex) {
+    // データの存在チェックと安全ガード（不正なデータによるエラーを完全に防ぎます）
+    if (!hourly || !hourly.precipitation || !Array.isArray(hourly.precipitation)) {
+        return 0;
+    }
+
+    // 3時間分のデータを安全に取得（配列の範囲外アクセス時は0として処理）
+    const p0 = hourly.precipitation[startIndex]     !== undefined ? hourly.precipitation[startIndex] : 0;
+    const p1 = hourly.precipitation[startIndex + 1] !== undefined ? hourly.precipitation[startIndex + 1] : 0;
+    const p2 = hourly.precipitation[startIndex + 2] !== undefined ? hourly.precipitation[startIndex + 2] : 0;
+
+    // 3時間の中の最大値を抽出
+    const maxVal = Math.max(p0, p1, p2);
+
+    // 仕様に基づき、小数点以下を切り捨てて返す
+    //return Math.floor(maxVal);
+    return maxVal;
+}
+
+/**
+ * サブルーチン：風速に応じて、既存の凡例（グレー ➔ 青 ➔ オレンジ ➔ 赤 ➔ 濃い赤）の
+ * 間をRGB値で線形補間（計算）し、なめらかに変化するカラーコードを返す
+ * @param {number} speed - 各単位での風速数値
+ * @param {string} unit - 風速の単位（省略時は viewConfig.windSpeedUnit）
+ * @returns {Object} { fill: 塗りつぶし色コード, stroke: 枠線色コード }
+ */
+function getWindColorStyles(speed, thLow=viewConfig.windThresholdLow, thMid=viewConfig.windThresholdMid, thHigh=viewConfig.windThresholdHigh, unit = viewConfig.windSpeedUnit) {
+    // データの存在チェックと安全ガード（不正な値は最低風速のグレーとする）
+    if (speed === undefined || speed === null || isNaN(speed)) {
+        return { fill: "#cccccc", stroke: "#b3b3b3" };
+    }
+
+    // 表記のゆれ（スラッシュの有無）を調整して、変換用単位キーを特定
+    const targetUnit = unit === 'm/s' ? 'ms' : (unit === 'km/h' ? 'kmh' : unit);
+
+    // 共通サブルーチンを使用して、渡された各単位の風速値をm/s単位に逆算
+    const speedMs = convertWindSpeedValue(speed, targetUnit, true);
+
+        // --- 1. カラーチェックポイント（ストップデータ）の定義 ---
+        // 15m/s以上の警告レベル「濃い赤」のチェックポイントを確実に追加しました
+        const colorStops = [
+            { speed: 0,  r: 204, g: 204, b: 204 }, // 0m/s基準：グレー   (#ccc)
+//            { speed: thLow,  r: 204, g: 204, b: 204 }, // 0m/s基準：グレー   (#ccc)
+            { speed: thLow,  r: 135, g: 206, b: 235 }, // 3m/s基準：青       (#87ceeb)
+            { speed: thMid,  r: 255, g: 165, b: 0   }, // 5m/s基準：オレンジ (#ffa500)
+            { speed: thHigh, r: 220, g: 20,  b: 60  }, // 10m/s基準：赤       (#dc143c)
+            { speed: 15, r: 139, g: 0,   b: 0   }  // 15m/s基準：濃い赤   (#8b0000)
+        ];
+
+    let targetR = 0;
+    let targetG = 0;
+    let targetB = 0;
+
+    // --- 2. 風速が位置する区間の特定とRGBの線形補間計算 ---
+    if (speedMs <= colorStops[0].speed) {
+        // 下限（0m/s以下）の場合はグレー固定
+        targetR = colorStops[0].r;
+        targetG = colorStops[0].g;
+        targetB = colorStops[0].b;
+    } else if (speedMs >= colorStops[colorStops.length - 1].speed) {
+        // 上限（15m/s以上）の場合は濃い赤固定
+        targetR = colorStops[colorStops.length - 1].r;
+        targetG = colorStops[colorStops.length - 1].g;
+        targetB = colorStops[colorStops.length - 1].b;
+    } else {
+        // 中間区間の計算（ループ処理で該当する区間を特定）
+        for (let i = 0; i < colorStops.length - 1; i++) {
+            const startStop = colorStops[i];
+            const endStop = colorStops[i + 1];
+
+            // 現在の風速がこの2つのチェックポイントの間にある場合
+            if (speedMs >= startStop.speed && speedMs <= endStop.speed) {
+                // この区間内での風速の進捗比率（0.0 〜 1.0）を割り戻します
+                const t = (speedMs - startStop.speed) / (endStop.speed - startStop.speed);
+
+                // RGBの各成分を線形補間（比例計算）します
+                targetR = Math.round(startStop.r + (endStop.r - startStop.r) * t);
+                targetG = Math.round(startStop.g + (endStop.g - startStop.g) * t);
+                targetB = Math.round(startStop.b + (endStop.b - startStop.b) * t);
+                break; // 区間が特定できたらループを抜けます
+            }
+        }
+    }
+
+    // --- 3. 枠線用（stroke）に少し暗くしたRGBを計算 ---
+    // 計算されたfillの色に対して、一律で80%の輝度に落とすことで、中間色に完璧に馴染む枠線を動的生成します
+    const strokeR = Math.round(targetR * 0.8);
+    const strokeG = Math.round(targetG * 0.8);
+    const strokeB = Math.round(targetB * 0.8);
+
+    // --- 4. RGB数値を16進数カラーコード文字列（#rrggbb）に変換する内部ヘルパー ---
+    const toHex = (r, g, b) => {
+        const hexComponent = (c) => {
+            const hex = c.toString(16);
+            return hex.length === 1 ? "0" + hex : hex; // 1桁の場合は0で埋める
+        };
+        return "#" + hexComponent(r) + hexComponent(g) + hexComponent(b);
+    };
+
+    // fill（塗りつぶし）と stroke（枠線）のカラーコードをセットで返します
+    return {
+        fill: toHex(targetR, targetG, targetB),
+        stroke: toHex(strokeR, strokeG, strokeB)
+    };
+}
+
+/**
+ * サブルーチン：気温（℃または℉）と単位に応じて、なめらかに変化する文字用カラーコードを返す
+ * （ライト/ダーク共通：青 ➔ 水色 ➔ 橙 ➔ 濃い赤 のシームレス完全統一バージョン）
+ * @param {number} temp - 気温の数値
+ * @param {string} unit - 単位 ('℃' または '℉')。未指定の場合は '℃' として処理
+ * @returns {string} 16進数カラーコード文字列（#rrggbb）
+ */
+function getTemperatureColorStyles(temp, unit = '℃') {
+    // データの存在チェックと安全ガード（不正な値は視認性の高いグレーとする）
+    if (temp === undefined || temp === null || isNaN(temp)) {
+        return "#8a8a8a";
+    }
+
+    // ℉（華氏）から ℃（摂氏）への自動単位変換
+    let tempC = temp;
+    if (unit === '℉') {
+        tempC = (temp - 32) * 5 / 9;
+    }
+
+    // --- 1. ユーザー提案に基づく4つのカラーチェックポイント定義 ---
+    // ライト/ダークどちらの背景でも100%文字が読めるRGB値を厳選
+    const colorStops = [
+        { temp: -5,  r: 0,   g: 102, b: 255 }, // -5℃以下：青（両画面で沈まない鮮やかな青）
+        { temp: 0,   r: 0,   g: 145, b: 195 }, // 0℃基準 ：水色（白背景でも読める濃さのしっかりした水色）
+        { temp: 25,  r: 255, g: 110, b: 0   }, // 25℃基準：橙（視認性抜群のオレンジ）
+        { temp: 35,  r: 215, g: 0,   b: 40  }  // 35℃以上：赤（少し濃い赤、黒背景でも沈まない絶妙な濃さ）
+    ];
+
+    let targetR = 0;
+    let targetG = 0;
+    let targetB = 0;
+
+    // --- 2. 気温(摂氏換算後)が位置する区間の特定とRGBの線形補間計算 ---
+    if (tempC <= colorStops[0].temp) {
+        // 下限（-5℃以下）の場合は青固定
+        targetR = colorStops[0].r;
+        targetG = colorStops[0].g;
+        targetB = colorStops[0].b;
+    } else if (tempC >= colorStops[colorStops.length - 1].temp) {
+        // 上限（35℃以上）の場合は少し濃い赤固定
+        targetR = colorStops[colorStops.length - 1].r;
+        targetG = colorStops[colorStops.length - 1].g;
+        targetB = colorStops[colorStops.length - 1].b;
+    } else {
+        // 中間区間の計算
+        for (let i = 0; i < colorStops.length - 1; i++) {
+            const startStop = colorStops[i];
+            const endStop = colorStops[i + 1];
+
+            // 現在の気温がこの2つのチェックポイントの間にある場合
+            if (tempC >= startStop.temp && tempC <= endStop.temp) {
+                // 区間内での進捗比率（0.0 〜 1.0）を算出
+                const t = (tempC - startStop.temp) / (endStop.temp - startStop.temp);
+
+                // RGBの各成分を線形補間
+                targetR = Math.round(startStop.r + (endStop.r - startStop.r) * t);
+                targetG = Math.round(startStop.g + (endStop.g - startStop.g) * t);
+                targetB = Math.round(startStop.b + (endStop.b - startStop.b) * t);
+                break;
+            }
+        }
+    }
+
+    // --- 3. RGB数値を16進数カラーコード文字列（#rrggbb）に変換する内部ヘルパー ---
+    const toHex = (r, g, b) => {
+        const hexComponent = (c) => {
+            const hex = c.toString(16);
+            return hex.length === 1 ? "0" + hex : hex;
+        };
+        return "#" + hexComponent(r) + hexComponent(g) + hexComponent(b);
+    };
+
+    return toHex(targetR, targetG, targetB);
+}
+
+
+/**
+ * サブルーチン：3時間ブロックの開始時間帯に応じて、最高気温または最低気温を動的に判定して抽出する
+ * * 【時間帯ルールの仕様】
+ * ・00:00-, 03:00- (深夜・明け方) ➔ 最低気温 (Math.min)
+ * ・06:00-, 09:00-, 12:00- (朝・日中) ➔ 最高気温 (Math.max)
+ * ・15:00-, 18:00-, 21:00- (夕方・夜間) ➔ 最低気温 (Math.min)
+ * * @param {Object} hourly - Open-Meteoのhourlyデータオブジェクト
+ * @param {number} startIndex - 3時間ブロックの配列開始インデックス
+ * @param {number} startHour - ブロックの開始時刻 (0, 3, 6, 9, 12, 15, 18, 21 のいずれか)
+ * @returns {number} 判定・抽出された気温数値（小数点第1位を四捨五入して整数化）
+ */
+function getDynamicTemperature(hourly, startIndex, startHour) {
+    // データの存在チェックと安全ガード（不正なデータによるエラーを完全に防ぎます）
+    if (!hourly || !hourly.temperature_2m || !Array.isArray(hourly.temperature_2m)) {
+        return 0;
+    }
+
+    // 3時間分の気温データを安全に取得（配列の範囲外アクセス時は0として処理）
+    const t0 = hourly.temperature_2m[startIndex]     !== undefined ? hourly.temperature_2m[startIndex] : 0;
+    const t1 = hourly.temperature_2m[startIndex + 1] !== undefined ? hourly.temperature_2m[startIndex + 1] : 0;
+    const t2 = hourly.temperature_2m[startIndex + 2] !== undefined ? hourly.temperature_2m[startIndex + 2] : 0;
+
+    let targetTemperature = 0;
+
+    // 開始時刻（startHour）に基づいて、計算ロジックを厳格に分岐
+    if (startHour === 0 || startHour === 3) {
+        // 深夜・明け方ブロック：1日のうちで最も気温が下がるボトムを捉えるため「最低気温」
+        targetTemperature = Math.min(t0, t1, t2);
+    } 
+    else if (startHour === 6 || startHour === 9 || startHour === 12) {
+        // 朝・日中ブロック：太陽が昇り気温が上がるピークを捉えるため「最高気温」
+        targetTemperature = Math.max(t0, t1, t2);
+    } 
+    else if (startHour === 15 || startHour === 18 || startHour === 21) {
+        // 夕方・夜間ブロック：日が落ちて再び冷え込んでいく変化を捉えるため「最低気温」
+        targetTemperature = Math.min(t0, t1, t2);
+    } 
+    else {
+        // 想定外の時間（イレギュラーなインデックスなど）が渡された場合の安全用デフォルト
+        targetTemperature = Math.max(t0, t1, t2);
+    }
+
+    // アプリ内のテキスト表示の統一感に合わせ、四捨五入して整数（あるいは必要に応じて丸めなしに変更可能）で返します
+    return Math.round(targetTemperature);
+}
+
+/**
+ * サブルーチン①：3時間分（1行分）のテキストモード用HTMLを生成する（多言語・単位連動版）
+ * @param {Object} hourly - Open-Meteoのhourlyデータオブジェクト
+ * @param {number} startIndex - 3時間ブロックの配列開始インデックス (0, 3, 6, 9, ...)
+ * @param {number} startHour - ブロックの開始時刻 (0, 3, 6, 9, ...)
+ * @returns {string} 1行分の構築済みHTML文字列
+ */
+function generateTextModeLine(hourly, startIndex, startHour) {
+    // データの存在チェックと安全ガード
+    if (!hourly || !hourly.time || startIndex === undefined) {
+        return "";
+    }
+
+    // 1. 時間表示の整形 (例: "03-")
+    const timeText = String(startHour).padStart(2, '0') + '-';
+
+    // 2. 既存の weatherIcons オブジェクトをそのまま流用して絵文字を3つ結合
+    let weatherEmojis = "";
+    for (let i = 0; i < 3; i++) {
+        const idx = startIndex + i;
+        const code = hourly.weather_code && hourly.weather_code[idx] !== undefined ? hourly.weather_code[idx] : null;
+        const emoji = (code !== null && weatherIcons[code] !== undefined) ? weatherIcons[code] : "☁️";
+        weatherEmojis += emoji;
+    }
+
+    // 3. 既成サブルーチンによる「動的気温」の取得と、viewConfigに連動した温度単位の付与
+    const temperature = getDynamicTemperature(hourly, startIndex, startHour);
+    const tempUnit = viewConfig.temperatureUnit === 'celsius' ? '°C' : '°F';
+
+    // 4. 既成サブルーチンによる「最大降水量」の取得
+    let maxPrecipitation = getMaxPrecipitation(hourly, startIndex);
+    if (maxPrecipitation !== 0) maxPrecipitation = Math.floor(maxPrecipitation) + "mm";
+    else maxPrecipitation = ""; // 0mmの場合は非表示
+
+    // 5. 3時間分の風向SVGアイコン（矢羽根デザイン）の生成ループ
+    let windIconsHtml = "";
+    for (let i = 0; i < 3; i++) {
+        const idx = startIndex + i;
+        const deg = hourly.wind_direction_10m && hourly.wind_direction_10m[idx] !== undefined ? hourly.wind_direction_10m[idx] : null;
+        const speed = hourly.wind_speed_10m && hourly.wind_speed_10m[idx] !== undefined ? hourly.wind_speed_10m[idx] : 0;
+        
+        const colors = getWindColorStyles(speed);
+        const rotateDeg = (deg !== null && !isNaN(deg)) ? (deg + 180) % 360 : 0;
+
+        // 【修正】改行と空白を完全除去して密着させ、transformで2px上に引き上げます
+        windIconsHtml += `
+            <div class="icon-box" style="display: inline-block; margin: 0 -6px; transform: translateY(-4px);">
+                <svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align: middle;">
+                    <path d="M0,-12 L6,6 L0,2 L-6,6 Z" 
+                          fill="${colors.fill}" 
+                          stroke="${colors.stroke}" 
+                          stroke-width="1" 
+                          transform="rotate(${rotateDeg})"/>
+                </svg>
+            </div>`;
+    }
+    // 6. 風速テキストの生成（開始時 ➔ 終了時、既存辞書の speedunit 設定に完全連動）
+    const startSpeed = hourly.wind_speed_10m && hourly.wind_speed_10m[startIndex] !== undefined ? Math.floor(hourly.wind_speed_10m[startIndex]) : 0;
+    const endSpeed = hourly.wind_speed_10m && hourly.wind_speed_10m[startIndex + 2] !== undefined ? Math.floor(hourly.wind_speed_10m[startIndex + 2]) : 0;
+    const speedUnit = i18n.t('speedunit');
+    const windSpeedText = `${startSpeed}➔${endSpeed} ${speedUnit}`;
+
+    // 7. 1つの行としてHTMLを出力
+    return `
+        <div class="text-mode-row">
+            <div class="text-cell-time">${timeText}</div>
+            <div class="text-cell-weather">${weatherEmojis}</div>
+            <div class="text-cell-temp" style="color: ${getTemperatureColorStyles(temperature, tempUnit)};">
+                ${temperature}${tempUnit}
+            </div>
+            <div class="text-cell-precip">${maxPrecipitation}</div>
+            <div class="text-cell-wind-dir">${windIconsHtml}</div>
+            <div class="text-cell-wind-speed">${windSpeedText}</div>
+        </div>
+    `;
+}
+
+/**
+ * サブルーチン②：テキストモードの全日程をループ処理し、多言語ヘッダーを挟んで画面に描画する
+ * @param {Object} weatherData - Open-Meteoから取得したAPIレスポンスの全体オブジェクト
+ */
+function renderTextMode(weatherData) {
+    // 【原因特定による修正】：実際のデータ構造（weatherData.data）に合わせて安全ガードを厳密化
+    if (!weatherData || !weatherData.data) {
+        return;
+    }
+
+    // 実際のデータ格納先である「data」を「hourly」としてエイリアス（代入）することで、
+    // 後続の構造化ロジックやコメント、変数名を一切変更せずにそのまま確実に動作させます。
+    const hourly = weatherData.data;
+    const totalHours = hourly.time.length;
+    let containerHtml = "";
+
+    // 既存の i18n オブジェクトから現在言語の曜日配列を直接取得
+    const weekDays = i18n.t('days');
+
+    // 全時間帯を3時間ステップでループ処理
+    for (let i = 0; i < totalHours; i += 3) {
+        const dateObj = new Date(hourly.time[i]);
+        const currentHour = dateObj.getHours();
+
+        // 24時間ごと（00:00）、またはループの最初に対象日の「日付ヘッダー」を生成
+        if (currentHour === 0 || i === 0) {
+            const month = dateObj.getMonth() + 1;
+            const date = dateObj.getDate();
+            const dayName = weekDays[dateObj.getDay()];
+            
+            // 曜日（0:日曜日, 6:土曜日）を判定してクラスを動的に決定
+            const dayOfWeek = dateObj.getDay();
+            let dayClass = "";
+            if (dayOfWeek === 0) {
+                dayClass = " is-sunday";
+            } else if (dayOfWeek === 6) {
+                dayClass = " is-saturday";
+            }
+            
+            // 各見出し文字列を辞書から取得（未定義時のフォールバック付き）
+            const labelTemp = i18n.t('temp') || '気温';
+            const labelPrecip = i18n.t('precip') || '降水';
+            const labelWindDir = i18n.t('windDir') || '風向';
+            const labelWindSpeed = i18n.t('windSpeed') || '風速';
+            
+            // 憶測を排除し、実際の辞書翻訳結果が「半角英字」から始まっているかで英語モードを自動判定
+            const isEnMode = /^[a-zA-Z]/.test(labelTemp);
+            const enClass = isEnMode ? " is-en" : "";
+            
+            containerHtml += `
+                <div class="text-mode-date-header${dayClass}${enClass}">
+                    <div class="text-header-date-cell">${getLocalizedDate(dateObj)} </div>
+                    <div class="text-cell-temp text-header-label"><span>${labelTemp}</span></div>
+                    <div class="text-cell-precip text-header-label"><span>${labelPrecip}</span></div>
+                    <div class="text-cell-wind-dir text-header-label"><span>${labelWindDir}</span></div>
+                    <div class="text-cell-wind-speed text-header-label"><span>${labelWindSpeed}</span></div>
+                </div>
+            `;
+        }
+
+        // 既成の1行生成サブルーチンを呼び出してベースHTMLを取得
+        let lineHtml = generateTextModeLine(hourly, i, currentHour);
+
+        // 【経過分数ベースの動的タイムライン判定】
+        const now = new Date();
+        const blockStart = new Date(hourly.time[i]);
+        const blockEnd = new Date(blockStart.getTime() + 3 * 60 * 60 * 1000); // 3時間後
+
+        // 現在時刻がこの3時間ブロック（180分間）の範囲内にある場合
+        if (now >= blockStart && now < blockEnd) {
+            // 3時間の枠内（180分）で、現在何分経過しているかをミリ秒から正確に算出
+            const passedMinutes = Math.floor((now.getTime() - blockStart.getTime()) / (60 * 1000));
+            
+            // 180分に対する経過割合をパーセンテージ（%）に換算
+            const topPercent = (passedMinutes / 180) * 100;
+
+            // サブルーチン①の戻り値（lineHtml）には一切触れず、外側からラッパーで包み、
+            // 計算した%の位置（top）に最背面レイヤーとして青破線を安全に滑り込ませます。
+            // 【スクロール用変更】：自動スクロールの対象を補足するため、id="textModeCurrentRow" を追加付与します。
+            lineHtml = `
+                <div id="textModeCurrentRow" class="text-mode-row-wrapper">
+                    ${lineHtml}
+                    <div class="text-mode-current-timeline" style="top: ${topPercent}%;"></div>
+                </div>
+            `;
+        }
+
+        // 最終的なHTMLコンテナに結合
+        containerHtml += lineHtml;
+    }
+
+    // DOMへの描画（表示切り替えやUI制御は applyDisplayModeUI 側に完全移管）
+    const textContainer = document.getElementById("textModeContainer");
+    if (textContainer) {
+        textContainer.innerHTML = containerHtml;
+    }
+
+    // ============================================================
+    // 【新規追加仕様】：現在時刻の予報位置への自動スムーズスクロール
+    // ============================================================
+    // 描画されたHTMLの中から、現在時刻のIDを持つラッパー要素を即座に検索
+    const currentTargetRow = document.getElementById("textModeCurrentRow");
+    if (currentTargetRow) {
+        // 画面の中央（block: 'center'）にジャストフィットするよう、滑らかにスクロールさせます
+        currentTargetRow.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+        });
+    }
+}
+
+/**
+ * サブルーチン③：グラフモード（通常画面）への切り替え時に、実際のグラフ描画ロジックを安全に呼び出す
+ * （コンテナの表示・非表示やナビゲーション状態の復元は applyDisplayModeUI 側で一括処理されます）
+ */
+function renderChartMode() {
+    // グラフモード移行時に実際のSVG描画（draw）を確実に実行して画面を復元する
+    if (typeof draw === 'function') {
+        draw();
+    }
+}
+
+/**
+ * サブローチン：スクロール補助ボタンの自動生成と表示制御
+ * 画面右下に「上↑」「左←」ボタンを動的に配置し、スクロール量に応じて表示・非表示を切り替えます。
+ * グラフモード（#scroll-root）とテキストモード（#textModeContainer）の両方の横スクロールに完全自動対応。
+ */
+function initScrollHelper() {
+    // 重複生成を防ぐ安全ガード
+    if (document.getElementById('scroll-helper-container')) return;
+
+    // 1. ボタンを包む固定コンテナを生成
+    const container = document.createElement('div');
+    container.id = 'scroll-helper-container';
+
+    // 2. 「上↑」ボタンの生成（縦スクロール用）
+    const btnTop = document.createElement('button');
+    btnTop.className = 'scroll-helper-btn';
+    btnTop.innerHTML = '↑';
+    btnTop.setAttribute('aria-label', 'トップへ戻る');
+    btnTop.onclick = () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    // 3. 「左←」ボタンの生成（横スクロール用）
+    const btnLeft = document.createElement('button');
+    btnLeft.className = 'scroll-helper-btn';
+    btnLeft.innerHTML = '←';
+    btnLeft.setAttribute('aria-label', '左端へ戻る');
+    btnLeft.onclick = () => {
+        const textContainer = document.getElementById('textModeContainer');
+        const graphContainer = document.getElementById('scroll-root');
+        
+        // 存在するコンテナをすべて安全に左端へスムーズスクロール
+        if (textContainer) textContainer.scrollTo({ left: 0, behavior: 'smooth' });
+        if (graphContainer) graphContainer.scrollTo({ left: 0, behavior: 'smooth' });
+    };
+
+    // 【修正】コンテナにボタンを結合（「←」を上、「↑」を下にすることで、下端の位置を完全固定）
+    container.appendChild(btnLeft);
+    container.appendChild(btnTop);
+    
+    // html直下に挿入することで、上位要素のtransform干渉を100%完全回避
+    document.documentElement.appendChild(container);
+
+    // 4. 縦スクロールの監視（200px以上スクロールで「上↑」を表示）
+    window.addEventListener('scroll', () => {
+        if (window.scrollY > 200) {
+            btnTop.classList.add('is-visible');
+        } else {
+            btnTop.classList.remove('is-visible');
+        }
+    });
+
+    // 5. 横スクロールの監視（40px以上横スクロールで「左←」を表示）
+    const checkHorizontalScroll = (e) => {
+        if (e.target.scrollLeft > 40) {
+            btnLeft.classList.add('is-visible');
+        } else {
+            // 両方のコンテナがどちらも左端に戻っている場合のみ非表示にする
+            const textContainer = document.getElementById('textModeContainer');
+            const graphContainer = document.getElementById('scroll-root');
+            const textLeft = textContainer ? textContainer.scrollLeft : 0;
+            const graphLeft = graphContainer ? graphContainer.scrollLeft : 0;
+
+            if (textLeft <= 40 && graphLeft <= 40) {
+                btnLeft.classList.remove('is-visible');
+            }
+        }
+    };
+
+    // 対象要素のスクロールイベントにサブルーチンを紐付け
+    const textContainer = document.getElementById('textModeContainer');
+    const graphContainer = document.getElementById('scroll-root');
+
+    if (textContainer) textContainer.addEventListener('scroll', checkHorizontalScroll);
+    if (graphContainer) graphContainer.addEventListener('scroll', checkHorizontalScroll);
+}
+
+//////グラフモード//////////////////////////////////////////////////////////////////////////////////
 // ツールチップ消去用タイマー変数
 let tooltipTimer = null;
 
@@ -3325,6 +4003,9 @@ async function draw() {
         
         // --- 1. ウィジェットモード時のパラメータ反映（確実に最新を反映） ---
         if (isWidget) {
+            document.body.classList.add('widget-mode'); // 【追加】親要素（body）にwidgetモードの目印クラスを付与
+            if (params.get('theme')!== null) viewConfig.themeMode = params.get('theme');
+            if (params.get('display')!== null) viewConfig.displayMode = params.get('display');
             if (params.get('tUnit')) viewConfig.temperatureUnit = params.get('tUnit');
             if (params.get('wUnit')) viewConfig.windSpeedUnit = params.get('wUnit');
             if (params.get('thH') !== null) viewConfig.windThresholdHigh = parseFloat(params.get('thH'));
@@ -3332,12 +4013,14 @@ async function draw() {
             if (params.get('thL') !== null) viewConfig.windThresholdLow  = parseFloat(params.get('thL'));
 
             // 【追加仕様】widget表示の時はツールチップ非表示、グラフ内数値表示設定にする
+            viewConfig.welcomeBarVisibility = 'hide';
             viewConfig.tooltipVisibility = 'hide';
             viewConfig.graphValuesVisibility = 'show';
 
-            // ナび表示制御
+            // ナビ表示制御
             const nav = document.querySelector('.nav-container') || document.querySelector('nav');
             if (nav) nav.style.display = 'none';
+            applyEnvVisuals(); // ウィジェットモードのテーマ・背景色を即座に反映
         }
 
         // --- 2. 【重要】反映されない単位テキストの再計算と辞書の更新 ---
@@ -3362,6 +4045,13 @@ async function draw() {
             }
         }
         console.timeEnd("1. Data Fetch (Cache)");
+
+        // ==========================================================
+        // 【提案追記】起動時またはデータ更新時、テキストモードなら中身をレンダリングする
+        // ==========================================================
+        if (viewConfig.displayMode === 'text' && typeof renderTextMode === 'function' && allData) {
+            renderTextMode(allData);
+        }
 
         const svgW = document.getElementById('svg-weather');
         if (!svgW || !allData || !allData.data) return;
@@ -3396,14 +4086,16 @@ async function draw() {
         if (titles.length >= 4) {
             titles[0].innerHTML = i18n.t('yAxisWeather');
             titles[1].innerHTML = `${baseWindIcon}${i18n.t('windDir')}<br>(${currentWUnit})`;
-            titles[2].innerHTML = `${i18n.t('temp')}(${currentTUnit})<br>${i18n.t('seawater')}(${currentTUnit})`;
+            //titles[2].innerHTML = `${i18n.t('temp')}(${currentTUnit})<br>${i18n.t('seawater')}(${currentTUnit})`;
+            titles[2].innerHTML = `${i18n.t('temp')}(${currentTUnit})<br>`;
             
             const waveData = allData.data.wave_height ? allData.data.wave_height.slice(startIdx) : [];
             const tideData = allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl.slice(startIdx) : [];
             const hasMarineData = waveData.some(v => v !== 0 && v !== null) || tideData.some(v => v !== 0 && v !== null);
             
-            let marineTitle = hasMarineData ? i18n.t('yAxisMarine') : `<br><span style="color:#FF0000; font-weight:bold; font-size:14px; display:block; margin-top:2px;">No Marine Data</span>`;
-            titles[3].innerHTML = marineTitle;
+            //let marineTitle = hasMarineData ? i18n.t('yAxisMarine') : `<br><span style="color:#FF0000; font-weight:bold; font-size:14px; display:block; margin-top:2px; background-color:transparent;">No Marine Data</span>`;
+            let marineTitle = hasMarineData ? i18n.t('seawater') : `<span style="color:#FF0000; font-weight:bold; font-size:14px; display:block; margin-top:2px; background-color:transparent;">No Marine Data</span>`;
+            titles[2].innerHTML += marineTitle;
         }
 
         const labelFS = viewConfig.fontSize;
@@ -3448,12 +4140,13 @@ async function draw() {
 
         // 【追加】ブラウザが現在ダークモードであるかどうかの事実を判定
         const isDarkForPrecip = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        // ダークモード時は黒背景に映える鮮やかなスカイブルー、通常時は既存の青
+        // ダークモード時は黒背景に映える鮮やかなスカイブルー、通常時は既存의 青
         const precipColor = isDarkForPrecip ? "#388ef8" : "#0000FF";
 
         for(let i = startIdx; i < totalDataCount; i++) {
             const x = (i - startIdx) * hScale; 
-            const icon = weatherIcons[allData.data.weather_code[i]] || "❓";
+            //const icon = weatherIcons[allData.data.weather_code[i]] || "❓";
+            const icon = weatherIcons[allData.data.weather_code[i]] || allData.data.weather_code[i];
             wHtml += `<text x="${x}" y="52" font-size="28" text-anchor="middle">${icon}</text>`; 
             const p = allData.data.precipitation ? allData.data.precipitation[i] : 0;
             if (p > 0) {
@@ -3482,8 +4175,18 @@ async function draw() {
         const hasMarineData = (allData.data.wave_height && allData.data.wave_height.slice(startIdx).some(v => v !== 0 && v !== null));
         renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], subH, 5.0, false, !hasMarineData, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, null);
         
+        // 【追加】マリンデータの有無に応じて、重なっているsticky-labelの表示/非表示をピンポイントで制御
+        const marineLabel = document.querySelector('.section-marine .sticky-label');
+
         if (hasMarineData) {
+            if (marineLabel) marineLabel.style.display = ''; // 通常時は表示を元に戻す
             renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], subH, 0.5, false, true, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, null);
+        } else {
+            if (marineLabel) marineLabel.style.display = 'none'; // マリンデータがない時は完全に非表示
+            const svgM = document.getElementById('svg-marine');
+            const dateM = document.getElementById('date-marine');
+            if (svgM) svgM.innerHTML = "";
+            if (dateM) dateM.innerHTML = "";
         }
 
         updateWindLegend();
@@ -3547,8 +4250,8 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
             html += `<line x1="${x}" y1="0" x2="${x}" y2="${plotHeight}" class="grid-day" />`;
             const dayIdx = d.getDay();
             
-            // 【修正】現在の環境がダークモードかどうかを自動判定
-            const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            // 【修正】現在の環境がダークモードかどうかを自動判定（PWAアプリのdata-theme属性を基準に判定するよう修正）
+            const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
             let dayColor;
             if (isDarkMode) {
                 // ダークモード時は背景と同化しない明るい色相を割り当て
@@ -3616,28 +4319,29 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                 if (currentDirIdx === -1) currentDirIdx = enDirs.indexOf(dirText);
                 
                 const isTargetDir = filterIndices.includes(currentDirIdx);
+                const colors = getWindColorStyles(val,thLow,thMid,thHigh);
                 
                 let color = '#ccc'; 
 
                 if (isTargetDir) {
-                    if (val >= thHigh) color = '#dc143c';
-                    else if (val >= thMid) color = '#ffa500';
-                    else if (val >= thLow) color = '#87CEEB';
-                } else {
-                    if (val >= thHigh) color = 'rgba(220, 20, 60, 0.4)';
+                    color = colors.fill
                 }
 
                 html += `<rect x="${x - (hScale*0.4)}" y="${plotHeight-h}" width="${hScale*0.8}" height="${h}" fill="${color}" />`;
                 if (isWind) {
-                    html += `<path d="M0,-12 L6,6 L0,2 L-6,6 Z" transform="translate(${x}, ${plotHeight-h-30}) rotate(${(deg+180)%360}) scale(${1.4 * iScale})" class="wind-arrow" />`;
-                    
+                    html += 
+                        `<path d="M0,-12 L6,6 L0,2 L-6,6 Z"
+                            transform="translate(${x}, ${plotHeight-h-30}) rotate(${(deg+180)%360}) scale(${1.4 * iScale})" 
+                            style="fill: ${colors.fill}; stroke: ${colors.stroke};" 
+                            stroke-width="1" 
+                            class="wind-arrow" />`;                                           
                     // 【風速：数値を45度左回りで傾け、アンカー位置を調整して等間隔に並べる修正】
                     if (viewConfig.graphValuesVisibility !== 'hide') {
                         // 棒の先端から5px上に一律配置（上下の交互ずらしは廃止）
                         const targetY = plotHeight - h - 7;
                         // 左回りに45度回転させるため、rotate の角度を -45 に設定。基準点を (x, targetY) に指定することで、その場を中心に綺麗に回転します。
                         // text-anchor="middle" から "start" もしくは重心を意識した配置を維持（middleのままでも傾き回転軸が中心なら綺麗に配置されます）
-                        html += `<text x="${x}" y="${targetY}" font-size="${labelFS - 1}" font-weight="bold" fill="#333333" text-anchor="middle" transform="rotate(-45, ${x}, ${targetY})">${val.toFixed(1)}</text>`;
+                        html += `<text x="${x}" y="${targetY}" font-size="${labelFS - 1}" font-weight="bold" fill="${colors.fill}" text-anchor="middle" transform="rotate(-45, ${x}, ${targetY})">${val.toFixed(1)}</text>`;
                     }
                 }
             }
@@ -3690,7 +4394,7 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                 
                 const px = (i - startIdx) * hScale;
                 const py = plotHeight - (((v - min) / range) * plotHeight);
-                points.push(`${px},${py}`);
+                const points_pushed = points.push(`${px},${py}`);
 
                 if (viewConfig.graphValuesVisibility !== 'hide' && !isGust) {
                     let shouldShowValue = false;
@@ -3846,13 +4550,27 @@ function initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime) 
         const isDarkForPrecip = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         // ダークモード時は黒背景に映える鮮やかなスカイブルー、通常時は既存の青
         const precipColor = isDarkForPrecip ? "#388ef8" : "#0000FF";
+        
+        // 【修正・安全対策】関数のスコープ未定義や内部エラーによるツールチップ全体の停止を100%回避するガード処理
+        let colors = { fill: "#cccccc", stroke: "#b3b3b3" }; // デフォルト色（安全なフォールバック用）
+        try {
+            if (typeof getWindColorStyles === 'function') {
+                const rawWindSpeed = allData.data.wind_speed_10m ? allData.data.wind_speed_10m[validIdx] : null;
+                // 現在の設定単位を明示的に第2引数へ渡し、計算の安全性を強化
+                colors = getWindColorStyles(rawWindSpeed);
+            } else {
+                console.warn("getWindColorStyles is not defined or accessible in this scope.");
+            }
+        } catch (err) {
+            console.error("Error occurred while executing getWindColorStyles:", err);
+        }
 
         tooltip.innerHTML = `
             <span class="spot-name-tip">📍 ${currentLabel}</span>
             <span class="coord-tip notranslate">${currentLat.toFixed(3)}, ${currentLon.toFixed(3)}</span>
             <b class="notranslate">${localizedDateStr} ${d.getHours()}:00 ${wIcon}</b>
             <div class="icon-box"><span class="legend-bar" style="background:${precipColor}; margin-right:0;"></span></div>${i18n.t('precip')}: ${precipVal}<br>
-            <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" fill="#00d4ff" stroke="#008eb3" stroke-width="1" transform="rotate(${rotateDeg})"/></svg></div>${i18n.t('windDir')}: ${deg !== null && !isNaN(deg) ? getWindDirText(deg) + ' (' + deg + '°)' : '---'}<br>
+            <div class="icon-box"><svg width="14" height="14" viewBox="-8 -15 16 20" style="vertical-align:middle;"><path d="M0,-12 L6,6 L0,2 L-6,6 Z" style="fill: ${colors.fill}; stroke: ${colors.stroke}; stroke-width:1;" transform="rotate(${rotateDeg})"/></svg></div>${i18n.t('windDir')}: ${deg !== null && !isNaN(deg) ? getWindDirText(deg) + ' (' + deg + '°)' : '---'}<br>
             <div class="icon-box">🚩</div>${i18n.t('windSpeed')}: ${windVal}<br>
             <div class="icon-box"><span class="legend-line" style="background: linear-gradient(to right, #ff4500 50%, transparent 50%); background-size: 8px 100%; height: 2px; margin-right: 0; display: inline-block; vertical-align: middle; width: 14px;"></span></div>${i18n.t('gust')}: ${gustVal}<br>
             <div class="icon-box"><span class="legend-line" style="background:#ff4500; margin-right:0;"></span></div>${i18n.t('temp')}: ${tempVal}<br>
@@ -4042,20 +4760,6 @@ function updateWindLegend() {
             <span class="legend-wind-label">…</span>
         </div>
     `;
-}
-
-/**
- * 依存サブルーチン：風速の単位変換ヘルパー
- */
-function convertWindSpeedValue(value, unit, reverse = false) {
-    const factors = {
-        'kn': 1.94384,
-        'kmh': 3.6,
-        'mph': 2.23694,
-        'ms': 1.0
-    };
-    const factor = factors[unit] || 1.0;
-    return reverse ? (value / factor) : (value * factor);
 }
 
 /**
@@ -4296,8 +5000,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
- * サブルーチン：通知設定モーダルを汎用ダイアログとして一本化して表示（方法A：完全流用版）
- * 修正内容：独自ボタンの生成をすべて撤廃。既存のフッターおよび onSave ロジックを100%流用するように修正。
+ * サブルーチン：通知設定モーダルを汎用ダイアログとして一本化して表示（方法A：完全流用版・HTML静的配置対応）
+ * 修正内容：独自ボタンの生成およびJSによる動的DOM生成をすべて撤廃。HTML側の静的専用エリアの表示制御に移行。
  */
 function openNotificationModalGeneral() {
     // --- 既存の openModalFromSidebar の安全設計に準拠（戻るボタン暴発防止） ---
@@ -4313,28 +5017,28 @@ function openNotificationModalGeneral() {
     window.history.replaceState({ page: 'modal', id: 'app-common-modal' }, "");
     // ------------------------------------------------------------------
 
-    // 汎用モーダルに流し込むための親コンテナ（入力欄のみを格納）
-    const container = document.createElement('div');
-    container.className = "notification-container";
+    // HTML側の静的専用エリアおよび各入力要素を取得
+    const notificationArea = document.getElementById('common-modal-notification-area');
+    const labelSpot = document.getElementById('label-notification-spot');
+    const selectSpot = document.getElementById('select-notification-spot');
+    const labelTime = document.getElementById('label-notification-time');
+    const inputTime = document.getElementById('input-notification-time');
+    const errorArea = document.getElementById('notification-error-area');
 
-    // 1. 場所選択セレクトボックスのグループ作成
-    const groupSpot = document.createElement('div');
-    groupSpot.className = "setting-group";
-    groupSpot.style.marginBottom = "14px";
+    // HTML側に追加した専用ボタンの取得
+    const btnCancel = document.getElementById('notification-btn-close');
+    const btnSave = document.getElementById('notification-btn-save');
+
+    if (!notificationArea || !selectSpot || !inputTime || !errorArea) return;
+
+    // 前回の状態を完全に初期化
+    selectSpot.innerHTML = "";
+    errorArea.style.display = 'none';
+    errorArea.textContent = '';
     
-    const labelSpot = document.createElement('label');
-    labelSpot.className = "setting-label";
-    labelSpot.style.display = "block";
-    labelSpot.style.marginBottom = "6px";
     // 既存の正しい辞書キーを使用
-    labelSpot.innerText = typeof i18n !== 'undefined' ? i18n.t('notificationSelectSpot') : "通知する場所：";
-    
-    const selectSpot = document.createElement('select');
-    selectSpot.id = 'select-notification-spot';
-    selectSpot.style.width = "100%";
-    selectSpot.style.padding = "8px";
-    selectSpot.style.borderRadius = "4px";
-    selectSpot.style.border = "1px solid #ccc";
+    if (labelSpot) labelSpot.innerText = typeof i18n !== 'undefined' ? i18n.t('notificationSelectSpot') : "通知する場所：";
+    if (labelTime) labelTime.innerText = typeof i18n !== 'undefined' ? i18n.t('notificationSelectTime') : "通知時刻：";
 
     // 既存のお気に入りスポット(mySpots)から選択肢を動的に生成
     if (typeof mySpots !== 'undefined' && Array.isArray(mySpots)) {
@@ -4352,86 +5056,65 @@ function openNotificationModalGeneral() {
     if (savedLat && savedLon && savedLabel) {
         selectSpot.value = `${savedLat},${savedLon},${savedLabel}`;
     }
-    groupSpot.appendChild(labelSpot);
-    groupSpot.appendChild(selectSpot);
 
-    // 2. 時刻入力欄のグループ作成
-    const groupTime = document.createElement('div');
-    groupTime.className = "setting-group";
-    groupTime.style.marginBottom = "14px";
-    
-    const labelTime = document.createElement('label');
-    labelTime.className = "setting-label";
-    labelTime.style.display = "block";
-    labelTime.style.marginBottom = "6px";
-    // 既存の正しい辞書キーを使用
-    labelTime.innerText = typeof i18n !== 'undefined' ? i18n.t('notificationSelectTime') : "通知時刻：";
-    
-    const inputTime = document.createElement('input');
-    inputTime.type = 'time';
-    inputTime.id = 'input-notification-time';
-    inputTime.style.width = "100%";
-    inputTime.style.padding = "8px";
-    inputTime.style.borderRadius = "4px";
-    inputTime.style.border = "1px solid #ccc";
     inputTime.value = localStorage.getItem('notification_time') || "07:00";
-    
-    groupTime.appendChild(labelTime);
-    groupTime.appendChild(inputTime);
 
-    // 3. 【方法A】エラーメッセージ表示用のエリア（初期状態は隠す）
-    const errorArea = document.createElement('div');
-    errorArea.style.display = 'none';
-    errorArea.style.color = '#dc2626';
-    errorArea.style.backgroundColor = '#fef2f2';
-    errorArea.style.border = '1px solid #fee2e2';
-    errorArea.style.borderRadius = '4px';
-    errorArea.style.padding = '8px 12px';
-    errorArea.style.marginTop = '12px';
-    errorArea.style.fontSize = '13px';
-    errorArea.style.lineHeight = '1.4';
-    errorArea.style.textAlign = 'left';
+    // 【専用Cancelボタン】：イベントハンドラを直接バインドしてダイアログと通知エリアを安全に閉じる
+    if (btnCancel) {
+        btnCancel.onclick = () => {
+            const modal = document.getElementById('app-common-modal');
+            if (modal) modal.style.display = 'none';
+            // 個別要素群も連動して非表示にする安全処理
+            if (notificationArea) notificationArea.style.display = 'none';
+            if (labelSpot) labelSpot.style.display = 'none';
+            if (selectSpot) selectSpot.style.display = 'none';
+            if (labelTime) labelTime.style.display = 'none';
+            if (inputTime) inputTime.style.display = 'none';
+            if (btnCancel) btnCancel.style.display = 'none';
+            if (btnSave) btnSave.style.display = 'none';
+        };
+    }
 
-    // コンテナに入力欄とエラーエリアのみを結合
-    container.appendChild(groupSpot);
-    container.appendChild(groupTime);
-    container.appendChild(errorArea);
+    // 【専用Saveボタン】：イベントハンドラを直接バインドして保存ロジックを実行
+    if (btnSave) {
+        const originalBtnText = typeof i18n !== 'undefined' ? i18n.t('notificationSaveBtn') : "Save Settings";
+        btnSave.innerText = originalBtnText;
+        btnSave.disabled = false;
 
-    // 4. 既存の汎用ダイアログの仕組み（onSave）に、実際の保存処理を渡して呼び出す
-    showAppDialog({
-        title: "毎朝の気象概況通知設定",
-        message: "",
-        customElement: container, // 中央エリアに上記の入力欄を流し込む
-        saveBtnKey: "notificationSaveBtn", // フッターの青いボタンのテキストに既存辞書キーを指定
-        onSave: async () => {
-            // フッター内の既存の青い保存ボタンを取得
-            const footer = document.getElementById('common-modal-footer');
-            const saveBtn = footer ? footer.querySelector('.btn-save') : null;
-            const originalBtnText = typeof i18n !== 'undefined' ? i18n.t('notificationSaveBtn') : "設定を保存";
-
+        btnSave.onclick = async () => {
             // 二重クリック防止およびローディング演出
-            if (saveBtn && saveBtn.disabled) return;
-            if (saveBtn) {
-                saveBtn.disabled = true;
-                saveBtn.innerText = "保存中..."; // 既存ボタンのテキストを切り替えて処理中を表現
-            }
+            if (btnSave.disabled) return;
+            btnSave.disabled = true;
+            btnSave.innerText = "保存中..."; 
+            
             errorArea.style.display = 'none';
             errorArea.textContent = '';
 
-            // 非同期保存処理を実行
+            // 既存の非同期保存処理を実行
             const success = await executeNotificationSaveLogic(selectSpot.value, inputTime.value, errorArea);
             
-            if (saveBtn) {
-                saveBtn.disabled = false;
-                saveBtn.innerText = originalBtnText;
-            }
+            btnSave.disabled = false;
+            btnSave.innerText = originalBtnText;
 
-            // 【超重要】成功した場合のみ、明示的に共通モーダルを閉じる
+            // 成功した場合のみ、明示的に共通モーダルと全通知UIを閉じる
             if (success) {
                 const modal = document.getElementById('app-common-modal');
                 if (modal) modal.style.display = 'none';
+                if (notificationArea) notificationArea.style.display = 'none';
+                if (labelSpot) labelSpot.style.display = 'none';
+                if (selectSpot) selectSpot.style.display = 'none';
+                if (labelTime) labelTime.style.display = 'none';
+                if (inputTime) inputTime.style.display = 'none';
+                if (btnCancel) btnCancel.style.display = 'none';
+                if (btnSave) btnSave.style.display = 'none';
             }
-        }
+        };
+    }
+
+    // 汎用ダイアログ呼び出し（タイトルを元にshowAppDialog側で自動的に専用スイッチングが行われます）
+    showAppDialog({
+        title: typeof i18n !== 'undefined' ? i18n.t('notificationModalTitle') : "Daily Notification",
+        messageKey: 'notificationModalTitle'
     });
 }
 
@@ -4505,90 +5188,32 @@ async function executeNotificationSaveLogic(spotValue, timeValue, errorAreaEleme
 }
 
 /**
- * モーダル内の「設定を保存」ボタンが押された時の保存処理
+ * モーダル内の「設定を保存」ボタンが押された時の保存処理（汎用ダイアログ一本化に伴う、HTML配置対応のブリッジ用サブルーチン）
+ * 憶測による重複コードを整理し、安全に既存の更新処理へ連動させます。
  */
 async function saveNotificationSettingsFromModal() {
     const selectSpot = document.getElementById('select-notification-spot');
     const inputTime = document.getElementById('input-notification-time');
-    const msgEl = document.getElementById('notification-save-status');
+    const errorArea = document.getElementById('notification-error-area');
 
-    if (!selectSpot || !inputTime || !selectSpot.value) return;
+    if (!selectSpot || !inputTime || !selectSpot.value || !errorArea) return;
 
-    if ('Notification' in window && Notification.permission !== 'granted') {
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-            const permDeniedText = typeof i18n !== 'undefined' ? i18n.t('notificationPermDenied') : "Notifications are blocked.";
-            alert(permDeniedText);
+    errorArea.style.display = 'none';
+    errorArea.textContent = '';
+
+    // 一本化した実際の保存・通信ロジックを呼び出し、整合性を完全に維持
+    const success = await executeNotificationSaveLogic(selectSpot.value, inputTime.value, errorArea);
+    
+    if (success) {
+        if (typeof closeNotificationModal === 'function') {
+            closeNotificationModal();
+        } else {
+            const modal = document.getElementById('app-common-modal');
+            if (modal) modal.style.display = 'none';
+            const notificationArea = document.getElementById('common-modal-notification-area');
+            if (notificationArea) notificationArea.style.display = 'none';
         }
     }
-
-    const [lat, lon, label] = selectSpot.value.split(',');
-    const time = inputTime.value;
-
-    if (!lat || !lon || !label || !time) return;
-
-    // 【追加】処理開始直後に「保存中...」のステータスを表示（ガセ情報を防ぐ）
-    if (msgEl) {
-        msgEl.textContent = typeof i18n !== 'undefined' ? i18n.t('savingMsg') : "Saving...";
-    }
-
-    // ユーザーにIDを登録させず、意識させない運用のための自動発行ロジック
-    let userId = localStorage.getItem('notification_user_id');
-    if (!userId) {
-        // ブラウザ固有のランダムな一意のID（識別子）を自動生成して保存
-        userId = 'usr_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
-        localStorage.setItem('notification_user_id', userId);
-    }
-
-    localStorage.setItem('notification_lat', lat);
-    localStorage.setItem('notification_lon', lon);
-    localStorage.setItem('notification_label', label);
-    localStorage.setItem('notification_time', time);
-
-    // --- Web Push 購読の自動実行とGASへの設定一括保存処理（追加連動部分） ---
-    if ('serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted') {
-        try {
-            console.log("[Web Push] 購読処理を開始します...");
-            const registration = await navigator.serviceWorker.ready;
-            
-            // server.jsに明記されているVAPID公開鍵をそのまま使用します
-            const publicKey = "BJYVLMl3qqgbwsXUJAFHJsTbXgr8uB_8z1NawLGeon-cE4YpgGg3FmnSdjSzjdtVsp51Gapl53XwJ38KR5BXvjg";
-            
-            // プッシュサービスへの端末登録を実行
-            const subscription = await subscribeUserToPush(registration, publicKey);
-            
-            // ユーザーの環境から現在のタイムゾーン（例: "Asia/Tokyo"）を自動取得
-            const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Tokyo";
-            
-            // 【方針2追加】現在のアプリ画面設定から言語と風速単位を動的に取得します
-            const lang = viewConfig.language || "ja";
-            const unit = viewConfig.windSpeedUnit || "ms"; // 'kn' を変換せず、そのままシステム全体に流通させます
-            
-            // 拡張したサブルーチンを呼び出し、位置情報・時刻・鍵情報に加えて言語と単位をGASへ一括送信
-            await saveSubscriptionToSpreadsheet(userId, subscription, timeZone, lat, lon, label, time, lang, unit);
-            
-            console.log("[Web Push] GASへの購読・設定情報の保存がすべて正常に完了しました。");
-        } catch (pushErr) {
-            console.error("[Web Push エラー] 購読またはGASへのデータ送信に失敗しました:", pushErr.message);
-            
-            // 【修正】エラー発生時はステータスを戻し、原因をユーザーにポップアップで通知して処理を中断（モーダルは閉じない）
-            if (msgEl) msgEl.textContent = '';
-            const errText = typeof i18n !== 'undefined' ? i18n.t('notificationSaveFailed') : "通知設定の保存に失敗しました。";
-            alert(`${errText}\n原因: ${pushErr.message}`);
-            return; 
-        }
-    }
-    // ---------------------------------------------------------------------
-
-    // 【修正】すべての非同期処理が無事に終わったら、文字をクリアして即座にモーダルを閉じます
-    if (msgEl) {
-        msgEl.textContent = '';
-    }
-    closeNotificationModal();
-
-    console.log(`[設定保存完了] 場所: ${label}, 時刻: ${time}`);
-
-    setupUserConfiguredNotificationTimer();
 }
 
 /**
