@@ -17,9 +17,9 @@ const defaultViewConfig = {
     // ----------------------------------------------------------
 
     // --- 風速色付け閾値（初期値） ---
-    windThresholdHigh: 10.0,
-    windThresholdMid: 5.0,
-    windThresholdLow: 3.0,
+    windThresholdHigh: 12.0,
+    windThresholdMid: 8.0,
+    windThresholdLow: 4.0,
     // ----------------------------
     iconScale: 0.7,             // 風向アイコン倍率
     hourWidth: 18,              // 1時間の幅
@@ -140,7 +140,7 @@ const i18n = {
             cfgMargin: "グラフ間の余白",
             cfgFontSize: "ラベル文字サイズ",
             cfgIconScale: "風向アイコン倍率",
-            cfgGraphValuesVisibility: "グラフ内への数値表示",
+            cfgGraphValuesVisibility: "グラフ内数値表示",
             cfgTooltipVisibility: "詳細情報（ツールチップ）のポップアップ",
             cfgTooltipDuration: "詳細情報（ツールチップ）の表示時間", 
             optShow: "表示する",
@@ -4315,7 +4315,7 @@ function renderSection(svgId, dateContId, datasets, height, stepY, isWind, isLas
                         const targetY = plotHeight - h - 7;
                         // 左回りに45度回転させるため、rotate の角度を -45 に設定。基準点を (x, targetY) に指定することで、その場を中心に綺麗に回転します。
                         // text-anchor="middle" から "start" もしくは重心を意識した配置を維持（middleのままでも傾き回転軸が中心なら綺麗に配置されます）
-                        html += `<text x="${x}" y="${targetY}" font-size="${labelFS - 1}" font-weight="bold" fill="#333333" text-anchor="middle" transform="rotate(-45, ${x}, ${targetY})">${val.toFixed(1)}</text>`;
+                        html += `<text x="${x}" y="${targetY}" font-size="${labelFS - 1}" font-weight="bold" fill="${colors.fill}" text-anchor="middle" transform="rotate(-45, ${x}, ${targetY})">${val.toFixed(1)}</text>`;
                     }
                 }
             }
