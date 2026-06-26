@@ -3818,9 +3818,23 @@ function renderTextMode(weatherData) {
                 dayClass = " is-saturday";
             }
             
+            // 各見出し文字列を辞書から取得（未定義時のフォールバック付き）
+            const labelTemp = i18n.t('temp') || '気温';
+            const labelPrecip = i18n.t('precip') || '降水';
+            const labelWindDir = i18n.t('windDir') || '風向';
+            const labelWindSpeed = i18n.t('windSpeed') || '風速';
+            
+            // 憶測を排除し、実際の辞書翻訳結果が「半角英字」から始まっているかで英語モードを自動判定
+            const isEnMode = /^[a-zA-Z]/.test(labelTemp);
+            const enClass = isEnMode ? " is-en" : "";
+            
             containerHtml += `
-                <div class="text-mode-date-header${dayClass}">
-                    ${getLocalizedDate(dateObj)} 
+                <div class="text-mode-date-header${dayClass}${enClass}">
+                    <div class="text-header-date-cell">${getLocalizedDate(dateObj)} </div>
+                    <div class="text-cell-temp text-header-label"><span>${labelTemp}</span></div>
+                    <div class="text-cell-precip text-header-label"><span>${labelPrecip}</span></div>
+                    <div class="text-cell-wind-dir text-header-label"><span>${labelWindDir}</span></div>
+                    <div class="text-cell-wind-speed text-header-label"><span>${labelWindSpeed}</span></div>
                 </div>
             `;
         }

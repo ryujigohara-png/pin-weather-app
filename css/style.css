@@ -224,7 +224,7 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
 
 /* テキスト予報全体コンテナ：幅が足りないスマホのために横スクロールを許可（安全策） */
 #textModeContainer {
-    overflow-x: avisible !important;
+    overflow-x: visible !important;
     -webkit-overflow-scrolling: touch; /* iOSでのスクロールを滑らかに */
 }
 
@@ -239,30 +239,33 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     width: max-content; /* 中身に合わせてコンテナを広げ、スクロールを発生させる（安全策） */
 }
 
-/* 【修正】合計334pxに収め、360px幅のスマホでも絶対に1行表示・重なりなしを達成するpx幅設定 */
+/* --------------------------------------------------
+ * データ行セルの固有幅・スタイル（一切の変更・上書きを禁止し完全維持）
+ * -------------------------------------------------- */
 
-/* 1. 時間セル：55px（維持） 【修正：colorの固定値を削除し、気温と同様の自動切換に対応】 */
+/* 1. 時間セル */
 .text-cell-time       { width: 30px; font-size: 16px; }
 
-/* 2. 天気セル：【修正】幅を 52px から 60px に広げ、 letter-spacing を 2px から 4px に増やしてゆとりを持たせる */
+/* 2. 天気セル */
 .text-cell-weather    { width: 88px; letter-spacing: 1px; text-align: center; }
 
-/* 3. 気温セル：45px（維持） */
+/* 3. 気温セル */
 .text-cell-temp       { width: 38px; text-align: right; font-size: 16px; color: #ff8400; }
 
-/* 4. 降水セル：40px（維持） */
+/* 4. 降水セル */
 .text-cell-precip     { width: 50px; text-align: right; font-size: 16px; color: #388ef8; }
 
-/* 5. 風向きセル：【修正】JSでのマージン縮小に合わせて幅を 56px から 50px に狭め、さらに右マージン 10px を追加して風速と離す */
-.text-cell-wind-dir   { width: 50px; text-align: center; white-space: nowrap; margin-right: 10px; }
+/* 5. 風向きセル */
+.text-cell-wind-dir   { width: 50px; text-align: center; white-space: nowrap; }
 
-/* 6. 風速セル：【修正】幅を 72px に維持しつつ、絶対に改行させない white-space: nowrap; を追加 【修正：color: #fefefe; を削除し白背景での同化を解消】 */
+/* 6. 風速セル */
 .text-cell-wind-speed { width: 70px; text-align: right; font-size: 16px; white-space: nowrap; }
 
-/* 日付ヘッダー */
+/* --------------------------------------------------
+ * 日付ヘッダー（データ行と1px単位で横並びを完全同期）
+ * -------------------------------------------------- */
 .text-mode-date-header {
     background-color: #f5f7fa;
-    padding: 6px 12px;
     font-weight: bold;
     font-size: 18px;
     color: #333;
@@ -272,11 +275,18 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     width: max-content; /* 行コンテナと同じ幅で横スクロールに合わせる */
     min-width: 100%; /* コンテナ幅が広い場合は100%広げる */
     position: sticky;
-    top: 101px;            /* 上部で固定する位置 */
+    top: 101px;        /* 上部で固定する位置 */
     z-index: 10;       /* スクロール時に他のコンテンツの上に重ねるための設定 */
+    
+    /* データ行のFlex配置・パディングと100%同一に揃える */
+    display: flex !important;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    padding: 10px 6px !important; /* データ行のpaddingと完全に同期 */
 }
 
-/* 【追加】widgetモードの時だけ上書き（親要素に .widget-mode がある場合） */
+/* widgetモードの時だけ上書き（親要素に .widget-mode がある場合） */
 .widget-mode .text-mode-date-header {
     top: 44px; /* widgetモードではナビバーがないため、固定位置を下げる */
 }
@@ -312,14 +322,36 @@ body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding-top: cal
     left: 0;
     width: 100%;
     border-top: 2px dashed #007bff; /* ライトモード用の鮮やかな青破線 */
-    z-index: 1;                     /* 文字（z-index: 2）の後ろに配置 */
-    pointer-events: none;           /* マウスイベントを透過 */
-    transform: translateY(-1px);    /* 線の厚み分、中央にジャストフィットさせる微調整 */
+    z-index: 1; /* 文字（z-index: 2）の後ろに配置 */
+    pointer-events: none; /* マウスイベントを透過 */
+    transform: translateY(-1px); /* 線の厚み分、中央にジャストフィットさせる微調整 */
 }
 
 /* ダークモード環境（手動ダーク固定、またはシステム連動かつライト固定以外）での青破線の色微調整 */
 html[data-theme="dark"] .text-mode-current-timeline {
     border-top: 2px dashed #3897ff; /* ダークモード用の明るい青破線 */
+}
+
+/* ============================================================
+    ヘッダー内見出しセル・色継承用スタイル
+    ============================================================ */
+
+/* 左側の日付テキスト領域を、時間(30px)＋天気(88px)＝合計118pxに厳密固定 */
+.text-header-date-cell {
+    width: 118px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+/* 各見出しラベルセルの共通基盤：ご指摘通りデータ行の固有色を打ち消し、日付（曜日カラー）を100%継承 */
+.text-header-label {
+    font-size: 14px;
+    font-weight: bold;
+    color: inherit !important; /* 親要素（.text-mode-date-header）の色と完全同期 */
+    flex-shrink: 0;
 }
 
 /* ============================================================
