@@ -106,7 +106,9 @@ const i18n = {
             btnTempView: "グラフ表示",
             btnTextView: "文字表示", // 【追加】テキストモード切り替えボタン用（日本語）
             btnClose: "キャンセル", 
+            limitReachedTitle: "MySpots登録制限",
             limitReached: "10箇所までしか登録できません。これ以上追加する場合は、既存の地点を長押しまたは右クリックして削除してください。",
+            shareSuccess: "MySpotsに追加しました",
             mapStatusFetching: "地点情報を取得中...",
             mapStatusFail: "地点名取得失敗",
             mapNewSpot: "新規地点",
@@ -304,7 +306,9 @@ const i18n = {
             btnTempView: "View Graph",
             btnTextView: "View Text", // 【追加】テキストモード切り替えボタン用（英語）
             btnClose: "Cancel",
+            limitReachedTitle: "MySpats Limit Reached",
             limitReached: "Maximum of 10 spots allowed. Please delete an existing spot to add a new one.",
+            shareSuccess: "Added to MySpots",
             mapStatusFetching: "Fetching location info...",
             mapStatusFail: "Failed to get location name",
             mapNewSpot: "New Spot",
@@ -931,6 +935,19 @@ function resetViewSettings() {
 }
 
 /**
+ * 新設サブルーチン：現在の地点情報からシェア用URLを生成する
+ * @returns {string} シェア用URL文字列
+ */
+function getShareUrl() {
+    // 現在のクエリパラメータを除外したベースとなるURLを取得
+    const baseUrl = window.location.origin + window.location.pathname;
+    const encodedPlace = encodeURIComponent(currentLabel);
+    
+    // シェアモード用のパラメータを正確に組み立てる
+    return `${baseUrl}?mode=share&lat=${currentLat}&lon=${currentLon}&place=${encodedPlace}`;
+}
+
+/**
  * サブルーチン：QRコード生成
  */
 function generateSidebarQRCode() {
@@ -942,8 +959,11 @@ function generateSidebarQRCode() {
     const script = document.createElement('script');
     script.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
     script.onload = () => {
+        // 修正：新設サブルーチンから最新のシェア用URLを取得
+        const shareUrl = getShareUrl();
+
         new QRCode(qrContainer, {
-            text: window.location.href,
+            text: shareUrl,
             width: 120,
             height: 120,
             colorDark: "#000000",
@@ -966,7 +986,9 @@ function initCopyUrlEvent() {
         const originalBg = copyBtn.style.backgroundColor || "#e3f2fd";
 
         try {
-            await navigator.clipboard.writeText(window.location.href);
+            // 修正：新設サブルーチンから最新のシェア用URLを取得してコピー
+            const shareUrl = getShareUrl();
+            await navigator.clipboard.writeText(shareUrl);
             
             // 成功時：緑系に変化
             copyBtn.innerText = i18n.t('copySuccess');
@@ -1308,9 +1330,18 @@ async function initApp() {
         console.log("DEBUG: Location, Wind Filters, and View Config loaded from URL parameters.");
     }
 
+    // --- 【新規追加】：シェアモードでの座標パラメータ指定（方法A） ---
+    let isShareModeLoaded = false;
+    if (pMode === 'share' && pLat && pLon) {
+        currentLat = parseFloat(pLat);
+        currentLon = parseFloat(pLon);
+        currentLabel = pPlace ? decodeURIComponent(pPlace) : "Shared Location";
+        isShareModeLoaded = true;
+    }
+
     // --- 【新規追加】：通常モードでの座標パラメータ指定（通知からの遷移、地図指定と同じ挙動） ---
     let isUrlLocationLoaded = false;
-    if (pMode !== 'widget' && pLat && pLon) {
+    if (pMode !== 'widget' && pMode !== 'share' && pLat && pLon) {
         currentLat = parseFloat(pLat);
         currentLon = parseFloat(pLon);
         currentLabel = pPlace ? decodeURIComponent(pPlace) : "Selected Location";
@@ -1329,6 +1360,18 @@ async function initApp() {
     // --- 地点確定ロジック（上書きガード付き） ---
     if (isParamLoaded) {
         finalizeInit(); 
+    } else if (isShareModeLoaded) {
+        // ストレージにデータがあればロード、なければ空配列で初期化（消されていた場合の防衛策）
+        mySpots = parsedData && parsedData.length > 0 ? parsedData : [];
+        
+        // 新設サブルーチン：シェアされた地点の登録・移動処理を独立して実行
+        const shareStatus = processSharedSpot(currentLat, currentLon, currentLabel);
+        
+        // 共通の初期化プロセスを実行
+        finalizeInit(); 
+        
+        // 新設サブルーチン：初期化完了後にアナウンス通知を実行（方法Y）
+        showShareNotification(shareStatus, currentLabel);
     } else if (isUrlLocationLoaded) {
         // ストレージにデータがあればロード、なければ空配列で初期化（消されていた場合の防衛策）
         mySpots = parsedData && parsedData.length > 0 ? parsedData : [];
@@ -1383,7 +1426,7 @@ async function initApp() {
         currentLon = lastSpot.lon;
         currentLabel = lastSpot.label;
 
-        // 地点個別の風向設定があれば反映
+        // 地点個個別風向設定設定があれば反映
         if (lastSpot.windFilters) {
             targetWindDirections = [...lastSpot.windFilters];
         } else {
@@ -2090,6 +2133,82 @@ function checkSpotLimit(newName) {
         return false;
     }
     return true;
+}
+
+/**
+ * 新設サブルーチン：シェアされた地点のデータ処理および保存管理
+ * @param {number} lat 緯度
+ * @param {number} lon 経度
+ * @param {string} label 地点名
+ * @returns {string} 処理結果ステータス ('added': 新規追加, 'exists': 重複移動, 'limit': 上限到達)
+ */
+function processSharedSpot(lat, lon, label) {
+    const threshold = 0.0001;
+    const existingIdx = mySpots.findIndex(spot => 
+        Math.abs(spot.lat - lat) < threshold && 
+        Math.abs(spot.lon - lon) < threshold
+    );
+
+    if (existingIdx !== -1) {
+        // ケースA：すでにストレージに存在していた場合、先頭に移動させてラベルを最新化
+        const targetSpot = mySpots.splice(existingIdx, 1)[0];
+        targetSpot.label = label;
+        mySpots.unshift(targetSpot);
+        
+        if (targetSpot.windFilters) {
+            targetWindDirections = [...targetSpot.windFilters];
+        }
+        
+        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+        return 'exists';
+    } else {
+        // ケースB：新規地点の場合、まず上限10件チェックを行う
+        if (mySpots.length >= 10) {
+            return 'limit';
+        }
+        
+        // 登録枠に空きがあれば0番目に新規追加
+        const newSpot = {
+            lat: lat,
+            lon: lon,
+            label: label,
+            windFilters: typeof jaDirs !== 'undefined' ? [...jaDirs] : []
+        };
+        mySpots.unshift(newSpot);
+        if (typeof jaDirs !== 'undefined') {
+            targetWindDirections = [...jaDirs];
+        }
+        
+        localStorage.setItem('pin_weather_spots', JSON.stringify(mySpots));
+        return 'added';
+    }
+}
+
+/**
+ * 新設サブルーチン：シェア処理結果のアナウンス通知表示（方法Y）
+ * @param {string} status 処理結果ステータス
+ * @param {string} label 地点名
+ */
+function showShareNotification(status, label) {
+    // 描画サイクル完了後にダイアログを確実に呼び出すための僅かなディレイ
+    setTimeout(() => {
+        if (status === 'added') {
+            // ダイアログの仕様に合わせ、title属性に直接メッセージを集約
+            showAppDialog({
+                title: `${label} をMySpotsに追加しました`,
+                messageKey: 'shareSuccess' // 翻訳ファイルの将来的な拡張用
+            });
+        } else if (status === 'limit') {
+            // 既存の上限エラーダイアログの挙動と仕様を完全踏襲
+            showAppDialog({
+                title: i18n.t('limitReachedTitle') || "Limit",
+                messageKey: 'limitReached'
+            });
+        } else if (status === 'exists') {
+            // 重複時は何もしつけず、サイレントで処理（ログのみ記録）
+            console.log("DEBUG: Shared spot already exists. Moved to top without dialog.");
+        }
+    }, 150);
 }
 
 /**
