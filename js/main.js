@@ -1525,9 +1525,7 @@ function setupGeneralEvents() {
         // HTML側でクラスが空なのを補うため、GPSボタン等と全く同じCSSクラスを動的に適用して形をそろえる
         modeToggleBtn.className = 'btn-mode-small'; 
         
-if (mode === 'text') {                                                      // テキストモード時のUI調整
-            modeToggleBtn.innerText = typeof i18n !== 'undefined' ? i18n.t('btnTempView') || "グラフ表示" : "グラフ表示";
-            
+        if (mode === 'text') {                                                      // テキストモード時のUI調整
             // 【追加】テキストモード切り替え時、グラフコンテナのスクロール位置を左端に戻す
             if (graphContainer) graphContainer.scrollLeft = 0;
 
@@ -1540,7 +1538,7 @@ if (mode === 'text') {                                                      // �
                     btnLeft.classList.remove('is-visible');
                 }
             }
-
+            modeToggleBtn.innerText = typeof i18n !== 'undefined' ? i18n.t('btnTempView') || "グラフ表示" : "グラフ表示";
             if (graphContainer) graphContainer.style.display = 'none';                  // グラフコンテナを消す
             if (textContainer) textContainer.style.display = 'block';                   // テキストコンテナを表示 
             if (summaryBtn) summaryBtn.style.display = 'none';                          // 概況ボタンを消す
@@ -1556,7 +1554,7 @@ if (mode === 'text') {                                                      // �
             if (summaryTargetContainer) summaryTargetContainer.style.display = '';      // 気象概況コンテナを表示
 
         }
-
+        
     }
 
     // 起動時：現在の保存状態（未定義ならデフォルトの'text'）に従ってUIの形を初期化
