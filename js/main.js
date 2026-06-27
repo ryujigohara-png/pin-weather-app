@@ -3648,7 +3648,7 @@ function getWindColorStyles(speed, thLow=viewConfig.windThresholdLow, thMid=view
         // 15m/s以上の警告レベル「濃い赤」のチェックポイントを確実に追加しました
         const colorStops = [
             { speed: 0,  r: 204, g: 204, b: 204 }, // 0m/s基準：グレー   (#ccc)
-            { speed: 2.5,  r: 204, g: 204, b: 204 }, // 0m/s基準：グレー   (#ccc)
+            { speed: 3,  r: 204, g: 204, b: 204 }, // 0m/s基準：グレー   (#ccc)
             { speed: thLow,  r: 135, g: 206, b: 235 }, // 3m/s基準：青       (#87ceeb)
             { speed: thMid,  r: 255, g: 165, b: 0   }, // 5m/s基準：オレンジ (#ffa500)
             { speed: thHigh, r: 220, g: 20,  b: 60  }, // 10m/s基準：赤       (#dc143c)
