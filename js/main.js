@@ -11,7 +11,7 @@ const defaultViewConfig = {
     // --- 新設：表示フラグの既定値（デフォルトに戻すボタンとも連動） ---
     themeMode: 'dark',             // テーマモード ('light' or 'dark')
     displayMode: 'text',           // 【追加】初期表示モード ('text' or 'graph')
-    tooltipVisibility: 'show',     // ツールチップ表示設定 ('show' or 'hide')
+    tooltipVisibility: 'hide',     // ツールチップ表示設定 ('show' or 'hide')
     graphValuesVisibility: 'show', // グラフ内数値表示設定 ('show' or 'hide')
     welcomeBarVisibility: 'show',  // 【追加】ウェルカムバー表示設定 ('show' or 'hide')
     // ----------------------------------------------------------
@@ -143,7 +143,7 @@ const i18n = {
             cfgFontSize: "ラベル文字サイズ",
             cfgIconScale: "風向アイコン倍率",
             cfgGraphValuesVisibility: "グラフ内数値表示",
-            cfgTooltipVisibility: "詳細情報（ツールチップ）のポップアップ",
+            cfgTooltipVisibility: "詳細情報（ツールチップ）のスクロール時表示",
             cfgTooltipDuration: "詳細情報（ツールチップ）の表示時間", 
             optShow: "表示する",
             optHide: "表示しない",
@@ -343,7 +343,7 @@ const i18n = {
             cfgFontSize: "Font Size",
             cfgIconScale: "Icon Scale",
             cfgGraphValuesVisibility: "Show Values in Graph",
-            cfgTooltipVisibility: "Tooltip Popup",
+            cfgTooltipVisibility: "Tooltip Popup when scrolling",
             cfgTooltipDuration: "Info Display Duration",
             optShow: "Show",
             optHide: "Hide",
