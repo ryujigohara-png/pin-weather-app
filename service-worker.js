@@ -15,11 +15,15 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(ASSETS_TO_CACHE))
   );
+  // 【追加】新しいサービスワーカーが待機状態にならず、即座にアクティブになるよう強制
+  self.skipWaiting();
 });
 
 // アクティベート時
 self.addEventListener('activate', (event) => {
   console.log('Service Worker: Activated');
+  // 【追加】アクティブになった瞬間から、開いているすべてのPWAクライアント（画面）を制御下に置く
+  event.waitUntil(self.clients.claim());
 });
 
 // フェッチ時 (ネットワーク優先)
@@ -124,7 +128,8 @@ async function handleNotificationClick(event) {
 
   // 【追加】クリップボードコピー用のテキストをURLパラメータに付与
   if (copyText) {
-    targetUrl.searchParams.set('copy_text', copyText);
+    // 【決定的なバグ修正】：clients.openWindow() がURLエンコードされた改行コード(%0A)を含むURLを拒否して空（about:blank）になる現象を100%回避するため、一時的に[BR]に置換して引き渡す
+    targetUrl.searchParams.set('copy_text', copyText.replace(/\n/g, '[BR]'));
   }
 
   const targetUrlString = targetUrl.toString();
@@ -355,8 +360,8 @@ function buildNotificationBody(weatherData, lang, unit) {
             const line = formatThreeHourLine(hourly, currentIndex, lang, unit);
             lines.push(line);
         } else {
-            const line = formatThreeHourLine(hourly, currentIndex, lang, unit);
-            lines.push(line);
+            // 【修正】配列上限を超えた（または超えるリスクがある）場合は安全にループを終了させる
+            break;
         }
         currentIndex += 3; // 次の3時間ブロックへ
     }

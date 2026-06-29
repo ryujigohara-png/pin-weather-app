@@ -2228,17 +2228,23 @@ function checkAndHandleCopyParam() {
     if (copyText) {
         console.log("DEBUG [Main]: コピー対象のテキストをパラメータから検出しました。");
         
-        // 既存の汎用モーダル showAppDialog を無改造のまま安全に利用
-        showAppDialog({
-            title: typeof i18n !== 'undefined' ? i18n.t('notificationModalTitle') || "天気予報のコピー" : "天気予報のコピー",
-            message: copyText, // 4行サマリーテキストをそのままメッセージ領域に表示
-            onOk: () => {
-                executeClipboardCopy(copyText);
-            }
-        });
+        // Service Worker側から安全に送られてきたプレースホルダー[BR]を、本来の改行コードに完全復元
+        const restoredText = copyText.replace(/\[BR\]/g, '\n');
+        
+        // 描画処理などの非同期のドタバタが100%落ち着いた1秒後に安全に実行
+        setTimeout(() => {
+            // 既存の汎用モーダル showAppDialog を無改造のまま安全に利用
+            showAppDialog({
+                title: "天気予報のコピー", // 固有のタイトルにすることで、通知設定モード(isNotificationMode)への誤判定を100%防止
+                message: restoredText, // 完全復元した4行サマリーテキストをそのままメッセージ領域に表示
+                onOk: () => {
+                    executeClipboardCopy(restoredText);
+                }
+            });
 
-        // コピー誘導UIの表示が終わったら、URLパラメータを綺麗にクリーンアップ
-        cleanUpUrlParameter();
+            // コピー誘導UIの表示が終わったら、URLパラメータを綺麗にクリーンアップ
+            cleanUpUrlParameter();
+        }, 1000); // 1000ミリ秒（1秒）の安全マージン
     }
 }
 
