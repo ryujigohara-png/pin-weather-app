@@ -1568,7 +1568,7 @@ function setupGeneralEvents() {
         // HTML側でクラスが空なのを補うため、GPSボタン等と全く同じCSSクラスを動的に適用して形をそろえる
         modeToggleBtn.className = 'btn-mode-small'; 
         
-        if (mode === 'text') {                                                      // テキストモード時のUI調整
+        if (mode === 'text') {                                                     // テキストモード時のUI調整
             // 【追加】テキストモード切り替え時、グラフコンテナのスクロール位置を左端に戻す
             if (graphContainer) graphContainer.scrollLeft = 0;
 
@@ -1787,6 +1787,9 @@ function setupGeneralEvents() {
     if (widgetBtn) {
         widgetBtn.onclick = openWidgetPreview;
     }
+
+    // 【追加仕様】：通知からの自動コピー用クエリパラメータを検知・処理する構造化サブルーチンの呼び出し
+    checkAndHandleCopyParam();
 }
 
 /**
@@ -1935,7 +1938,7 @@ function initCompassUI() {
 
 /**
  * サブルーチン：環境色を反映した汎用ダイアログを表示
- * 修正内容：通知専用の引数 onOk を追加。これが存在する場合は、他のボタンを排除してOKボタンのみを表示する。
+ * 修正内容：通知専用の引数 onOkを追加。これが存在する場合は、他のボタンを排除してOKボタンのみを表示する。
  * 【今回追加】：customElement 引数を追加し、外部から組み立てられたフォーム要素を中央に流し込めるように拡張。
  * 修正内容2：モーダルヘッダーもトップバーと同様に、ダークモード時は環境色を維持したディープトーンに切り替え、見ぐるしさを解消。
  */
@@ -2072,7 +2075,7 @@ function showAppDialog({ title, message = null, messageKey = null, inputValue = 
             // 通常ダイアログのOKボタン単体生成モード
             const btnOk = document.createElement('button');
             btnOk.className = "btn btn-save"; 
-            btnOk.innerText = i18n.t('btnOK') || "OK";
+            btnOk.innerText = typeof i18n !== 'undefined' ? i18n.t('btnOK') || "OK" : "OK";
             btnOk.onclick = () => {
                 onOk();
                 modal.style.display = 'none';
@@ -2083,7 +2086,7 @@ function showAppDialog({ title, message = null, messageKey = null, inputValue = 
             if (onDelete) {
                 const btnDelete = document.createElement('button');
                 btnDelete.className = "btn btn-danger-outline";
-                btnDelete.innerText = i18n.t('btnDelete'); 
+                btnDelete.innerText = typeof i18n !== 'undefined' ? i18n.t('btnDelete') || "Delete" : "Delete"; 
                 btnDelete.onclick = () => { onDelete(); modal.style.display = 'none'; };
                 footer.appendChild(btnDelete);
             }
@@ -2098,14 +2101,14 @@ function showAppDialog({ title, message = null, messageKey = null, inputValue = 
             // キャンセルボタン（閉じる）を表示
             const btnCancel = document.createElement('button');
             btnCancel.className = "btn btn-secondary";
-            btnCancel.innerText = i18n.t('btnClose');
+            btnCancel.innerText = typeof i18n !== 'undefined' ? i18n.t('btnClose') || "Close" : "Close";
             btnCancel.onclick = () => { modal.style.display = 'none'; };
             footer.appendChild(btnCancel);
 
             if (onSave) {
                 const btnSave = document.createElement('button');
                 btnSave.className = "btn btn-save";
-                btnSave.innerText = saveBtnKey ? i18n.t(saveBtnKey) : (i18n.t('btnSaveSpot') || "Update");
+                btnSave.innerText = typeof i18n !== 'undefined' ? (saveBtnKey ? i18n.t(saveBtnKey) : (i18n.t('btnSaveSpot') || "Update")) : "Update";
                 btnSave.onclick = () => { onSave(input ? input.value : null); modal.style.display = 'none'; };
                 footer.appendChild(btnSave);
             }
@@ -2209,6 +2212,61 @@ function showShareNotification(status, label) {
             console.log("DEBUG: Shared spot already exists. Moved to top without dialog.");
         }
     }, 150);
+}
+
+// ======================================================================================
+// クリップボードコピー連携用の新規追加サブルーチン群 (構造化維持)
+// ======================================================================================
+
+/**
+ * 追加サブルーチン：URLパラメータからコピー対象テキストを検知し、既存モーダルを起動する
+ */
+function checkAndHandleCopyParam() {
+    const searchParams = new URLSearchParams(window.location.search);
+    const copyText = searchParams.get('copy_text');
+
+    if (copyText) {
+        console.log("DEBUG [Main]: コピー対象のテキストをパラメータから検出しました。");
+        
+        // 既存の汎用モーダル showAppDialog を無改造のまま安全に利用
+        showAppDialog({
+            title: typeof i18n !== 'undefined' ? i18n.t('notificationModalTitle') || "天気予報のコピー" : "天気予報のコピー",
+            message: copyText, // 4行サマリーテキストをそのままメッセージ領域に表示
+            onOk: () => {
+                executeClipboardCopy(copyText);
+            }
+        });
+
+        // コピー誘導UIの表示が終わったら、URLパラメータを綺麗にクリーンアップ
+        cleanUpUrlParameter();
+    }
+}
+
+/**
+ * 追加サブルーチン：実際のクリップボードへのテキスト書き込み処理
+ * @param {string} text - コピーする文字列
+ */
+function executeClipboardCopy(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+            .then(() => {
+                console.log("DEBUG [Main]: クリップボードへの書き込みに成功しました。");
+            })
+            .catch((err) => {
+                console.error("DEBUG [Main]: クリップボードへの書き込みに失敗しました。", err);
+            });
+    } else {
+        console.warn("DEBUG [Main]: クリップボードAPIがこの環境で利用できません。");
+    }
+}
+
+/**
+ * 追加サブルーチン：履歴を汚さずにURLから copy_text パラメータのみを消去する
+ */
+function cleanUpUrlParameter() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('copy_text');
+    window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
 }
 
 /**

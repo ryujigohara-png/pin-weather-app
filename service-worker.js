@@ -95,6 +95,11 @@ async function displayNotification(event) {
 async function handleNotificationClick(event) {
   console.log("DEBUG [SW]: 1. 通知クリックイベントを検知しました。");
 
+  // 【追加】通知のタイトル（場所）と本文（4行サマリー）を取得してコピー用テキストを構成
+  const notificationTitle = event.notification.title || "";
+  const notificationBody = event.notification.body || "";
+  const copyText = `${notificationTitle}\n${notificationBody}`;
+
   // クリックされた通知を閉じる
   event.notification.close();
 
@@ -115,6 +120,11 @@ async function handleNotificationClick(event) {
     if (place) {
       targetUrl.searchParams.set('place', place);
     }
+  }
+
+  // 【追加】クリップボードコピー用のテキストをURLパラメータに付与
+  if (copyText) {
+    targetUrl.searchParams.set('copy_text', copyText);
   }
 
   const targetUrlString = targetUrl.toString();
@@ -179,16 +189,16 @@ async function handleNotificationClick(event) {
  * */
 const I18N_DICT = {
     ja: {
-        hours: "時",
-        maxPrecip: "最大降水量",
-        wind: "風",
-        directions: ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "西北", "北西北"]
+      hours: "時",
+      maxPrecip: "最大降水量",
+      wind: "風",
+      directions: ["北", "北北東", "北東", "東北東", "東", "東南東", "南東", "南南東", "南", "南南西", "南西", "西南西", "西", "西北西", "西北", "北西北"]
     },
     en: {
-        hours: "h",
-        maxPrecip: "Max Precip",
-        wind: "Wind",
-        directions: ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
+      hours: "h",
+      maxPrecip: "Max Precip",
+      wind: "Wind",
+      directions: ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
     }
 };
 
@@ -345,7 +355,8 @@ function buildNotificationBody(weatherData, lang, unit) {
             const line = formatThreeHourLine(hourly, currentIndex, lang, unit);
             lines.push(line);
         } else {
-            console.warn(`DEBUG [SW]: インデックス ${currentIndex} がデータの長さ ${hourly.time.length} を超えるためスキップされました。`);
+            const line = formatThreeHourLine(hourly, currentIndex, lang, unit);
+            lines.push(line);
         }
         currentIndex += 3; // 次の3時間ブロックへ
     }
