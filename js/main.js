@@ -1949,6 +1949,8 @@ function showAppDialog({ title, message = null, messageKey = null, inputValue = 
     const msgEl = document.getElementById('common-modal-message');
     const inputArea = document.getElementById('common-modal-input-area');
     const input = document.getElementById('common-modal-input');
+    // 【アプローチ1新設コンテナ取得】：既存の1行入力欄を破壊しないための受け皿
+    const customArea = document.getElementById('common-modal-custom-area');
     const footer = document.getElementById('common-modal-footer');
     const closeBtn = document.getElementById('common-modal-close');
 
@@ -2009,6 +2011,7 @@ function showAppDialog({ title, message = null, messageKey = null, inputValue = 
     if (isNotificationMode) {
         // --- 1. 通知設定モード時の振る舞い ---
         if (inputArea) inputArea.style.display = 'none';         
+        if (customArea) { customArea.style.display = 'none'; customArea.innerHTML = ""; }
         if (widgetArea) widgetArea.style.display = 'none';         
         if (widgetActionArea) widgetActionArea.style.display = 'none';
         
@@ -2026,6 +2029,7 @@ function showAppDialog({ title, message = null, messageKey = null, inputValue = 
     } else if (isWidgetMode) {
         // --- 2. ウィジェット埋め込み設定モード時の振る舞い ---
         if (inputArea) inputArea.style.display = 'none';         
+        if (customArea) { customArea.style.display = 'none'; customArea.innerHTML = ""; }
         if (widgetArea) widgetArea.style.display = 'block';       
         if (widgetActionArea) widgetActionArea.style.display = 'block';
         
@@ -2056,14 +2060,22 @@ function showAppDialog({ title, message = null, messageKey = null, inputValue = 
         if (btnNotifSave) btnNotifSave.style.display = 'none';
         if (errorArea) errorArea.style.display = 'none';
 
-        if (inputArea && input) {
-            if (customElement) {
-                // 外部からカスタム要素が渡された場合は、既存の1行入力欄をクリアして流し込む
-                inputArea.style.display = 'block';
-                inputArea.innerHTML = ""; 
-                inputArea.appendChild(customElement);
-            } else {
-                // 通常時は既存の1行入力欄のロジックを1文字も変えず完全維持
+        // アプローチ1に基づく入力エリアの完全分離制御
+        if (customElement) {
+            // カスタム要素が渡された場合は、既存の1行入力欄は完全に隠し、新設コンテナ側に流し込む（干渉を100%遮断）
+            if (inputArea) inputArea.style.display = 'none';
+            if (customArea) {
+                customArea.style.display = 'block';
+                customArea.innerHTML = ""; 
+                customArea.appendChild(customElement);
+            }
+        } else {
+            // 通常時はカスタムエリアを完全に隠してクリアし、既存の1行入力欄のロジックを1文字も変えず完全維持
+            if (customArea) {
+                customArea.style.display = 'none';
+                customArea.innerHTML = "";
+            }
+            if (inputArea && input) {
                 inputArea.style.display = (inputValue !== null) ? 'block' : 'none';
                 if (inputValue !== null) input.value = inputValue;
             }
@@ -5196,8 +5208,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
- * サブルーチン：通知設定モーダルを汎用ダイアログとして一本化して表示（方法A：完全流用版・HTML静的配置対応）
- * 修正内容：独自ボタンの生成およびJSによる動的DOM生成をすべて撤廃。HTML側の静的専用エリアの表示制御に移行。
+ * サブルーチン：通知設定モーダルを汎用ダイアログとして一本化して表示（方法A：提示HTML適合・動的拡張版）
+ * 修正内容：提供された本物のHTML構造（時刻欄が1つの状態）に100%合わせ、JS側で2つ目・3つ目の入力欄を安全に動的生成して拡張します。
  */
 function openNotificationModalGeneral() {
     // --- 既存の openModalFromSidebar の安全設計に準拠（戻るボタン暴発防止） ---
@@ -5217,25 +5229,99 @@ function openNotificationModalGeneral() {
     const notificationArea = document.getElementById('common-modal-notification-area');
     const labelSpot = document.getElementById('label-notification-spot');
     const selectSpot = document.getElementById('select-notification-spot');
+    
+    // 1つ目の時刻設定要素をHTMLから正確に取得
     const labelTime = document.getElementById('label-notification-time');
     const inputTime = document.getElementById('input-notification-time');
+    
     const errorArea = document.getElementById('notification-error-area');
-
-    // HTML側に追加した専用ボタンの取得
+    // HTML側の専用ボタンを取得
     const btnCancel = document.getElementById('notification-btn-close');
     const btnSave = document.getElementById('notification-btn-save');
-
     if (!notificationArea || !selectSpot || !inputTime || !errorArea) return;
+
+    // 【重要・憶測の完全排除】：提示されたHTMLに存在しない2つ目・3つ目の入力欄が未生成の場合のみ、動的に生成して挿入します
+    let labelTime2 = document.getElementById('input-notification-time2');
+    let inputTime2 = document.getElementById('input-notification-time2');
+    let labelTime3 = document.getElementById('input-notification-time3');
+    let inputTime3 = document.getElementById('input-notification-time3');
+
+    if (!inputTime2) {
+        // 2つ目の時間設定グループ作成（提示されたHTMLのインラインスタイルと完全に同一の見た目を再現）
+        const group2 = document.createElement('div');
+        group2.className = 'setting-group';
+        group2.style.marginBottom = '14px';
+        
+        labelTime2 = document.createElement('label');
+        labelTime2.id = 'label-notification-time2';
+        labelTime2.className = 'setting-label';
+        labelTime2.style.display = 'block';
+        labelTime2.style.marginBottom = '6px';
+        
+        inputTime2 = document.createElement('input');
+        inputTime2.type = 'time';
+        inputTime2.id = 'input-notification-time2';
+        inputTime2.style.width = '100%';
+        inputTime2.style.padding = '8px';
+        inputTime2.style.border = '1px solid #ccc';
+        inputTime2.style.borderRadius = '4px';
+        inputTime2.style.boxSizing = 'border-box';
+        
+        group2.appendChild(labelTime2);
+        group2.appendChild(inputTime2);
+        
+        // 3つ目の時間設定グループ作成
+        const group3 = document.createElement('div');
+        group3.className = 'setting-group';
+        group3.style.marginBottom = '14px';
+        
+        labelTime3 = document.createElement('label');
+        labelTime3.id = 'label-notification-time3';
+        labelTime3.className = 'setting-label';
+        labelTime3.style.display = 'block';
+        labelTime3.style.marginBottom = '6px';
+        
+        inputTime3 = document.createElement('input');
+        inputTime3.type = 'time';
+        inputTime3.id = 'input-notification-time3';
+        inputTime3.style.width = '100%';
+        inputTime3.style.padding = '8px';
+        inputTime3.style.border = '1px solid #ccc';
+        inputTime3.style.borderRadius = '4px';
+        inputTime3.style.boxSizing = 'border-box';
+        
+        group3.appendChild(labelTime3);
+        group3.appendChild(inputTime3);
+        
+        // エラーエリアの直前に2つと3つのグループを綺麗に挿入
+        errorArea.parentNode.insertBefore(group2, errorArea);
+        errorArea.parentNode.insertBefore(group3, errorArea);
+    }
 
     // 前回の状態を完全に初期化
     selectSpot.innerHTML = "";
     errorArea.style.display = 'none';
     errorArea.textContent = '';
     
-    // 既存の正しい辞書キーを使用
+    // 表示状態を安全に復帰させます
+    if (notificationArea) notificationArea.style.display = '';
+    if (labelSpot) labelSpot.style.display = '';
+    if (selectSpot) selectSpot.style.display = '';
+    if (labelTime) labelTime.style.display = '';
+    if (inputTime) inputTime.style.display = '';
+    if (labelTime2) labelTime2.style.display = '';
+    if (inputTime2) inputTime2.style.display = '';
+    if (labelTime3) labelTime3.style.display = '';
+    if (inputTime3) inputTime3.style.display = '';
+    if (btnCancel) btnCancel.style.display = '';
+    if (btnSave) btnSave.style.display = '';
+    
+    // 既存の正しい辞書キーを使用しつつ、複数枠用にナンバリングを定義
     if (labelSpot) labelSpot.innerText = typeof i18n !== 'undefined' ? i18n.t('notificationSelectSpot') : "通知する場所：";
-    if (labelTime) labelTime.innerText = typeof i18n !== 'undefined' ? i18n.t('notificationSelectTime') : "通知時刻：";
-
+    if (labelTime) labelTime.innerText = (typeof i18n !== 'undefined' ? i18n.t('notificationSelectTime') : "通知時刻") + "1：";
+    if (labelTime2) labelTime2.innerText = (typeof i18n !== 'undefined' ? i18n.t('notificationSelectTime') : "通知時刻") + "2：";
+    if (labelTime3) labelTime3.innerText = (typeof i18n !== 'undefined' ? i18n.t('notificationSelectTime') : "通知時刻") + "3：";
+    
     // 既存のお気に入りスポット(mySpots)から選択肢を動的に生成
     if (typeof mySpots !== 'undefined' && Array.isArray(mySpots)) {
         mySpots.forEach(spot => {
@@ -5253,19 +5339,28 @@ function openNotificationModalGeneral() {
         selectSpot.value = `${savedLat},${savedLon},${savedLabel}`;
     }
 
-    inputTime.value = localStorage.getItem('notification_time') || "07:00";
+    // カンマ区切りの保存文字列から各時刻入力要素へ分割復元
+    const savedTime = localStorage.getItem('notification_time') || "07:00";
+    const times = savedTime.split(',');
+    inputTime.value = times[0] || "07:00";
+    if (inputTime2) inputTime2.value = times[1] || "";
+    if (inputTime3) inputTime3.value = times[2] || "";
 
     // 【専用Cancelボタン】：イベントハンドラを直接バインドしてダイアログと通知エリアを安全に閉じる
     if (btnCancel) {
         btnCancel.onclick = () => {
             const modal = document.getElementById('app-common-modal');
             if (modal) modal.style.display = 'none';
-            // 個別要素群も連動して非表示にする安全処理
+            // 個別要素群も連動して非表示にする安全処理（増設分を含む）
             if (notificationArea) notificationArea.style.display = 'none';
             if (labelSpot) labelSpot.style.display = 'none';
             if (selectSpot) selectSpot.style.display = 'none';
             if (labelTime) labelTime.style.display = 'none';
             if (inputTime) inputTime.style.display = 'none';
+            if (labelTime2) labelTime2.style.display = 'none';
+            if (inputTime2) inputTime2.style.display = 'none';
+            if (labelTime3) labelTime3.style.display = 'none';
+            if (inputTime3) inputTime3.style.display = 'none';
             if (btnCancel) btnCancel.style.display = 'none';
             if (btnSave) btnSave.style.display = 'none';
         };
@@ -5276,7 +5371,6 @@ function openNotificationModalGeneral() {
         const originalBtnText = typeof i18n !== 'undefined' ? i18n.t('notificationSaveBtn') : "Save Settings";
         btnSave.innerText = originalBtnText;
         btnSave.disabled = false;
-
         btnSave.onclick = async () => {
             // 二重クリック防止およびローディング演出
             if (btnSave.disabled) return;
@@ -5285,10 +5379,18 @@ function openNotificationModalGeneral() {
             
             errorArea.style.display = 'none';
             errorArea.textContent = '';
+            
+            // 入力された有効な複数の時刻をカンマ区切りで一本に結合
+            let timeValueCombined = inputTime.value;
+            if (inputTime2 && inputTime2.value.trim() !== "") {
+                timeValueCombined += `,${inputTime2.value.trim()}`;
+            }
+            if (inputTime3 && inputTime3.value.trim() !== "") {
+                timeValueCombined += `,${inputTime3.value.trim()}`;
+            }
 
             // 既存の非同期保存処理を実行
-            const success = await executeNotificationSaveLogic(selectSpot.value, inputTime.value, errorArea);
-            
+            const success = await executeNotificationSaveLogic(selectSpot.value, timeValueCombined, errorArea);
             btnSave.disabled = false;
             btnSave.innerText = originalBtnText;
 
@@ -5301,6 +5403,10 @@ function openNotificationModalGeneral() {
                 if (selectSpot) selectSpot.style.display = 'none';
                 if (labelTime) labelTime.style.display = 'none';
                 if (inputTime) inputTime.style.display = 'none';
+                if (labelTime2) labelTime2.style.display = 'none';
+                if (inputTime2) inputTime2.style.display = 'none';
+                if (labelTime3) labelTime3.style.display = 'none';
+                if (inputTime3) inputTime3.style.display = 'none';
                 if (btnCancel) btnCancel.style.display = 'none';
                 if (btnSave) btnSave.style.display = 'none';
             }
@@ -5319,12 +5425,12 @@ function openNotificationModalGeneral() {
  */
 async function executeNotificationSaveLogic(spotValue, timeValue, errorAreaElement) {
     if (!spotValue || !timeValue) return false;
-
     // 1. 通知パーミッションの確認
     if ('Notification' in window && Notification.permission !== 'granted') {
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {
-            errorAreaElement.textContent = typeof i18n !== 'undefined' ? i18n.t('notificationPermDenied') : "通知の許可がブロックされています。ブラウザの設定を変更してください。";
+            errorAreaElement.textContent = typeof i18n !== 'undefined' ?
+                i18n.t('notificationPermDenied') : "通知の許可がブロックされています。ブラウザの設定を変更してください。";
             errorAreaElement.style.display = 'block';
             return false;
         }
@@ -5334,7 +5440,6 @@ async function executeNotificationSaveLogic(spotValue, timeValue, errorAreaEleme
     const time = timeValue;
 
     if (!lat || !lon || !label || !time) return false;
-
     // 2. ローカルストレージへの保存
     let userId = localStorage.getItem('notification_user_id');
     if (!userId) {
@@ -5345,7 +5450,7 @@ async function executeNotificationSaveLogic(spotValue, timeValue, errorAreaEleme
     localStorage.setItem('notification_lat', lat);
     localStorage.setItem('notification_lon', lon);
     localStorage.setItem('notification_label', label);
-    localStorage.setItem('notification_time', time);
+    localStorage.setItem('notification_time', time); // カンマ区切り文字列としてそのままローカルに保存されます
 
     // 3. ServiceWorkerを用いたWeb Push購読とGASサーバーへの非同期通信
     if ('serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted') {
@@ -5359,13 +5464,12 @@ async function executeNotificationSaveLogic(spotValue, timeValue, errorAreaEleme
             const lang = viewConfig.language || "ja";
             const unit = viewConfig.windSpeedUnit || "ms";
             
-            // サーバー通信実行
+            // サーバー通信実行（カンマ区切りデータが time パラメータとしてそのままGASに引き渡されます）
             await saveSubscriptionToSpreadsheet(userId, subscription, timeZone, lat, lon, label, time, lang, unit);
             console.log("[Web Push] GASへの保存が正常に完了しました。");
 
         } catch (pushErr) {
             console.error("[Web Push エラー] 失敗しました:", pushErr.message);
-            
             // 【方法A】：既存モーダルを上書きせず、現在の入力画面の中にあるエラーエリアに赤字で原因を表示
             const failText = typeof i18n !== 'undefined' ? i18n.t('notificationSaveFailed') : "設定の保存に失敗しました。";
             errorAreaElement.textContent = `${failText}\n(原因: ${pushErr.message})`;
@@ -5390,6 +5494,8 @@ async function executeNotificationSaveLogic(spotValue, timeValue, errorAreaEleme
 async function saveNotificationSettingsFromModal() {
     const selectSpot = document.getElementById('select-notification-spot');
     const inputTime = document.getElementById('input-notification-time');
+    const inputTime2 = document.getElementById('input-notification-time2');
+    const inputTime3 = document.getElementById('input-notification-time3');
     const errorArea = document.getElementById('notification-error-area');
 
     if (!selectSpot || !inputTime || !selectSpot.value || !errorArea) return;
@@ -5397,8 +5503,17 @@ async function saveNotificationSettingsFromModal() {
     errorArea.style.display = 'none';
     errorArea.textContent = '';
 
+    // ブリッジ側でも複数時刻をカンマ区切りで一本に結合
+    let timeValueCombined = inputTime.value;
+    if (inputTime2 && inputTime2.value.trim() !== "") {
+        timeValueCombined += `,${inputTime2.value.trim()}`;
+    }
+    if (inputTime3 && inputTime3.value.trim() !== "") {
+        timeValueCombined += `,${inputTime3.value.trim()}`;
+    }
+
     // 一本化した実際の保存・通信ロジックを呼び出し、整合性を完全に維持
-    const success = await executeNotificationSaveLogic(selectSpot.value, inputTime.value, errorArea);
+    const success = await executeNotificationSaveLogic(selectSpot.value, timeValueCombined, errorArea);
     
     if (success) {
         if (typeof closeNotificationModal === 'function') {

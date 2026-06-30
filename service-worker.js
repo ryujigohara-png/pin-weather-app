@@ -51,7 +51,8 @@ self.addEventListener('notificationclick', (event) => {
  * @param {ExtendableEvent} event 
  * */
 async function displayNotification(event) {
-  let title = '【12時間概況】'; // ご指定通りデフォルトのタイトルを「【12時間概況】」に変更
+  let title = '【12時間概況】';
+  // ご指定通りデフォルトのタイトルを「【12時間概況】」に変更
   let options = {
     body: '新しい天気情報があります。',
     icon: '/icon.png',
@@ -62,12 +63,10 @@ async function displayNotification(event) {
     try {
       // 【デバッグ追加】サーバーから届いた生のペイロード文字列をそのまま出力
       console.log("DEBUG [SW]: 0. サーバーから受信した生のデータ(テキスト):", event.data.text());
-
       const data = event.data.json();
       title = data.title || title;
       options.body = data.body || options.body;
       options.icon = data.icon || options.icon;
-      
       // サーバー側の通知ペイロードから lat, lon, place を抽出して格納
       options.data.lat = data.lat || null;
       options.data.lon = data.lon || null;
@@ -98,12 +97,10 @@ async function displayNotification(event) {
  * */
 async function handleNotificationClick(event) {
   console.log("DEBUG [SW]: 1. 通知クリックイベントを検知しました。");
-
   // 【追加】通知のタイトル（場所）と本文（4行サマリー）を取得してコピー用テキストを構成
   const notificationTitle = event.notification.title || "";
   const notificationBody = event.notification.body || "";
   const copyText = `${notificationTitle}\n${notificationBody}`;
-
   // クリックされた通知を閉じる
   event.notification.close();
 
@@ -116,7 +113,6 @@ async function handleNotificationClick(event) {
 
   // アプリのルートURLをベースに設定
   let targetUrl = new URL('/', self.location.origin);
-
   // 座標データが存在する場合は、URLパラメータを組み立てて付与（widgetモードは指定しない）
   if (lat && lon) {
     targetUrl.searchParams.set('lat', lat);
@@ -134,7 +130,6 @@ async function handleNotificationClick(event) {
 
   const targetUrlString = targetUrl.toString();
   console.log("DEBUG [SW]: 3. 生成されたターゲットURL:", targetUrlString);
-
   // 既にアプリのウィンドウが開いているかチェック
   const clientList = await self.clients.matchAll({
     type: 'window',
@@ -162,7 +157,6 @@ async function handleNotificationClick(event) {
           // サービスワーカーの新旧不整合等でURL書き換えに失敗した場合でも、多重起動（真っ白）を防ぐため画面フォーカスのみ試みる
           try {
             console.log("DEBUG [SW]: 7-補足. ナビゲート失敗のため、既存ウィンドウのフォーカスのみ要求します。");
-            
             // 補足側のフォーカス処理もawaitして結果をログ出力
             const focusedClient補足 = await client.focus();
             console.log("DEBUG [SW]: 7-補足結果. フォーカス処理のPromiseが解決されました。オブジェクト:", focusedClient補足);
@@ -287,7 +281,6 @@ function convertAndFloorWindSpeed(speedMs, unit) {
 function formatThreeHourLine(hourly, startIndex, lang, unit) {
     const dict = I18N_DICT[lang] || I18N_DICT["ja"];
     const unitStr = unit === "kn" ? "kn" : "m/s";
-
     // 日付・時刻の取得 (インデックスの最初の時刻を基準にする)
     const baseDate = new Date(hourly.time[startIndex]);
     const month = String(baseDate.getMonth() + 1).padStart(2, '0');
@@ -296,11 +289,10 @@ function formatThreeHourLine(hourly, startIndex, lang, unit) {
     // 曜日の取得
     const weekdays = lang === "en" ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] : ["日", "月", "火", "水", "木", "金", "土"];
     const weekdayStr = weekdays[baseDate.getDay()];
-
+    
     // 時刻文字列の生成（修正: ユーザー指定の開始時刻＋コロン形式「00:00-」へ変更）
     const startHour = String(baseDate.getHours()).padStart(2, '0');
     const timeRange = `${startHour}:00-`;
-
     // ① 天気絵文字を3つ並べる
     const code1 = hourly.weather_code[startIndex];
     const code2 = hourly.weather_code[startIndex + 1];
@@ -315,7 +307,6 @@ function formatThreeHourLine(hourly, startIndex, lang, unit) {
     console.log(`DEBUG [SW] 行生成時刻 [${timeRange}] -> インデックス: ${startIndex}〜${startIndex+2}`);
     console.log(`  -> 生天気コード: [${code1}, ${code2}, ${code3}]`);
     console.log(`  -> 変換後絵文字: ${emojis}`);
-
     // ② 最大降水量の計算（3時間の中の最大値を抽出して切り捨て）
     const maxPrecip = Math.floor(
         Math.max(
@@ -324,7 +315,6 @@ function formatThreeHourLine(hourly, startIndex, lang, unit) {
             hourly.precipitation[startIndex + 2]
         )
     );
-
     // ③ 風向（1つ目の時間帯）と風速推移（1つ目 → 3つ目）の計算
     const windDirStr = getWindDirectionStr(hourly.wind_direction_10m[startIndex], lang);
     const windSpeedStart = convertAndFloorWindSpeed(hourly.wind_speed_10m[startIndex], unit);
@@ -351,7 +341,6 @@ function buildNotificationBody(weatherData, lang, unit) {
     // 現在時刻が属するインデックス（3の倍数）を特定
     let currentIndex = findCurrentTimeIndex(hourly.time);
     console.log(`DEBUG [SW]: buildNotificationBody 開始時の起点インデックス: ${currentIndex} (時刻: ${hourly.time[currentIndex]})`);
-    
     const lines = [];
     // 3時間おきに4回（計12時間分）ループ処理を行う
     for (let i = 0; i < 4; i++) {
