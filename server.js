@@ -9,7 +9,7 @@ const GAS_URL = process.env.GAS_URL || "";
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "";
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";
 //※コード上に直接書かれていた元の文字列は、先ほどGitHubの「Secrets」に登録したため、Actions側では自動的かつ安全に読み込まれます。
-//（ローカル環境で再度テスト実行したい場合は、コマンドプロンプトやターミナルで GAS_URL="xxx" VAPID_PRIVATE_KEY="xxx" node server.js
+//（ローカイ環境で再度テスト実行したい場合は、コマンドプロンプトやターミナルで GAS_URL="xxx" VAPID_PRIVATE_KEY="xxx" node server.js
 //  のように環境変数を付与して起動するか、一時的に値を書き戻してテストする運用になります）
 
 // Web Pushの設定（あなたの連絡先URLまたは mailto: メールアドレスを設定してください）
@@ -25,11 +25,9 @@ webpush.setVapidDetails(
 async function main() {
     try {
         console.log("--- 処理を開始します ---");
-        
         // 1. スプレッドシート（GAS）から全ユーザーデータを取得
         const users = await fetchUserDataFromSpreadsheet(GAS_URL);
         console.log(`データ取得成功: 合計 ${users.length} 件のユーザーデータがあります。`);
-        
         // 2. 各ユーザーの判定と個別処理の実行
         for (const user of users) {
             await processUserNotification(user);
@@ -56,16 +54,25 @@ async function processUserNotification(user) {
     // ユーザーのタイムゾーンに基づいた「現在の現地時刻」を取得 (HH:mm)
     const localCurrentTime = getUserCurrentTime(user.TimeZone);
     
-    // スプレッドシートの時刻表記（"7:00" など）を "07:00" 形式に整形して比較
-    const targetTime = formatTimeStr(user.NotificationTime);
-    
     console.log(`\n[ユーザー: ${userId} (${label}) (${lat}) (${lon})]`);
-    console.log(`  設定時刻: ${targetTime} / 現在の現地時刻: ${localCurrentTime}`);
+    console.log(`  設定時刻: ${user.NotificationTime} / 現在の現地時刻: ${localCurrentTime}`);
+    
+    // 【方法A拡張】カンマ区切りで格納された複数の設定時刻に対応します
+    const notificationTimesStr = user.NotificationTime || "";
+    const targetTimes = notificationTimesStr.split(',').map(t => formatTimeStr(t)).filter(t => t !== "");
+    
+    let isNotifyTime = false;
+    for (const targetTime of targetTimes) {
+        if (isTimeInWindow(targetTime, localCurrentTime, 5)) {
+            isNotifyTime = true;
+            console.log(`  -> 設定時刻 [${targetTime}] が現在の時間枠（5分以内）に一致しました。`);
+            break;
+        }
+    }
     
     // 時刻が一致しているか判定（5分おきの定期実行に対応するため、5分以内の時間枠に入っているか判定）
-    if (isTimeInWindow(targetTime, localCurrentTime, 5)) {
+    if (isNotifyTime) {
         console.log("  -> ★通知対象の時間です。天気データを取得します。");
-        
         if (!user.Lat || !user.Lon) {
             console.log("  [スキップ] 緯度または経度が設定されていません。");
             return;
@@ -74,11 +81,9 @@ async function processUserNotification(user) {
         try {
             // 3. Open-Meteoから時系列（hourly）気象データを取得
             const weatherData = await fetchWeatherData(user.Lat, user.Lon);
-            
             // 4. 該当ユーザーの端末へ、気象データとユーザー設定をパッキングしてWeb Push通知を実際に送信する
             //（※テキスト生成処理はService Worker側へ完全移譲されたため、weatherDataをそのまま渡します）
             await sendWebPushNotification(user.Subscription, weatherData, userId, user.Lat, user.Lon, user.Label, lang, unit);
-            
         } catch (err) {
             console.error(`  [エラー] 天気データ取得・生成中に失敗しました:`, err.message);
         }
@@ -121,7 +126,6 @@ function getUserCurrentTime(timeZone) {
             minute: "2-digit",
             hour12: false // 24時間表記（07:00 や 23:15 など）に固定します
         };
-        
         // 言語設定を 'en-US' に指定することで、余計な日本語（"午前"など）の混入を防ぎ、純粋な数字のみを取得します
         const formatter = new Intl.DateTimeFormat("en-US", options);
         return formatter.format(new Date());
@@ -151,12 +155,11 @@ function formatTimeStr(timeStr) {
  * Open-Meteo APIから時系列（hourly）気象データを取得するサブルーチン
  * @param {number|string} lat - 緯度
  * @param {number|string} lon - 経度
- * @returns {Promise<Object>} 気象データのJSONオブジェクト
+ * @returns {Promise<Object>}気象データのJSONオブジェクト
  */
 async function fetchWeatherData(lat, lon) {
     // スマホ側の3時間おきサマリー生成に必要な hourly パラメータを追加し、&forecast_days=2 で確実に48時間分のデータに制限します
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=weather_code,precipitation,wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&forecast_days=2&timezone=auto`;
-    
     const response = await fetch(url);
     if (!response.ok) {
         throw new Error(`Open-Meteo API 通信エラー (ステータス: ${response.status})`);
@@ -184,7 +187,6 @@ async function sendWebPushNotification(subscriptionStr, weatherData, userId, lat
     try {
         // スプレッドシートに保存されている文字列をJSONオブジェクトに復元します
         const subscription = JSON.parse(subscriptionStr);
-
         // プッシュ通知のペイロード（データ中身）を作成します
         // タイトルはスマホ側（Service Worker）で固定記述するため、ここでは含めず純粋なデータのみをパッキングします
         const payload = JSON.stringify({
@@ -197,15 +199,12 @@ async function sendWebPushNotification(subscriptionStr, weatherData, userId, lat
         });
 
         console.log(`  -> ユーザー: ${userId} へ Web Push 通知を送信中...`);
-        
         // 実際に通知を送信
         await webpush.sendNotification(subscription, payload);
         
         console.log(`  -> 正常に通知を配信しました。`);
-
     } catch (error) {
         console.error(`  [通知エラー] ユーザー: ${userId} への送信に失敗しました:`, error.message);
-        
         // もし「410 Gone」のエラーが返ってきた場合、ユーザーがブラウザで通知を拒否したか、期限切れの古い情報であることを示します
         if (error.statusCode === 410) {
             console.log("  (提示): このSubscriptionは無効化されているため、スプレッドシートから削除することを推奨します。");
@@ -222,18 +221,15 @@ async function sendWebPushNotification(subscriptionStr, weatherData, userId, lat
  */
 function isTimeInWindow(targetTime, currentTime, windowMinutes = 5) {
     if (!targetTime || !currentTime) return false;
-
     // "HH:mm" を時と分に分解
     const [tHour, tMinute] = targetTime.split(":").map(Number);
     const [cHour, cMinute] = currentTime.split(":").map(Number);
-
     // 一日の総分数に換算
     const targetMinutes = tHour * 60 + tMinute;
     const currentMinutes = cHour * 60 + cMinute;
 
     // 現在時刻から設定時刻を引いた差分を計算
     let diff = currentMinutes - targetMinutes;
-
     // 日を跨いだ場合の補正（例: 設定時刻 23:58、現在時刻 00:03 の場合、diffは -1435 になるため +1440 して 5分 とする）
     if (diff < 0) {
         diff += 1440;
