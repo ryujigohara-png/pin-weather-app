@@ -5249,9 +5249,9 @@ function openNotificationModalGeneral() {
     if (!notificationArea || !selectSpot || !inputTime || !errorArea) return;
 
     // 【重要・憶測の完全排除】：提示されたHTMLに存在しない2つ目・3つ目の入力欄が未生成の場合のみ、動的に生成して挿入します
-    let labelTime2 = document.getElementById('input-notification-time2');
+    let labelTime2 = document.getElementById('label-notification-time2');
     let inputTime2 = document.getElementById('input-notification-time2');
-    let labelTime3 = document.getElementById('input-notification-time3');
+    let labelTime3 = document.getElementById('label-notification-time3');
     let inputTime3 = document.getElementById('input-notification-time3');
 
     if (!inputTime2) {

@@ -77,6 +77,20 @@ async function displayNotification(event) {
       if (data.hourly) {
         const lang = data.lang || 'ja'; // サーバーペイロードから言語を取得（なければ 'ja'）
         const unit = data.unit || 'ms'; // サーバーペイロードから単位を取得（なければ 'ms'）
+
+        // 【追加】起点となるインデックスの時刻から日付・曜日を取得してタイトルに付与
+        if (data.hourly.time) {
+          const currentIndex = findCurrentTimeIndex(data.hourly.time);
+          if (data.hourly.time[currentIndex]) {
+            const baseDate = new Date(data.hourly.time[currentIndex]);
+            const month = String(baseDate.getMonth() + 1).padStart(2, '0');
+            const day = String(baseDate.getDate()).padStart(2, '0');
+            const weekdays = lang === "en" ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] : ["日", "月", "火", "水", "木", "金", "土"];
+            const weekdayStr = weekdays[baseDate.getDay()];
+            title += `${month}/${day}(${weekdayStr})`;
+          }
+        }
+
         const summaryBody = buildNotificationBody(data, lang, unit);
         if (summaryBody) {
           options.body = summaryBody;
@@ -281,14 +295,8 @@ function convertAndFloorWindSpeed(speedMs, unit) {
 function formatThreeHourLine(hourly, startIndex, lang, unit) {
     const dict = I18N_DICT[lang] || I18N_DICT["ja"];
     const unitStr = unit === "kn" ? "kn" : "m/s";
-    // 日付・時刻の取得 (インデックスの最初の時刻を基準にする)
+    // 時刻の取得 (インデックスの最初の時刻を基準にする)
     const baseDate = new Date(hourly.time[startIndex]);
-    const month = String(baseDate.getMonth() + 1).padStart(2, '0');
-    const day = String(baseDate.getDate()).padStart(2, '0');
-    
-    // 曜日の取得
-    const weekdays = lang === "en" ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] : ["日", "月", "火", "水", "木", "金", "土"];
-    const weekdayStr = weekdays[baseDate.getDay()];
     
     // 時刻文字列の生成（修正: ユーザー指定の開始時刻＋コロン形式「00:00-」へ変更）
     const startHour = String(baseDate.getHours()).padStart(2, '0');
@@ -321,7 +329,7 @@ function formatThreeHourLine(hourly, startIndex, lang, unit) {
     const windSpeedEnd = convertAndFloorWindSpeed(hourly.wind_speed_10m[startIndex + 2], unit);
 
     // 1行のテキストへ結合（末尾の区切りコロンをスペースに変更し、ご指定通りの「00:00- 」の間隔を厳密に維持）
-    return `${month}/${day}(${weekdayStr}) ${timeRange} ${emojis} ${maxPrecip}mm ${windDirStr} ${windSpeedStart} → ${windSpeedEnd}${unitStr}`;
+    return `${timeRange} ${emojis} ${maxPrecip}mm ${windDirStr} ${windSpeedStart} → ${windSpeedEnd}${unitStr}`;
 }
 
 /**
