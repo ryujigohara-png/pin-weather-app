@@ -1291,3 +1291,345 @@ html[data-theme="dark"] .scroll-helper-btn {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
+
+/* 自作アナログ時計型タイムピッカー：モーダルオーバーレイ */
+.timepicker-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+}
+
+/* タイムピッカーコンテナ (文字サイズ変更対策としてflex-shrinkと最大高を設定) */
+.timepicker-container {
+    background-color: #ffffff;
+    border-radius: 8px;
+    width: 280px;
+    max-height: 90vh; /* 画面外への飛び出し防止 */
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: Roboto, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+/* 時刻デジタル表示ヘッダー */
+.timepicker-header {
+    background-color: #31708f; /* 画像準拠の落ち着いた青 */
+    color: #ffffff;
+    padding: 16px;
+    text-align: center;
+    font-size: 52px;
+    font-weight: bold;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0; /* ヘッダーが潰れるのを防止 */
+}
+.timepicker-header span {
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+.timepicker-header .timepicker-header-active {
+    opacity: 1.0;
+}
+
+/* クロックボディ */
+.timepicker-body {
+    background-color: #ffffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    position: relative;
+    flex-grow: 1;
+    overflow: auto; /* 万が一のスクロール対応 */
+    transition: background-color 0.2s;
+}
+
+/* 円形時計盤面 */
+.timepicker-clock {
+    position: relative;
+    width: 240px;
+    height: 240px;
+    border-radius: 50%;
+    background-color: #f5f5f5;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+/* 時計盤面の中心点 */
+.timepicker-center-dot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    background-color: #31708f;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+}
+
+/* 時計の針 */
+.timepicker-needle {
+    position: absolute;
+    bottom: 50%;
+    left: 50%;
+    width: 2px;
+    height: 98px; /* 動的に変更されます */
+    background-color: #31708f;
+    transform-origin: bottom center;
+    z-index: 4;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), height 0.2s;
+}
+
+/* 針の先端（選択中の数字の背面を覆う丸型表示） */
+.timepicker-needle-circle {
+    position: absolute;
+    top: -15px;
+    left: 50%;
+    width: 30px;
+    height: 30px;
+    background-color: rgba(49, 112, 143, 0.2);
+    border-radius: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 針の先端：選択値を固定表示する際の塗りつぶし背景 */
+.timepicker-needle-circle-solid {
+    background-color: #31708f !important;
+}
+
+/* 数字を動的に配置するためのコンテナ */
+.timepicker-numbers-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* 盤面の数字テキスト */
+.timepicker-number {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    line-height: 30px;
+    text-align: center;
+    font-size: 13px;
+    color: #333333;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 6;
+    transition: color 0.15s, background-color 0.15s;
+}
+
+/* 盤面の内周数字（13〜23時/00時用：JSインライン指定からCSS管理へ完全移行） */
+.timepicker-number-inner {
+    font-size: 11px;
+    color: #777777;
+}
+
+/* 針の先端と重なっている数字のテキスト色 */
+.timepicker-number.active {
+    color: #ffffff !important;
+    font-weight: bold;
+}
+
+/* アクションボタン（最下部のキャンセル・OKエリア） */
+.timepicker-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 16px;
+    padding: 12px 16px 16px 16px;
+    background-color: #ffffff;
+    flex-shrink: 0; /* 絶対に潰れないように保護 */
+    transition: background-color 0.2s;
+}
+
+/* アクションボタン単体スタイル */
+.timepicker-btn {
+    background: none;
+    border: none;
+    color: #e91e63; /* 画像準拠の濃いピンク */
+    font-size: 14px;
+    font-weight: bold;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.timepicker-btn:hover {
+    background-color: #f5f5f5;
+}
+
+/* ==========================================================
+   通知時間・セレクトボックスおよびエラーエリアの基本（ライトモード）
+   ========================================================== */
+#input-notification-time1,
+#input-notification-time2,
+#input-notification-time3 {
+    background-color: #ffffff;
+    color: #333333;
+    border: 1px solid #ccc;
+}
+#select-notification-spot {
+    background-color: #ffffff;
+    color: #333333;
+    border: 1px solid #ccc;
+}
+#notification-error-area {
+    color: #dc2626;
+    background-color: #fef2f2;
+    border-color: #fee2e2;
+}
+
+/* ==========================================================
+   ダークモード対応設定
+   (システム自動判別、および明示的な .dark-mode クラス適用の双方に対応)
+   ========================================================== */
+
+/* システム設定がダーク、かつ明示的なライト指定がない場合の自動追従 */
+@media (prefers-color-scheme: dark) {
+    body:not(.light-mode) .timepicker-container {
+        background-color: #2c2c2c;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    body:not(.light-mode) .timepicker-body,
+    body:not(.light-mode) .timepicker-actions {
+        background-color: #2c2c2c;
+    }
+    body:not(.light-mode) .timepicker-clock {
+        background-color: #3a3a3a;
+    }
+    body:not(.light-mode) .timepicker-number {
+        color: #e0e0e0;
+    }
+    body:not(.light-mode) .timepicker-number-inner {
+        color: #aaaaaa;
+    }
+    body:not(.light-mode) .timepicker-btn:hover {
+        background-color: #3a3a3a;
+    }
+    body:not(.light-mode) #input-notification-time1,
+    body:not(.light-mode) #input-notification-time2,
+    body:not(.light-mode) #input-notification-time3 {
+        background-color: #3a3a3a;
+        color: #ffffff;
+        border-color: #555555;
+    }
+    body:not(.light-mode) #select-notification-spot {
+        background-color: #3a3a3a;
+        color: #ffffff;
+        border-color: #555555;
+    }
+    body:not(.light-mode) #notification-error-area {
+        color: #ef4444;
+        background-color: #2d1a1a;
+        border-color: #4c1d1d;
+    }
+}
+
+/* アプリ内の明示的な .dark-mode クラス設定への追従（詳細度を最優先） */
+.dark-mode .timepicker-container {
+    background-color: #2c2c2c !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
+}
+.dark-mode .timepicker-body,
+.dark-mode .timepicker-actions {
+    background-color: #2c2c2c !important;
+}
+.dark-mode .timepicker-clock {
+    background-color: #3a3a3a !important;
+}
+.dark-mode .timepicker-number {
+    color: #e0e0e0 !important;
+}
+.dark-mode .timepicker-number-inner {
+    color: #aaaaaa !important;
+}
+.dark-mode .timepicker-btn:hover {
+    background-color: #3a3a3a !important;
+}
+.dark-mode #input-notification-time1,
+.dark-mode #input-notification-time2,
+.dark-mode #input-notification-time3 {
+    background-color: #3a3a3a !important;
+    color: #ffffff !important;
+    border-color: #555555 !important;
+}
+.dark-mode #select-notification-spot {
+    background-color: #3a3a3a !important;
+    color: #ffffff !important;
+    border-color: #555555 !important;
+}
+.dark-mode #notification-error-area {
+    color: #ef4444 !important;
+    background-color: #2d1a1a !important;
+    border-color: #4c1d1d !important;
+}
+
+/* ==========================================================
+ ゴミ箱クリアボタンのスタイル 
+   ========================================================== */
+
+.btn-clear-time {
+    background: none;
+    border: none;
+    padding: 8px;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #888888;
+    border-radius: 4px;
+    transition: color 0.2s, background-color 0.2s;
+}
+
+/* ホバー時にゴミ箱を赤くし、うっすら赤い背景をつける */
+.btn-clear-time:hover {
+    color: #dc2626;
+    background-color: rgba(220, 38, 38, 0.1);
+}
+
+/* ==========================================================
+   ダークモード対応設定 (システム自動判別＆クラス追従)
+   ========================================================== */
+
+/* システムダークモード自動追従 */
+@media (prefers-color-scheme: dark) {
+    body:not(.light-mode) .btn-clear-time {
+        color: #aaaaaa;
+    }
+    body:not(.light-mode) .btn-clear-time:hover {
+        color: #ef4444;
+        background-color: rgba(239, 68, 68, 0.15);
+    }
+}
+
+/* 明示的な .dark-mode クラス追従 */
+.dark-mode .btn-clear-time {
+    color: #aaaaaa !important;
+}
+.dark-mode .btn-clear-time:hover {
+    color: #ef4444 !important;
+    background-color: rgba(239, 68, 68, 0.15) !important;
+}

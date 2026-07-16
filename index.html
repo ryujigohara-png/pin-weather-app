@@ -542,11 +542,50 @@
                     <label id="label-notification-spot" class="setting-label" style="display: block; margin-bottom: 6px;"></label>
                     <select id="select-notification-spot" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"></select>
                 </div>
+                
+                <!-- 1つ目の通知時間設定グループ -->
                 <div class="setting-group" style="margin-bottom: 14px;">
                     <label id="label-notification-time" class="setting-label" style="display: block; margin-bottom: 6px;"></label>
-                    <input type="time" id="input-notification-time" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="text" id="input-notification-time1" readonly placeholder="--:--" style="flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; cursor: pointer;">
+                        <button type="button" id="btn-clear-time1" class="btn-clear-time" title="Clear">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
+                                <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-                <div id="notification-error-area" style="display: none; color: #dc2626; background-color: #fef2f2; border: 1px solid #fee2e2; border-radius: 4px; padding: 8px 12px; margin-top: 12px; font-size: 13px; line-height: 1.4; text-align: left;"></div>
+
+                <!-- 2つ目の通知時間設定グループ -->
+                <div class="setting-group" style="margin-bottom: 14px;">
+                    <label id="label-notification-time2" class="setting-label" style="display: block; margin-bottom: 6px;"></label>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="text" id="input-notification-time2" readonly placeholder="--:--" style="flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; cursor: pointer;">
+                        <button type="button" id="btn-clear-time2" class="btn-clear-time" title="Clear">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
+                                <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 3つ目の通知時間設定グループ -->
+                <div class="setting-group" style="margin-bottom: 14px;">
+                    <label id="label-notification-time3" class="setting-label" style="display: block; margin-bottom: 6px;"></label>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="text" id="input-notification-time3" readonly placeholder="--:--" style="flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; cursor: pointer;">
+                        <button type="button" id="btn-clear-time3" class="btn-clear-time" title="Clear">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
+                                <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="notification-error-area" style="display: none; border: 1px solid; border-radius: 4px; padding: 8px 12px; margin-top: 12px; font-size: 13px; line-height: 1.4; text-align: left;"></div>
                 
                 <div id="notification-action-area" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
                     <button type="button" id="notification-btn-close" class="btn btn-secondary">Cancel</button>
@@ -593,6 +632,34 @@
         </div>
     </div>
 </div>
+
+<!-- 自作アナログ時計型タイムピッカーモーダル -->
+<div id="custom-timepicker-modal" class="timepicker-overlay" style="display: none;">
+    <div class="timepicker-container">
+        <!-- デジタル時刻表示ヘッダー -->
+        <div class="timepicker-header">
+            <span id="timepicker-header-hour" class="timepicker-header-active">11</span>:<span id="timepicker-header-minute">00</span>
+        </div>
+        <!-- アナログクロック盤面 -->
+        <div class="timepicker-body">
+            <div id="timepicker-clock" class="timepicker-clock">
+                <div class="timepicker-center-dot"></div>
+                <!-- 時計の針 -->
+                <div id="timepicker-needle" class="timepicker-needle">
+                    <div class="timepicker-needle-circle"></div>
+                </div>
+                <!-- 数字の動的配置領域 -->
+                <div id="timepicker-numbers-container" class="timepicker-numbers-container"></div>
+            </div>
+        </div>
+        <!-- 下部アクションボタン -->
+        <div class="timepicker-actions">
+            <button type="button" id="timepicker-btn-cancel" class="timepicker-btn">キャンセル</button>
+            <button type="button" id="timepicker-btn-ok" class="timepicker-btn">OK</button>
+        </div>
+    </div>
+</div>
+
 </div>
 </body>
 </html>
