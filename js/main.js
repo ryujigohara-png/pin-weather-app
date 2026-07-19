@@ -5216,11 +5216,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
- * サブルーチン：通知設定モーダルを汎用ダイアログとして一本化して表示（方法A：提示HTML適合・動的拡張版）
- * 修正内容：提供された本物のHTML構造（時刻欄が1つの状態）に100%合わせ、JS側で2つ目・3つ目の入力欄を安全に動的生成して拡張します。
+ * サブルーチン：通知設定モーダルを汎用ダイアログとして一本化して表示（方法A：静的定義版）
+ * 修正内容：提供された本物のHTML構造に3枠全ての入力要素を静的に追加配置した状態に適合させ、
+ *           動的生成処理をすべて排したクリーンな設計のもと、保存値の復元・保存・タイムピッカー連動を行います。
  */
 function openNotificationModalGeneral() {
-    // --- 既存の openModalFromSidebar の安全設計に準拠（戻るボタン暴発防止） ---
+    // --- 既存 of openModalFromSidebar の安全設計に準拠（戻るボタン暴発防止） ---
     const sb = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
     if (sb) {
@@ -5238,95 +5239,52 @@ function openNotificationModalGeneral() {
     const labelSpot = document.getElementById('label-notification-spot');
     const selectSpot = document.getElementById('select-notification-spot');
     
-    // 1つ目の時刻設定要素をHTMLから正確に取得
-    const labelTime = document.getElementById('label-notification-time');
-    const inputTime = document.getElementById('input-notification-time');
+    // 静的配置された3つの時間設定グループの要素を正確に取得（time1/time2/time3）
+    const labelTime1 = document.getElementById('label-notification-time');
+    const inputTime1 = document.getElementById('input-notification-time1');
+    const labelTime2 = document.getElementById('label-notification-time2');
+    const inputTime2 = document.getElementById('input-notification-time2');
+    const labelTime3 = document.getElementById('label-notification-time3');
+    const inputTime3 = document.getElementById('input-notification-time3');
+    
+    // 追加：ゴミ箱クリアボタンを取得
+    const btnClearTime1 = document.getElementById('btn-clear-time1');
+    const btnClearTime2 = document.getElementById('btn-clear-time2');
+    const btnClearTime3 = document.getElementById('btn-clear-time3');
     
     const errorArea = document.getElementById('notification-error-area');
     // HTML側の専用ボタンを取得
     const btnCancel = document.getElementById('notification-btn-close');
     const btnSave = document.getElementById('notification-btn-save');
-    if (!notificationArea || !selectSpot || !inputTime || !errorArea) return;
-
-    // 【重要・憶測の完全排除】：提示されたHTMLに存在しない2つ目・3つ目の入力欄が未生成の場合のみ、動的に生成して挿入します
-    let labelTime2 = document.getElementById('label-notification-time2');
-    let inputTime2 = document.getElementById('input-notification-time2');
-    let labelTime3 = document.getElementById('label-notification-time3');
-    let inputTime3 = document.getElementById('input-notification-time3');
-
-    if (!inputTime2) {
-        // 2つ目の時間設定グループ作成（提示されたHTMLのインラインスタイルと完全に同一の見た目を再現）
-        const group2 = document.createElement('div');
-        group2.className = 'setting-group';
-        group2.style.marginBottom = '14px';
-        
-        labelTime2 = document.createElement('label');
-        labelTime2.id = 'label-notification-time2';
-        labelTime2.className = 'setting-label';
-        labelTime2.style.display = 'block';
-        labelTime2.style.marginBottom = '6px';
-        
-        inputTime2 = document.createElement('input');
-        inputTime2.type = 'time';
-        inputTime2.id = 'input-notification-time2';
-        inputTime2.style.width = '100%';
-        inputTime2.style.padding = '8px';
-        inputTime2.style.border = '1px solid #ccc';
-        inputTime2.style.borderRadius = '4px';
-        inputTime2.style.boxSizing = 'border-box';
-        
-        group2.appendChild(labelTime2);
-        group2.appendChild(inputTime2);
-        
-        // 3つ目の時間設定グループ作成
-        const group3 = document.createElement('div');
-        group3.className = 'setting-group';
-        group3.style.marginBottom = '14px';
-        
-        labelTime3 = document.createElement('label');
-        labelTime3.id = 'label-notification-time3';
-        labelTime3.className = 'setting-label';
-        labelTime3.style.display = 'block';
-        labelTime3.style.marginBottom = '6px';
-        
-        inputTime3 = document.createElement('input');
-        inputTime3.type = 'time';
-        inputTime3.id = 'input-notification-time3';
-        inputTime3.style.width = '100%';
-        inputTime3.style.padding = '8px';
-        inputTime3.style.border = '1px solid #ccc';
-        inputTime3.style.borderRadius = '4px';
-        inputTime3.style.boxSizing = 'border-box';
-        
-        group3.appendChild(labelTime3);
-        group3.appendChild(inputTime3);
-        
-        // エラーエリアの直前に2つと3つのグループを綺麗に挿入
-        errorArea.parentNode.insertBefore(group2, errorArea);
-        errorArea.parentNode.insertBefore(group3, errorArea);
-    }
+    if (!notificationArea || !selectSpot || !inputTime1 || !errorArea) return;
 
     // 前回の状態を完全に初期化
     selectSpot.innerHTML = "";
     errorArea.style.display = 'none';
     errorArea.textContent = '';
     
-    // 表示状態を安全に復帰させます
+    // 表示状態を安全に復帰させます（増設分の静的要素も漏れなく表示）
     if (notificationArea) notificationArea.style.display = '';
     if (labelSpot) labelSpot.style.display = '';
     if (selectSpot) selectSpot.style.display = '';
-    if (labelTime) labelTime.style.display = '';
-    if (inputTime) inputTime.style.display = '';
+    if (labelTime1) labelTime1.style.display = '';
+    if (inputTime1) inputTime1.style.display = '';
     if (labelTime2) labelTime2.style.display = '';
     if (inputTime2) inputTime2.style.display = '';
     if (labelTime3) labelTime3.style.display = '';
     if (inputTime3) inputTime3.style.display = '';
+    
+    // 追加：ゴミ箱クリアボタンの表示状態を復帰
+    if (btnClearTime1) btnClearTime1.style.display = '';
+    if (btnClearTime2) btnClearTime2.style.display = '';
+    if (btnClearTime3) btnClearTime3.style.display = '';
+    
     if (btnCancel) btnCancel.style.display = '';
     if (btnSave) btnSave.style.display = '';
     
     // 既存の正しい辞書キーを使用しつつ、複数枠用にナンバリングを定義
     if (labelSpot) labelSpot.innerText = typeof i18n !== 'undefined' ? i18n.t('notificationSelectSpot') : "通知する場所：";
-    if (labelTime) labelTime.innerText = (typeof i18n !== 'undefined' ? i18n.t('notificationSelectTime') : "通知時刻") + "1：";
+    if (labelTime1) labelTime1.innerText = (typeof i18n !== 'undefined' ? i18n.t('notificationSelectTime') : "通知時刻") + "1：";
     if (labelTime2) labelTime2.innerText = (typeof i18n !== 'undefined' ? i18n.t('notificationSelectTime') : "通知時刻") + "2：";
     if (labelTime3) labelTime3.innerText = (typeof i18n !== 'undefined' ? i18n.t('notificationSelectTime') : "通知時刻") + "3：";
     
@@ -5347,15 +5305,52 @@ function openNotificationModalGeneral() {
         selectSpot.value = `${savedLat},${savedLon},${savedLabel}`;
     }
 
-    // カンマ区切りの保存文字列から各時刻入力要素へ分割復元
-    const savedTime = localStorage.getItem('notification_time') || "07:00";
-    const times = savedTime.split(',');
-    inputTime.value = times[0] || "07:00";
-    if (inputTime2) inputTime2.value = times[1] || "";
-    if (inputTime3) inputTime3.value = times[2] || "";
+    // 改善：すべての通知をクリアされた状態でも正しく空のまま復元できるよう修正
+    const savedTime = localStorage.getItem('notification_time');
+    if (savedTime !== null) {
+        const times = savedTime.split(',');
+        inputTime1.value = times[0] || "";
+        if (inputTime2) inputTime2.value = times[1] || "";
+        if (inputTime3) inputTime3.value = times[2] || "";
+    } else {
+        // 初めて設定する場合などの初期デフォルト値
+        inputTime1.value = "07:00";
+        if (inputTime2) inputTime2.value = "";
+        if (inputTime3) inputTime3.value = "";
+    }
+
+    // 各静的インプット要素にタップ時の独自アナログ時計起動イベントを紐付け
+    [inputTime1, inputTime2, inputTime3].forEach(inputEl => {
+        if (!inputEl) return;
+        inputEl.onclick = (e) => {
+            e.preventDefault();
+            // 自作アナログタイムピッカーモーダルを起動（未設定の場合は現在の07:00等を基準に開く）
+            showTimePicker(inputEl.value || "07:00", (selectedTime) => {
+                inputEl.value = selectedTime;
+            });
+        };
+    });
+
+    // 追加：各ゴミ箱クリアボタンにクリックイベントを設定（値をクリアする）
+    if (btnClearTime1) {
+        btnClearTime1.onclick = () => {
+            inputTime1.value = "";
+        };
+    }
+    if (btnClearTime2) {
+        btnClearTime2.onclick = () => {
+            inputTime2.value = "";
+        };
+    }
+    if (btnClearTime3) {
+        btnClearTime3.onclick = () => {
+            inputTime3.value = "";
+        };
+    }
 
     // 【専用Cancelボタン】：イベントハンドラを直接バインドしてダイアログと通知エリアを安全に閉じる
     if (btnCancel) {
+        btnCancel.innerText = typeof i18n !== 'undefined' ? i18n.t('btnClose') : "Cancel";
         btnCancel.onclick = () => {
             const modal = document.getElementById('app-common-modal');
             if (modal) modal.style.display = 'none';
@@ -5363,12 +5358,18 @@ function openNotificationModalGeneral() {
             if (notificationArea) notificationArea.style.display = 'none';
             if (labelSpot) labelSpot.style.display = 'none';
             if (selectSpot) selectSpot.style.display = 'none';
-            if (labelTime) labelTime.style.display = 'none';
-            if (inputTime) inputTime.style.display = 'none';
+            if (labelTime1) labelTime1.style.display = 'none';
+            if (inputTime1) inputTime1.style.display = 'none';
             if (labelTime2) labelTime2.style.display = 'none';
             if (inputTime2) inputTime2.style.display = 'none';
             if (labelTime3) labelTime3.style.display = 'none';
             if (inputTime3) inputTime3.style.display = 'none';
+            
+            // 追加：ゴミ箱ボタンも非表示
+            if (btnClearTime1) btnClearTime1.style.display = 'none';
+            if (btnClearTime2) btnClearTime2.style.display = 'none';
+            if (btnClearTime3) btnClearTime3.style.display = 'none';
+            
             if (btnCancel) btnCancel.style.display = 'none';
             if (btnSave) btnSave.style.display = 'none';
         };
@@ -5380,22 +5381,19 @@ function openNotificationModalGeneral() {
         btnSave.innerText = originalBtnText;
         btnSave.disabled = false;
         btnSave.onclick = async () => {
-            // 二重クリック防止およびローディング演出
             if (btnSave.disabled) return;
             btnSave.disabled = true;
-            btnSave.innerText = "保存中..."; 
+            btnSave.innerText = typeof i18n !== 'undefined' ? (i18n.t('saving') || "保存中...") : "保存中..."; 
             
             errorArea.style.display = 'none';
             errorArea.textContent = '';
             
-            // 入力された有効な複数の時刻をカンマ区切りで一本に結合
-            let timeValueCombined = inputTime.value;
-            if (inputTime2 && inputTime2.value.trim() !== "") {
-                timeValueCombined += `,${inputTime2.value.trim()}`;
-            }
-            if (inputTime3 && inputTime3.value.trim() !== "") {
-                timeValueCombined += `,${inputTime3.value.trim()}`;
-            }
+            // 改善：クリアされた空枠を避けて、入力されている有効な時刻のみを正確に詰めてカンマ結合
+            const activeTimes = [];
+            if (inputTime1 && inputTime1.value.trim() !== "") activeTimes.push(inputTime1.value.trim());
+            if (inputTime2 && inputTime2.value.trim() !== "") activeTimes.push(inputTime2.value.trim());
+            if (inputTime3 && inputTime3.value.trim() !== "") activeTimes.push(inputTime3.value.trim());
+            const timeValueCombined = activeTimes.join(',');
 
             // 既存の非同期保存処理を実行
             const success = await executeNotificationSaveLogic(selectSpot.value, timeValueCombined, errorArea);
@@ -5409,19 +5407,25 @@ function openNotificationModalGeneral() {
                 if (notificationArea) notificationArea.style.display = 'none';
                 if (labelSpot) labelSpot.style.display = 'none';
                 if (selectSpot) selectSpot.style.display = 'none';
-                if (labelTime) labelTime.style.display = 'none';
-                if (inputTime) inputTime.style.display = 'none';
+                if (labelTime1) labelTime1.style.display = 'none';
+                if (inputTime1) inputTime1.style.display = 'none';
                 if (labelTime2) labelTime2.style.display = 'none';
                 if (inputTime2) inputTime2.style.display = 'none';
                 if (labelTime3) labelTime3.style.display = 'none';
                 if (inputTime3) inputTime3.style.display = 'none';
+                
+                // 追加：ゴミ箱ボタンも非表示
+                if (btnClearTime1) btnClearTime1.style.display = 'none';
+                if (btnClearTime2) btnClearTime2.style.display = 'none';
+                if (btnClearTime3) btnClearTime3.style.display = 'none';
+                
                 if (btnCancel) btnCancel.style.display = 'none';
                 if (btnSave) btnSave.style.display = 'none';
             }
         };
     }
 
-    // 汎用ダイアログ呼び出し（タイトルを元にshowAppDialog側で自動的に専用スイッチングが行われます）
+    // 汎用ダイアログ呼び出し
     showAppDialog({
         title: typeof i18n !== 'undefined' ? i18n.t('notificationModalTitle') : "Daily Notification",
         messageKey: 'notificationModalTitle'
@@ -5432,7 +5436,12 @@ function openNotificationModalGeneral() {
  * サブルーチン：通知設定の実際の保存・Push購読通信処理（方法A：エラーを画面内に書き出す）
  */
 async function executeNotificationSaveLogic(spotValue, timeValue, errorAreaElement) {
-    if (!spotValue || !timeValue) return false;
+    // 安全のため、timeValueが null または undefined の場合のみ空文字にフォールバックします
+    const time = (timeValue !== undefined && timeValue !== null) ? timeValue : "";
+    
+    // 時刻が空（すべての設定を削除）の場合も許容するため、!timeValue のチェックを除外します
+    if (!spotValue) return false;
+    
     // 1. 通知パーミッションの確認
     if ('Notification' in window && Notification.permission !== 'granted') {
         const permission = await Notification.requestPermission();
@@ -5445,9 +5454,10 @@ async function executeNotificationSaveLogic(spotValue, timeValue, errorAreaEleme
     }
 
     const [lat, lon, label] = spotValue.split(',');
-    const time = timeValue;
 
-    if (!lat || !lon || !label || !time) return false;
+    // 時刻が空の場合も許容するため、!time のチェックを除外します
+    if (!lat || !lon || !label) return false;
+    
     // 2. ローカルストレージへの保存
     let userId = localStorage.getItem('notification_user_id');
     if (!userId) {
@@ -5458,7 +5468,7 @@ async function executeNotificationSaveLogic(spotValue, timeValue, errorAreaEleme
     localStorage.setItem('notification_lat', lat);
     localStorage.setItem('notification_lon', lon);
     localStorage.setItem('notification_label', label);
-    localStorage.setItem('notification_time', time); // カンマ区切り文字列としてそのままローカルに保存されます
+    localStorage.setItem('notification_time', time); // カンマ区切り文字列としてそのままローカルに保存されます（空の場合は空文字になります）
 
     // 3. ServiceWorkerを用いたWeb Push購読とGASサーバーへの非同期通信
     if ('serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted') {
@@ -5472,7 +5482,7 @@ async function executeNotificationSaveLogic(spotValue, timeValue, errorAreaEleme
             const lang = viewConfig.language || "ja";
             const unit = viewConfig.windSpeedUnit || "ms";
             
-            // サーバー通信実行（カンマ区切りデータが time パラメータとしてそのままGASに引き渡されます）
+            // サーバー通信実行（空文字、またはカンマ区切りデータが time パラメータとしてそのままGASに引き渡されます）
             await saveSubscriptionToSpreadsheet(userId, subscription, timeZone, lat, lon, label, time, lang, unit);
             console.log("[Web Push] GASへの保存が正常に完了しました。");
 
@@ -5514,10 +5524,19 @@ async function saveNotificationSettingsFromModal() {
     // ブリッジ側でも複数時刻をカンマ区切りで一本に結合
     let timeValueCombined = inputTime.value;
     if (inputTime2 && inputTime2.value.trim() !== "") {
-        timeValueCombined += `,${inputTime2.value.trim()}`;
+        // 1つ目が空で2つ目がある場合などの対応
+        if (timeValueCombined.trim() === "") {
+            timeValueCombined = inputTime2.value.trim();
+        } else {
+            timeValueCombined += `,${inputTime2.value.trim()}`;
+        }
     }
     if (inputTime3 && inputTime3.value.trim() !== "") {
-        timeValueCombined += `,${inputTime3.value.trim()}`;
+        if (timeValueCombined.trim() === "") {
+            timeValueCombined = inputTime3.value.trim();
+        } else {
+            timeValueCombined += `,${inputTime3.value.trim()}`;
+        }
     }
 
     // 一本化した実際の保存・通信ロジックを呼び出し、整合性を完全に維持
@@ -5634,6 +5653,311 @@ function urlBase64ToUint8Array(base64String) {
     }
     return outputArray;
 }
+
+/* タイムピッカーの動作制御用共通ステート */
+let currentPickerMode = 'hour'; // 'hour' または 'minute'
+let selectedHour = 11;
+let selectedMinute = 0;
+let timePickerCallback = null;
+
+/**
+ * サブルーチン：自作アナログ時計タイムピッカーの初期設定とクリックリスナー of 登録
+ */
+function initTimePicker() {
+    const clock = document.getElementById('timepicker-clock');
+    if (!clock) return;
+
+    // 時計盤がクリックされた時（タップ選択専用の座標判定ロジック）
+    clock.addEventListener('click', (e) => {
+        const rect = clock.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const clickX = e.clientX;
+        const clickY = e.clientY;
+
+        const dx = clickX - centerX;
+        const dy = clickY - centerY;
+
+        // 中心点からの角度（ラジアン）を算出。12時方向を0ラジアン（基準）として時計回りに補正。
+        let angleRad = Math.atan2(dx, -dy);
+        let angleDeg = angleRad * (180 / Math.PI);
+        if (angleDeg < 0) angleDeg += 360;
+
+        // 中心からの距離を測定
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (currentPickerMode === 'hour') {
+            // 24時間表示（マテリアルデザイン仕様）：外周R=98px、内周R=64px。境界を80pxに設定。
+            const isInner = distance < 80;
+            let sector = Math.round(angleDeg / 30) % 12;
+            if (sector === 0) sector = 12;
+
+            let hour = sector;
+            if (isInner) {
+                hour = sector + 12;
+                if (hour === 24) hour = 0;
+            }
+            selectedHour = hour;
+
+            // 針とヘッダーの描画更新
+            updateNeedle(hour, 'hour');
+            document.getElementById('timepicker-header-hour').innerText = String(hour).padStart(2, '0');
+
+            // 「時」を選択したら、0.25秒後に自動的に「分」選択モードへ遷移
+            setTimeout(() => {
+                switchPickerMode('minute');
+            }, 250);
+
+        } else if (currentPickerMode === 'minute') {
+            // 分の決定：360度を60分割し、タップ位置からダイレクトに1分刻みで正確に時間を決定
+            let minute = Math.round(angleDeg / 6) % 60;
+            selectedMinute = minute;
+
+            updateNeedle(minute, 'minute');
+            document.getElementById('timepicker-header-minute').innerText = String(minute).padStart(2, '0');
+        }
+    });
+
+    // デジタルヘッダー部を直接タップした際の「時」と「分」表示の手動切り替え
+    const headerHour = document.getElementById('timepicker-header-hour');
+    const headerMin = document.getElementById('timepicker-header-minute');
+    if (headerHour) {
+        headerHour.addEventListener('click', () => switchPickerMode('hour'));
+    }
+    if (headerMin) {
+        headerMin.addEventListener('click', () => switchPickerMode('minute'));
+    }
+
+    // キャンセル・OKボタンのアクション設定
+    const btnCancel = document.getElementById('timepicker-btn-cancel');
+    const btnOk = document.getElementById('timepicker-btn-ok');
+    
+    if (btnCancel) {
+        btnCancel.onclick = () => {
+            closeTimePicker();
+        };
+    }
+    if (btnOk) {
+        btnOk.onclick = () => {
+            if (timePickerCallback) {
+                const formattedHour = String(selectedHour).padStart(2, '0');
+                const formattedMin = String(selectedMinute).padStart(2, '0');
+                timePickerCallback(`${formattedHour}:${formattedMin}`);
+            }
+            closeTimePicker();
+        };
+    }
+}
+
+/**
+ * サブルーチン：タイムピッカーの「時」と「分」選択モードの表示切り替え
+ */
+function switchPickerMode(mode) {
+    currentPickerMode = mode;
+    const headerHour = document.getElementById('timepicker-header-hour');
+    const headerMin = document.getElementById('timepicker-header-minute');
+    
+    if (mode === 'hour') {
+        if (headerHour) headerHour.classList.add('timepicker-header-active');
+        if (headerMin) headerMin.classList.remove('timepicker-header-active');
+        renderClockFace('hour');
+        updateNeedle(selectedHour, 'hour');
+    } else {
+        if (headerHour) headerHour.classList.remove('timepicker-header-active');
+        if (headerMin) headerMin.classList.add('timepicker-header-active');
+        renderClockFace('minute');
+        updateNeedle(selectedMinute, 'minute');
+    }
+}
+
+/**
+ * サブルーチン：選択モードに合わせて、盤面に配置する数字の座標を計算して描画
+ */
+function renderClockFace(mode) {
+    const container = document.getElementById('timepicker-numbers-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const clockRadius = 120; // 240pxの半分の中心点
+    const outerR = 98;       // 外周の半径
+    const innerR = 64;       // 内周の半径（24時間表示の内周用）
+
+    if (mode === 'hour') {
+        // 外周：1〜12時
+        for (let i = 1; i <= 12; i++) {
+            const angleDeg = (i * 30) % 360;
+            const angleRad = (angleDeg * Math.PI) / 180;
+            const x = clockRadius + outerR * Math.sin(angleRad);
+            const y = clockRadius - outerR * Math.cos(angleRad);
+
+            const numDiv = document.createElement('div');
+            numDiv.className = 'timepicker-number';
+            numDiv.innerText = i;
+            numDiv.style.left = `${x}px`;
+            numDiv.style.top = `${y}px`;
+            if (selectedHour === i) {
+                numDiv.classList.add('active');
+            }
+            container.appendChild(numDiv);
+        }
+
+        // 内周：13〜23時、および00時
+        for (let i = 1; i <= 12; i++) {
+            let val = i + 12;
+            if (val === 24) val = 0;
+            const displayVal = val === 0 ? "00" : String(val);
+
+            const angleDeg = (i * 30) % 360;
+            const angleRad = (angleDeg * Math.PI) / 180;
+            const x = clockRadius + innerR * Math.sin(angleRad);
+            const y = clockRadius - innerR * Math.cos(angleRad);
+
+            const numDiv = document.createElement('div');
+            // 修正：インライン色指定を廃止し、ダークモードと連動可能な一括CSS制御用の専用クラスを適用
+            numDiv.className = 'timepicker-number timepicker-number-inner';
+            numDiv.innerText = displayVal;
+            numDiv.style.left = `${x}px`;
+            numDiv.style.top = `${y}px`;
+            if (selectedHour === val) {
+                numDiv.classList.add('active');
+            }
+            container.appendChild(numDiv);
+        }
+    } else if (mode === 'minute') {
+        // 分：00, 05, 10 ... 55
+        for (let i = 0; i < 12; i++) {
+            const val = i * 5;
+            const displayVal = String(val).padStart(2, '0');
+            const angleDeg = i * 30;
+            const angleRad = (angleDeg * Math.PI) / 180;
+            const x = clockRadius + outerR * Math.sin(angleRad);
+            const y = clockRadius - outerR * Math.cos(angleRad);
+
+            const numDiv = document.createElement('div');
+            numDiv.className = 'timepicker-number';
+            numDiv.innerText = displayVal;
+            numDiv.style.left = `${x}px`;
+            numDiv.style.top = `${y}px`;
+            if (selectedMinute === val) {
+                numDiv.classList.add('active');
+            }
+            container.appendChild(numDiv);
+        }
+    }
+}
+
+/**
+ * サブルーチン：時計の「針」の角度、長さ、先端部分の表示スタイルを更新
+ */
+function updateNeedle(value, mode) {
+    const needle = document.getElementById('timepicker-needle');
+    if (!needle) return;
+
+    let angle = 0;
+    let height = 98; // 外周の標準長
+
+    if (mode === 'hour') {
+        const isInner = value === 0 || value > 12;
+        const normalizedVal = isInner ? (value === 0 ? 12 : value - 12) : value;
+        angle = (normalizedVal * 30) % 360;
+        height = isInner ? 64 : 98;
+    } else {
+        angle = (value * 6) % 360;
+        height = 98;
+    }
+
+    needle.style.height = `${height}px`;
+    needle.style.transform = `translateX(-50%) rotate(${angle}deg)`;
+
+    const needleCircle = needle.querySelector('.timepicker-needle-circle');
+    if (needleCircle) {
+        if (mode === 'hour') {
+            needleCircle.classList.add('timepicker-needle-circle-solid');
+        } else {
+            // 分選択時、数字とピタッと重なる5分刻みの時だけ先端を強調（端数の時は、中間位置に針が向くためうっすら表示）
+            if (value % 5 === 0) {
+                needleCircle.classList.add('timepicker-needle-circle-solid');
+            } else {
+                needleCircle.classList.remove('timepicker-needle-circle-solid');
+            }
+        }
+    }
+
+    // 盤面数字の「アクティブ表示」の即時更新
+    const numElements = document.querySelectorAll('.timepicker-number');
+    numElements.forEach(el => {
+        const txt = el.innerText;
+        const valNum = parseInt(txt, 10);
+        if (mode === 'hour') {
+            if (valNum === value) {
+                el.classList.add('active');
+            } else {
+                el.classList.remove('active');
+            }
+        } else {
+            if (value % 5 === 0 && valNum === value) {
+                el.classList.add('active');
+            } else {
+                el.classList.remove('active');
+            }
+        }
+    });
+}
+
+/**
+ * サブルーチン：自作アナログ時計タイムピッカーを表示する
+ */
+function showTimePicker(initialTime, callback) {
+    const modal = document.getElementById('custom-timepicker-modal');
+    if (!modal) return;
+
+    timePickerCallback = callback;
+
+    // 多言語化（i18n）対応：キャンセルボタンとOKボタンに動的翻訳テキストをセット
+    const btnCancel = document.getElementById('timepicker-btn-cancel');
+    const btnOk = document.getElementById('timepicker-btn-ok');
+    if (btnCancel) {
+        btnCancel.innerText = typeof i18n !== 'undefined' ? i18n.t('btnClose') : "キャンセル";
+    }
+    if (btnOk) {
+        btnOk.innerText = typeof i18n !== 'undefined' ? i18n.t('btnOK') : "OK";
+    }
+
+    // 時刻のパース
+    let hour = 11;
+    let min = 0;
+    if (initialTime && initialTime.includes(':')) {
+        const parts = initialTime.split(':');
+        hour = parseInt(parts[0], 10);
+        min = parseInt(parts[1], 10);
+        if (isNaN(hour) || hour < 0 || hour > 23) hour = 11;
+        if (isNaN(min) || min < 0 || min > 59) min = 0;
+    }
+
+    selectedHour = hour;
+    selectedMinute = min;
+
+    document.getElementById('timepicker-header-hour').innerText = String(hour).padStart(2, '0');
+    document.getElementById('timepicker-header-minute').innerText = String(min).padStart(2, '0');
+
+    modal.style.display = 'flex';
+
+    // 初期化時は「時」を選択状態にする
+    switchPickerMode('hour');
+}
+
+/**
+ * サブルーチン：タイムピッカーモーダルを非表示にする
+ */
+function closeTimePicker() {
+    const modal = document.getElementById('custom-timepicker-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+// ページロード完了時に、タイムピッカーのイベント・要素の初期化を自動実行
+document.addEventListener('DOMContentLoaded', () => {
+    initTimePicker();
+});
 
 
 /**
