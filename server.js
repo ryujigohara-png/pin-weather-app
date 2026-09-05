@@ -50,8 +50,22 @@ async function processUserNotification(user) {
     const lon = user.Lon || "(未設定)";
     const lang = user.Lang || "ja";   // スプレッドシートに追加された言語設定（未設定時は'ja'）
     const unit = user.Unit || "ms";   // スプレッドシートに追加された単位設定（未設定時は'ms'）
-    // スプレッドシートに追加された降水量表示設定を取得（未設定時は true とみなす）
-    const showPrecipitation = user.ShowPrecipitation !== undefined ? user.ShowPrecipitation : (user.showPrecipitation !== undefined ? user.showPrecipitation : true);
+    
+    // スプレッドシートに追加された降水量表示設定を取得し、文字列 "FALSE" や "false" を確実に boolean (true/false) へ正規化
+    const rawPrecip = user.ShowPrecipitation !== undefined ? user.ShowPrecipitation : user.showPrecipitation;
+    let showPrecipitation = true;
+    if (rawPrecip !== undefined && rawPrecip !== null) {
+        if (typeof rawPrecip === 'boolean') {
+            showPrecipitation = rawPrecip;
+        } else if (typeof rawPrecip === 'string') {
+            const lower = rawPrecip.trim().toLowerCase();
+            if (lower === 'false' || lower === '0' || lower === '') {
+                showPrecipitation = false;
+            }
+        } else if (typeof rawPrecip === 'number') {
+            showPrecipitation = rawPrecip !== 0;
+        }
+    }
     
     // ユーザーのタイムゾーンに基づいた「現在の現地時刻」を取得 (HH:mm)
     const localCurrentTime = getUserCurrentTime(user.TimeZone);
@@ -202,7 +216,7 @@ async function sendWebPushNotification(subscriptionStr, weatherData, userId, lat
             showPrecipitation: showPrecipitation
         });
 
-        console.log(`   -> ユーザー: ${userId} へ Web Push 通知を送信中...`);
+        console.log(`   -> ユーザー: ${userId} へ Web Push 通知を送信中... (showPrecipitation: ${showPrecipitation})`);
         // 実際に通知を送信
         await webpush.sendNotification(subscription, payload);
         
