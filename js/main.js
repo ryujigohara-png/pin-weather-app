@@ -5152,7 +5152,8 @@ function openNotificationModalGeneral() {
     const btnClearTime2 = document.getElementById('btn-clear-time2');
     const btnClearTime3 = document.getElementById('btn-clear-time3');
     
-    // 追加：降水量表示トグル要素を取得
+    // 追加：降水量表示トグル要素およびラベル要素を取得
+    const labelPrecipitation = document.getElementById('label-show-precipitation');
     const togglePrecipitation = document.getElementById('input-show-precipitation');
 
     const errorArea = document.getElementById('notification-error-area');
@@ -5182,6 +5183,10 @@ function openNotificationModalGeneral() {
     if (btnClearTime2) btnClearTime2.style.display = '';
     if (btnClearTime3) btnClearTime3.style.display = '';
     
+    // 追加：降水量表示エリアの表示状態を復帰
+    if (labelPrecipitation) labelPrecipitation.style.display = '';
+    if (togglePrecipitation) togglePrecipitation.style.display = '';
+    
     if (btnCancel) btnCancel.style.display = '';
     if (btnSave) btnSave.style.display = '';
     
@@ -5190,6 +5195,9 @@ function openNotificationModalGeneral() {
     if (labelTime1) labelTime1.innerText = (typeof i18n !== 'undefined' ? i18n.t('notificationSelectTime') : "通知時刻") + "1：";
     if (labelTime2) labelTime2.innerText = (typeof i18n !== 'undefined' ? i18n.t('notificationSelectTime') : "通知時刻") + "2：";
     if (labelTime3) labelTime3.innerText = (typeof i18n !== 'undefined' ? i18n.t('notificationSelectTime') : "通知時刻") + "3：";
+    
+    // 追加：降水量表示ラベルの多言語テキストを設定
+    if (labelPrecipitation) labelPrecipitation.innerText = typeof i18n !== 'undefined' ? i18n.t('notificationShowPrecipitation') : "降水量を表示：";
     
     // 既存のお気に入りスポット(mySpots)から選択肢を動的に生成
     if (typeof mySpots !== 'undefined' && Array.isArray(mySpots)) {
@@ -5224,7 +5232,7 @@ function openNotificationModalGeneral() {
 
     // 降水量表示トグルの状態を復元（viewConfigの設定値を反映）
     if (togglePrecipitation) {
-        togglePrecipitation.checked = (typeof viewConfig.showPrecipitation !== 'undefined') ? viewConfig.showPrecipitation : true;
+        togglePrecipitation.checked = (typeof viewConfig !== 'undefined' && typeof viewConfig.showPrecipitation !== 'undefined') ? viewConfig.showPrecipitation : true;
     }
 
     // 各静的インプット要素にタップ時の独自アナログ時計起動イベントを紐付け
@@ -5278,6 +5286,10 @@ function openNotificationModalGeneral() {
             if (btnClearTime2) btnClearTime2.style.display = 'none';
             if (btnClearTime3) btnClearTime3.style.display = 'none';
             
+            // 追加：降水量表示エリアも非表示
+            if (labelPrecipitation) labelPrecipitation.style.display = 'none';
+            if (togglePrecipitation) togglePrecipitation.style.display = 'none';
+            
             if (btnCancel) btnCancel.style.display = 'none';
             if (btnSave) btnSave.style.display = 'none';
         };
@@ -5303,6 +5315,12 @@ function openNotificationModalGeneral() {
             if (inputTime3 && inputTime3.value.trim() !== "") activeTimes.push(inputTime3.value.trim());
             const timeValueCombined = activeTimes.join(',');
 
+            // 降水量表示の設定値を viewConfig および localStorage に反映
+            if (togglePrecipitation && typeof viewConfig !== 'undefined') {
+                viewConfig.showPrecipitation = togglePrecipitation.checked;
+                localStorage.setItem('pin_weather_show_precipitation', togglePrecipitation.checked ? 'true' : 'false');
+            }
+
             // 既存の非同期保存処理を実行
             const success = await executeNotificationSaveLogic(selectSpot.value, timeValueCombined, errorArea);
             btnSave.disabled = false;
@@ -5326,6 +5344,10 @@ function openNotificationModalGeneral() {
                 if (btnClearTime1) btnClearTime1.style.display = 'none';
                 if (btnClearTime2) btnClearTime2.style.display = 'none';
                 if (btnClearTime3) btnClearTime3.style.display = 'none';
+                
+                // 追加：降水量表示エリアも非表示
+                if (labelPrecipitation) labelPrecipitation.style.display = 'none';
+                if (togglePrecipitation) togglePrecipitation.style.display = 'none';
                 
                 if (btnCancel) btnCancel.style.display = 'none';
                 if (btnSave) btnSave.style.display = 'none';
