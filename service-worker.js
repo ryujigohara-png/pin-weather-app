@@ -326,10 +326,18 @@ function formatThreeHourLine(hourly, startIndex, lang, unit, showPrecipitation) 
             hourly.precipitation[startIndex + 2]
         )
     );
-    
-    // 降水量表示設定の判定 (大文字・小文字の "false" や boolean の false を安全に除外して判定)
+
+    // 【デバッグログ追加】受領した値と型を出力
+    console.log(`DEBUG [SW] formatThreeHourLine - 受け取った showPrecipitation:`, showPrecipitation, `(型: ${typeof showPrecipitation})`);
+
+    // 降水量表示設定の判定 (false または "false" の場合は非表示にし、表示時は "〇mm " を出力)
     const normalizedPrecip = typeof showPrecipitation === 'string' ? showPrecipitation.toLowerCase() : showPrecipitation;
-    const precipStr = (normalizedPrecip !== false && normalizedPrecip !== "false") ? `${maxPrecip}mm ` : "";
+    const isShow = (normalizedPrecip !== false && normalizedPrecip !== "false" && normalizedPrecip !== 0);
+    
+    // 【デバッグログ追加】判定結果を出力
+    console.log(`DEBUG [SW] 降水量表示フラグの判定結果(isShow):`, isShow);
+
+    const precipStr = isShow ? `${maxPrecip}mm ` : "";
 
     // ③ 風向（1つ目の時間帯）と風速推移（1つ目 → 3つ目）の計算
     const windDirStr = getWindDirectionStr(hourly.wind_direction_10m[startIndex], lang);
@@ -349,6 +357,16 @@ function formatThreeHourLine(hourly, startIndex, lang, unit, showPrecipitation) 
  * @returns {string} 通知のbodyに設定する最終文字列
  * */
 function buildNotificationBody(weatherData, lang, unit, showPrecipitation) {
+    // 【デバッグログ追加】受け取った引数およびオブジェクト内のキー構造を詳細に出力
+    console.log("=== DEBUG [SW] buildNotificationBody 開始 ===");
+    console.log("DEBUG [SW] 1. 第一引数(weatherData)の有無:", !!weatherData);
+    console.log("DEBUG [SW] 2. 第四引数(showPrecipitation):", showPrecipitation, `(型: ${typeof showPrecipitation})`);
+    if (weatherData) {
+        console.log("DEBUG [SW] 3. weatherData のプロパティ一覧:", Object.keys(weatherData));
+        console.log("DEBUG [SW] 4. weatherData.showPrecipitation:", weatherData.showPrecipitation, `(型: ${typeof weatherData.showPrecipitation})`);
+        console.log("DEBUG [SW] 5. weatherData.ShowPrecipitation:", weatherData.ShowPrecipitation, `(型: ${typeof weatherData.ShowPrecipitation})`);
+    }
+
     const hourly = weatherData.hourly;
     if (!hourly) {
         console.warn("DEBUG [SW]: hourlyデータが存在しません。");
@@ -359,6 +377,8 @@ function buildNotificationBody(weatherData, lang, unit, showPrecipitation) {
     const showPrecip = showPrecipitation !== undefined 
         ? showPrecipitation 
         : (weatherData.showPrecipitation !== undefined ? weatherData.showPrecipitation : weatherData.ShowPrecipitation);
+
+    console.log("DEBUG [SW] 6. 最終選択された showPrecip 評価値:", showPrecip, `(型: ${typeof showPrecip})`);
 
     // 現在時刻が属するインデックス（3の倍数）を特定
     let currentIndex = findCurrentTimeIndex(hourly.time);
