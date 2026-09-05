@@ -77,6 +77,8 @@ async function displayNotification(event) {
       if (data.hourly) {
         const lang = data.lang || 'ja'; // サーバーペイロードから言語を取得（なければ 'ja'）
         const unit = data.unit || 'ms'; // サーバーペイロードから単位を取得（なければ 'ms'）
+        // サーバーペイロードから降水量表示設定を取得
+        const showPrecipitation = data.showPrecipitation !== undefined ? data.showPrecipitation : data.ShowPrecipitation;
 
         // 【追加】起点となるインデックスの時刻から日付・曜日を取得してタイトルに付与
         if (data.hourly.time) {
@@ -91,7 +93,7 @@ async function displayNotification(event) {
           }
         }
 
-        const summaryBody = buildNotificationBody(data, lang, unit);
+        const summaryBody = buildNotificationBody(data, lang, unit, showPrecipitation);
         if (summaryBody) {
           options.body = summaryBody;
         }
@@ -290,9 +292,10 @@ function convertAndFloorWindSpeed(speedMs, unit) {
  * @param {number} startIndex - 3時間ブロックの開始インデックス
  * @param {string} lang - 言語コード ('ja' または 'en')
  * @param {string} unit - 風速単位 ('ms' または 'kn')
+ * @param {boolean|string} [showPrecipitation=true] - 降水量表示設定 (true/false)
  * @returns {string} 整形された1行のテキスト
  * */
-function formatThreeHourLine(hourly, startIndex, lang, unit) {
+function formatThreeHourLine(hourly, startIndex, lang, unit, showPrecipitation) {
     const dict = I18N_DICT[lang] || I18N_DICT["ja"];
     const unitStr = unit === "kn" ? "kn" : "m/s";
     // 時刻の取得 (インデックスの最初の時刻を基準にする)
@@ -323,13 +326,16 @@ function formatThreeHourLine(hourly, startIndex, lang, unit) {
             hourly.precipitation[startIndex + 2]
         )
     );
+    // 降水量表示設定の判定 (false または "false" の場合は非表示にし、表示時は "〇mm " を出力)
+    const precipStr = (showPrecipitation !== false && showPrecipitation !== "false") ? `${maxPrecip}mm ` : "";
+
     // ③ 風向（1つ目の時間帯）と風速推移（1つ目 → 3つ目）の計算
     const windDirStr = getWindDirectionStr(hourly.wind_direction_10m[startIndex], lang);
     const windSpeedStart = convertAndFloorWindSpeed(hourly.wind_speed_10m[startIndex], unit);
     const windSpeedEnd = convertAndFloorWindSpeed(hourly.wind_speed_10m[startIndex + 2], unit);
 
     // 1行のテキストへ結合（末尾の区切りコロンをスペースに変更し、ご指定通りの「00:00- 」の間隔を厳密に維持）
-    return `${timeRange} ${emojis} ${maxPrecip}mm ${windDirStr} ${windSpeedStart} → ${windSpeedEnd}${unitStr}`;
+    return `${timeRange} ${emojis} ${precipStr}${windDirStr} ${windSpeedStart} → ${windSpeedEnd}${unitStr}`;
 }
 
 /**
@@ -337,14 +343,20 @@ function formatThreeHourLine(hourly, startIndex, lang, unit) {
  * @param {Object} weatherData - サーバーから受信したAPIデータオブジェクト
  * @param {string} lang - ユーザーの言語設定 ('ja' / 'en')
  * @param {string} unit - ユーザーの単位設定 ('ms' / 'kn')
+ * @param {boolean|string} [showPrecipitation=true] - 降水量表示設定 (true/false)
  * @returns {string} 通知のbodyに設定する最終文字列
  * */
-function buildNotificationBody(weatherData, lang, unit) {
+function buildNotificationBody(weatherData, lang, unit, showPrecipitation) {
     const hourly = weatherData.hourly;
     if (!hourly) {
         console.warn("DEBUG [SW]: hourlyデータが存在しません。");
         return "";
     }
+
+    // 引数またはweatherDataオブジェクト内からの降水量表示設定の取得
+    const showPrecip = showPrecipitation !== undefined 
+        ? showPrecipitation 
+        : (weatherData.showPrecipitation !== undefined ? weatherData.showPrecipitation : weatherData.ShowPrecipitation);
 
     // 現在時刻が属するインデックス（3の倍数）を特定
     let currentIndex = findCurrentTimeIndex(hourly.time);
@@ -354,7 +366,7 @@ function buildNotificationBody(weatherData, lang, unit) {
     for (let i = 0; i < 4; i++) {
         // 2日分のデータ（インデックス47まで）を超えないよう安全マージンを設定
         if (currentIndex + 2 < hourly.time.length) {
-            const line = formatThreeHourLine(hourly, currentIndex, lang, unit);
+            const line = formatThreeHourLine(hourly, currentIndex, lang, unit, showPrecip);
             lines.push(line);
         } else {
             // 【修正】配列上限を超えた（または超えるリスクがある）場合は安全にループを終了させる

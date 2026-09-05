@@ -14,6 +14,7 @@ const defaultViewConfig = {
     tooltipVisibility: 'hide',     // ツールチップ表示設定 ('show' or 'hide')
     graphValuesVisibility: 'show', // グラフ内数値表示設定 ('show' or 'hide')
     welcomeBarVisibility: 'show',  // 【追加】ウェルカムバー表示設定 ('show' or 'hide')
+    showPrecipitation: true,       // 【追加】降水量表示トグル設定 (初期値: true = ON)
     // ----------------------------------------------------------
 
     // --- 風速色付け閾値（初期値） ---
@@ -94,6 +95,7 @@ const i18n = {
             notificationModalTitle: "毎日の通知設定",
             notificationSelectSpot: "通知する場所：",
             notificationSelectTime: "通知時刻：",
+            notificationShowPrecipitation: "降水量表示",
             notificationSaveBtn: "設定を保存",
             notificationNoSpots: "登録地点がありません",
             notificationSavedMsg: "保存しました",
@@ -298,6 +300,7 @@ const i18n = {
             notificationModalTitle: "Daily Notification",
             notificationSelectSpot: "Notification Location:",
             notificationSelectTime: "Notification Time:",
+            notificationShowPrecipitation: "Show Precipitation",
             notificationSaveBtn: "Save Settings",
             notificationNoSpots: "No spots registered",
             notificationSavedMsg: "Saved successfully",
@@ -5065,9 +5068,6 @@ window.addEventListener('DOMContentLoaded', initPwaInstall);
 // 追加サブルーチン: 通知設定モーダルUI of データ処理・保存 ＆ 通知予約ロジック
 // ======================================================================================
 
-// タイマーの重複登録を確実に防止するためのグローバルなタイマーID管理変数
-let notificationTimeoutId = null;
-
 
 /**
  * 通知設定モーダルを閉じる
@@ -5081,103 +5081,6 @@ function closeNotificationModal() {
         const msgEl = document.getElementById('notification-save-status');
         if (msgEl) msgEl.textContent = '';
     }
-}
-
-/**
- * 【通知予約コアロジック】
- * 保存された個別の緯度経度・時刻を元に、指定された時刻に既存の関数を走らせるタイマーを設定する
- */
-async function setupUserConfiguredNotificationTimer() {
-    // 既存のタイマーがすでに走っている場合は、二重発火を防ぐため一度完全にクリアする（安全ガード）
-    if (notificationTimeoutId !== null) {
-        clearTimeout(notificationTimeoutId);
-        notificationTimeoutId = null;
-    }
-
-    // 1. 通知許可および必須設定値の存在チェック
-    if (!('Notification' in window) || Notification.permission !== 'granted') {
-        return;
-    }
-
-    const savedTime = localStorage.getItem('notification_time'); // 例: "06:00"
-    const rawLat = localStorage.getItem('notification_lat');     // 例: "34.61439"
-    const rawLon = localStorage.getItem('notification_lon');     // 例: "138.2342"
-    const label = localStorage.getItem('notification_label');    // 例: "御前崎港"
-
-    // 設定値が一つでも欠けている場合はタイマーを設定しない
-    if (!savedTime || !rawLat || !rawLon || !label) {
-        console.log('[通知予約] 通知条件が未設定のため、タイマー予約をスキップしました。');
-        return;
-    }
-
-    // .toFixed()のエラーを防ぐため、確実に数値型に変換する
-    const lat = parseFloat(rawLat);
-    const lon = parseFloat(rawLon);
-
-    const [targetHour, targetMinute] = savedTime.split(':').map(Number);
-
-    // 2. 次回の発火時刻（指定時刻）のミリ秒計算
-    const now = new Date();
-    const nextNotification = new Date();
-    nextNotification.setHours(targetHour, targetMinute, 0, 0);
-
-    // すでに当日の指定時間を過ぎている場合は翌日の同時刻にセット
-    if (now >= nextNotification) {
-        nextNotification.setDate(nextNotification.getDate() + 1);
-    }
-
-    const delay = nextNotification.getTime() - now.getTime();
-    console.log(`[通知予約] 次回の概況通知 [${label}] は ${nextNotification.toLocaleString()} にセットされました。`);
-
-    // 3. 指定時間まで待機するタイマーをセット
-    notificationTimeoutId = setTimeout(async () => {
-        let notificationData = null;
-
-        try {
-            // 数値型に変換した lat, lon を安全に引き渡す（4時間キャッシュルールがそのまま適用される）
-            notificationData = await fetchWithCache(lat, lon);
-        } catch (error) {
-            console.error('[通知処理] 最新データの取得に失敗しました。キャッシュの検索を試みます。', error);
-        }
-
-        // オフライン時や通信エラー時のバックアップ処理
-        if (!notificationData) {
-            // 既存の規則性である weather_cache_緯度_経度 キーから直接キャッシュを復元
-            const cacheKey = `weather_cache_${lat}_${lon}`;
-            const localCacheStr = localStorage.getItem(cacheKey);
-            if (localCacheStr) {
-                notificationData = JSON.parse(localCacheStr);
-                console.log('[通知処理] 最新フェッチ失敗のため、ローカルキャッシュデータを使用します。');
-            }
-        }
-
-        // データが正常に取得またはキャッシュから復元できた場合のみ、文章を生成して通知を発火
-        if (notificationData && notificationData.data) {
-            try {
-                // 指定時刻（朝6:00など）にまさにこの関数が実行されるため、
-                // 既存の generateWeatherSummary 内の現在時刻特定ロジックが走り、
-                // 自動的にその時刻を起点とした24時間の文章が100%正しく生成されます。
-                const morningSummaryText = generateWeatherSummary(notificationData.data, label);
-
-                // サービスワーカーへ、生成されたテキストを送信して通知を表示
-                if (navigator.serviceWorker.controller) {
-                    navigator.serviceWorker.controller.postMessage({
-                        type: 'SHOW_LOCAL_NOTIFICATION',
-                        title: `${label}の気象概況`,
-                        body: morningSummaryText,
-                        url: window.location.origin + '/index.html'
-                    });
-                }
-            } catch (summaryError) {
-                console.error('[通知処理] 概況文章の生成または送信に失敗しました:', summaryError);
-            }
-        } else {
-            console.log('[通知処理] 最新データおよびキャッシュデータがどちらも存在しないため、通知を断念しました。');
-        }
-
-        // 4. 通知発火完了後、次の日（24時間後）のタイマーを再帰的に再設定
-        setupUserConfiguredNotificationTimer();
-    }, delay);
 }
 
 // ======================================================================================
@@ -5210,15 +5113,12 @@ document.addEventListener('DOMContentLoaded', () => {
             saveNotificationSettingsFromModal();
         });
     }
-
-    // アプリ起動時に前回の設定が生きていれば、自動的にバックグラウンド待機タイマーを開始する
-    setupUserConfiguredNotificationTimer();
 });
 
 /**
  * サブルーチン：通知設定モーダルを汎用ダイアログとして一本化して表示（方法A：静的定義版）
  * 修正内容：提供された本物のHTML構造に3枠全ての入力要素を静的に追加配置した状態に適合させ、
- *           動的生成処理をすべて排したクリーンな設計のもと、保存値の復元・保存・タイムピッカー連動を行います。
+ *            動的生成処理をすべて排したクリーンな設計のもと、保存値の復元・保存・タイムピッカー連動を行います。
  */
 function openNotificationModalGeneral() {
     // --- 既存 of openModalFromSidebar の安全設計に準拠（戻るボタン暴発防止） ---
@@ -5252,6 +5152,9 @@ function openNotificationModalGeneral() {
     const btnClearTime2 = document.getElementById('btn-clear-time2');
     const btnClearTime3 = document.getElementById('btn-clear-time3');
     
+    // 追加：降水量表示トグル要素を取得
+    const togglePrecipitation = document.getElementById('input-show-precipitation');
+
     const errorArea = document.getElementById('notification-error-area');
     // HTML側の専用ボタンを取得
     const btnCancel = document.getElementById('notification-btn-close');
@@ -5317,6 +5220,11 @@ function openNotificationModalGeneral() {
         inputTime1.value = "07:00";
         if (inputTime2) inputTime2.value = "";
         if (inputTime3) inputTime3.value = "";
+    }
+
+    // 降水量表示トグルの状態を復元（viewConfigの設定値を反映）
+    if (togglePrecipitation) {
+        togglePrecipitation.checked = (typeof viewConfig.showPrecipitation !== 'undefined') ? viewConfig.showPrecipitation : true;
     }
 
     // 各静的インプット要素にタップ時の独自アナログ時計起動イベントを紐付け
@@ -5470,6 +5378,13 @@ async function executeNotificationSaveLogic(spotValue, timeValue, errorAreaEleme
     localStorage.setItem('notification_label', label);
     localStorage.setItem('notification_time', time); // カンマ区切り文字列としてそのままローカルに保存されます（空の場合は空文字になります）
 
+    // 降水量表示トグルの値を取得して viewConfig および localStorage に更新保存
+    const togglePrecipitation = document.getElementById('input-show-precipitation');
+    const showPrecipitation = togglePrecipitation ? togglePrecipitation.checked : true;
+    
+    viewConfig.showPrecipitation = showPrecipitation;
+    localStorage.setItem('pin_weather_view_config', JSON.stringify(viewConfig));
+
     // 3. ServiceWorkerを用いたWeb Push購読とGASサーバーへの非同期通信
     if ('serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted') {
         try {
@@ -5482,8 +5397,8 @@ async function executeNotificationSaveLogic(spotValue, timeValue, errorAreaEleme
             const lang = viewConfig.language || "ja";
             const unit = viewConfig.windSpeedUnit || "ms";
             
-            // サーバー通信実行（空文字、またはカンマ区切りデータが time パラメータとしてそのままGASに引き渡されます）
-            await saveSubscriptionToSpreadsheet(userId, subscription, timeZone, lat, lon, label, time, lang, unit);
+            // サーバー通信実行（showPrecipitation を追加パラメータとしてGASに引き渡します）
+            await saveSubscriptionToSpreadsheet(userId, subscription, timeZone, lat, lon, label, time, lang, unit, showPrecipitation);
             console.log("[Web Push] GASへの保存が正常に完了しました。");
 
         } catch (pushErr) {
@@ -5497,10 +5412,7 @@ async function executeNotificationSaveLogic(spotValue, timeValue, errorAreaEleme
         }
     }
 
-    console.log(`[設定保存完了] 場所: ${label}, 時刻: ${time}`);
-    if (typeof setupUserConfiguredNotificationTimer === 'function') {
-        setupUserConfiguredNotificationTimer();
-    }
+    console.log(`[設定保存完了] 場所: ${label}, 時刻: ${time}, 降水量表示: ${showPrecipitation}`);
     
     return true; // 成功を返す（呼び出し元でモーダルを閉じる）
 }
@@ -5587,7 +5499,7 @@ async function subscribeUserToPush(registration, publicKey) {
 }
 
 /**
- * 取得した接続鍵、位置情報、通知時刻、タイムゾーン、および言語・単位設定をGAS経由でスプレッドシートに保存するサブルーチン
+ * 取得した接続鍵、位置情報、通知時刻、タイムゾーン、言語・単位設定および降水量表示設定をGAS経由でスプレッドシートに保存するサブルーチン
  * @param {string} userId 
  * @param {PushSubscription} subscription 
  * @param {string} timeZone 
@@ -5597,8 +5509,9 @@ async function subscribeUserToPush(registration, publicKey) {
  * @param {string} time
  * @param {string} lang
  * @param {string} unit
+ * @param {boolean} showPrecipitation
  */
-async function saveSubscriptionToSpreadsheet(userId, subscription, timeZone, lat, lon, label, time, lang, unit) {
+async function saveSubscriptionToSpreadsheet(userId, subscription, timeZone, lat, lon, label, time, lang, unit, showPrecipitation) {
     // server.jsに記述されているご自身のGASウェブアプリのURL
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzWvf34Bhc5qEjROo69GvMeJvtW3k7_jVbTSwrkWjOFalr-yWxqlNuvKLNNWCnDZMoLgw/exec";
 
@@ -5612,15 +5525,13 @@ async function saveSubscriptionToSpreadsheet(userId, subscription, timeZone, lat
         lon: lon,
         label: label,
         time: time,
-        lang: lang, // 追加：現在の言語設定 ('ja' / 'en')
-        unit: unit  // 追加：現在の風速単位設定 ('ms' / 'kn')
+        lang: lang,             // 言語設定 ('ja' / 'en')
+        unit: unit,             // 風速単位設定 ('ms' / 'kn')
+        showPrecipitation: showPrecipitation // 追加：降水量表示フラグ (true / false)
     };
 
     console.log("GASへデータを送信中...");
 
-    // 【重要修正】mode: "no-cors" を削除（デフォルトの "cors" に変更）します。
-    // Content-Type: "text/plain" の指定によって、ブラウザのプレフライト(OPTIONS)制限を発生させずに通過させ、
-    // かつ "cors" モードにすることで、GAS特有のリダイレクトをブラウザが正しく追跡してデータを確実に届けます。
     const response = await fetch(GAS_URL, {
         method: "POST",
         headers: {
@@ -5635,7 +5546,6 @@ async function saveSubscriptionToSpreadsheet(userId, subscription, timeZone, lat
 
 /**
  * VAPIDのPublic Key文字列をブラウザ用のUint8Arrayに変換する補助サブルーチン
- * （Web Pushの実装において世界標準的に使われる定型コードです）
  * @param {string} base64String 
  * @returns {Uint8Array}
  */
