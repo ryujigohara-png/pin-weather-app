@@ -9,8 +9,8 @@ const defaultViewConfig = {
     windSpeedUnit: 'ms',        // 風速単位
     
     // --- 新設：表示フラグの既定値（デフォルトに戻すボタンとも連動） ---
-    themeMode: 'dark',             // テーマモード ('light' or 'dark')
-    displayMode: 'text',           // 【追加】初期表示モード ('text' or 'graph')
+    themeMode: 'system',           // テーマモード ('system' or 'light' or 'dark')
+    displayMode: 'graph',          // 【追加】初期表示モード ('text' or 'graph')
     tooltipVisibility: 'hide',     // ツールチップ表示設定 ('show' or 'hide')
     graphValuesVisibility: 'show', // グラフ内数値表示設定 ('show' or 'hide')
     welcomeBarVisibility: 'show',  // 【追加】ウェルカムバー表示設定 ('show' or 'hide')
