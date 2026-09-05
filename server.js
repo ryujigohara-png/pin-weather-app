@@ -51,8 +51,17 @@ async function processUserNotification(user) {
     const lang = user.Lang || "ja";   // スプレッドシートに追加された言語設定（未設定時は'ja'）
     const unit = user.Unit || "ms";   // スプレッドシートに追加された単位設定（未設定時は'ms'）
     
-    // スプレッドシートに追加された降水量表示設定を取得し、文字列 "FALSE" や "false" を確実に boolean (true/false) へ正規化
-    const rawPrecip = user.ShowPrecipitation !== undefined ? user.ShowPrecipitation : user.showPrecipitation;
+    // 【詳細デバッグ出力】スプレッドシートから届いた生のプロパティ・型を全てログ出力
+    console.log(`\n==================================================`);
+    console.log(`[DEBUG server.js] ユーザーID: ${userId}`);
+    console.log(` -> 存在プロパティ一覧:`, Object.keys(user));
+    console.log(` -> 生 ShowPrecipitation:`, JSON.stringify(user.ShowPrecipitation), `(型: ${typeof user.ShowPrecipitation})`);
+    console.log(` -> 生 showPrecipitation:`, JSON.stringify(user.showPrecipitation), `(型: ${typeof user.showPrecipitation})`);
+
+    // スプレッドシートに追加された降水量表示設定を取得（未設定時は true とみなす）
+    const rawPrecip = user.ShowPrecipitation !== undefined ? user.ShowPrecipitation : (user.showPrecipitation !== undefined ? user.showPrecipitation : true);
+    
+    // 文字列 "FALSE" / "false" や 0 を考慮した安全な boolean 変換
     let showPrecipitation = true;
     if (rawPrecip !== undefined && rawPrecip !== null) {
         if (typeof rawPrecip === 'boolean') {
@@ -66,7 +75,10 @@ async function processUserNotification(user) {
             showPrecipitation = rawPrecip !== 0;
         }
     }
-    
+
+    console.log(` -> 変換後の送信用 showPrecipitation 判定値:`, showPrecipitation, `(型: ${typeof showPrecipitation})`);
+    console.log(`==================================================`);
+
     // ユーザーのタイムゾーンに基づいた「現在の現地時刻」を取得 (HH:mm)
     const localCurrentTime = getUserCurrentTime(user.TimeZone);
     
@@ -204,9 +216,8 @@ async function sendWebPushNotification(subscriptionStr, weatherData, userId, lat
     try {
         // スプレッドシートに保存されている文字列をJSONオブジェクトに復元します
         const subscription = JSON.parse(subscriptionStr);
-        // プッシュ通知のペイロード（データ中身）を作成します
-        // タイトルはスマホ側（Service Worker）で固定記述するため、ここでは含めず純粋なデータのみをパッキングします
-        const payload = JSON.stringify({
+        
+        const payloadObj = {
             hourly: weatherData.hourly,
             lat: lat,
             lon: lon,
@@ -214,9 +225,12 @@ async function sendWebPushNotification(subscriptionStr, weatherData, userId, lat
             lang: lang,
             unit: unit,
             showPrecipitation: showPrecipitation
-        });
+        };
+        const payload = JSON.stringify(payloadObj);
 
-        console.log(`   -> ユーザー: ${userId} へ Web Push 通知を送信中... (showPrecipitation: ${showPrecipitation})`);
+        console.log(`   [DEBUG payload] 実際に送信される全Payloadデータ:`, payload);
+        console.log(`   -> ユーザー: ${userId} へ Web Push 通知を送信中...`);
+        
         // 実際に通知を送信
         await webpush.sendNotification(subscription, payload);
         
