@@ -326,8 +326,10 @@ function formatThreeHourLine(hourly, startIndex, lang, unit, showPrecipitation) 
             hourly.precipitation[startIndex + 2]
         )
     );
-    // 降水量表示設定の判定 (false または "false" の場合は非表示にし、表示時は "〇mm " を出力)
-    const precipStr = (showPrecipitation !== false && showPrecipitation !== "false") ? `${maxPrecip}mm ` : "";
+    
+    // 降水量表示設定の判定 (大文字・小文字の "false" や boolean の false を安全に除外して判定)
+    const normalizedPrecip = typeof showPrecipitation === 'string' ? showPrecipitation.toLowerCase() : showPrecipitation;
+    const precipStr = (normalizedPrecip !== false && normalizedPrecip !== "false") ? `${maxPrecip}mm ` : "";
 
     // ③ 風向（1つ目の時間帯）と風速推移（1つ目 → 3つ目）の計算
     const windDirStr = getWindDirectionStr(hourly.wind_direction_10m[startIndex], lang);
