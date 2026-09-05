@@ -51,11 +51,39 @@ async function processUserNotification(user) {
     const lang = user.Lang || "ja";   // スプレッドシートに追加された言語設定（未設定時は'ja'）
     const unit = user.Unit || "ms";   // スプレッドシートに追加された単位設定（未設定時は'ms'）
     
+    // 【詳細デバッグ出力】スプレッドシートから届いた生のプロパティ・型を全てログ出力
+    console.log(`\n==================================================`);
+    console.log(`[DEBUG server.js] ユーザーID: ${userId}`);
+    console.log(` -> 存在プロパティ一覧:`, Object.keys(user));
+    console.log(` -> 生 ShowPrecipitation:`, JSON.stringify(user.ShowPrecipitation), `(型: ${typeof user.ShowPrecipitation})`);
+    console.log(` -> 生 showPrecipitation:`, JSON.stringify(user.showPrecipitation), `(型: ${typeof user.showPrecipitation})`);
+
+    // スプレッドシートに追加された降水量表示設定を取得（未設定時は true とみなす）
+    const rawPrecip = user.ShowPrecipitation !== undefined ? user.ShowPrecipitation : (user.showPrecipitation !== undefined ? user.showPrecipitation : true);
+    
+    // 文字列 "FALSE" / "false" や 0 を考慮した安全な boolean 変換
+    let showPrecipitation = true;
+    if (rawPrecip !== undefined && rawPrecip !== null) {
+        if (typeof rawPrecip === 'boolean') {
+            showPrecipitation = rawPrecip;
+        } else if (typeof rawPrecip === 'string') {
+            const lower = rawPrecip.trim().toLowerCase();
+            if (lower === 'false' || lower === '0' || lower === '') {
+                showPrecipitation = false;
+            }
+        } else if (typeof rawPrecip === 'number') {
+            showPrecipitation = rawPrecip !== 0;
+        }
+    }
+
+    console.log(` -> 変換後の送信用 showPrecipitation 判定値:`, showPrecipitation, `(型: ${typeof showPrecipitation})`);
+    console.log(`==================================================`);
+
     // ユーザーのタイムゾーンに基づいた「現在の現地時刻」を取得 (HH:mm)
     const localCurrentTime = getUserCurrentTime(user.TimeZone);
     
     console.log(`\n[ユーザー: ${userId} (${label}) (${lat}) (${lon})]`);
-    console.log(`  設定時刻: ${user.NotificationTime} / 現在の現地時刻: ${localCurrentTime}`);
+    console.log(`   設定時刻: ${user.NotificationTime} / 現在の現地時刻: ${localCurrentTime}`);
     
     // 【方法A拡張】カンマ区切りで格納された複数の設定時刻に対応します
     const notificationTimesStr = user.NotificationTime || "";
@@ -65,16 +93,16 @@ async function processUserNotification(user) {
     for (const targetTime of targetTimes) {
         if (isTimeInWindow(targetTime, localCurrentTime, 5)) {
             isNotifyTime = true;
-            console.log(`  -> 設定時刻 [${targetTime}] が現在の時間枠（5分以内）に一致しました。`);
+            console.log(`   -> 設定時刻 [${targetTime}] が現在の時間枠（5分以内）に一致しました。`);
             break;
         }
     }
     
     // 時刻が一致しているか判定（5分おきの定期実行に対応するため、5分以内の時間枠に入っているか判定）
     if (isNotifyTime) {
-        console.log("  -> ★通知対象の時間です。天気データを取得します。");
+        console.log("   -> ★通知対象の時間です。天気データを取得します。");
         if (!user.Lat || !user.Lon) {
-            console.log("  [スキップ] 緯度または経度が設定されていません。");
+            console.log("   [スキップ] 緯度または経度が設定されていません。");
             return;
         }
         
@@ -83,12 +111,12 @@ async function processUserNotification(user) {
             const weatherData = await fetchWeatherData(user.Lat, user.Lon);
             // 4. 該当ユーザーの端末へ、気象データとユーザー設定をパッキングしてWeb Push通知を実際に送信する
             //（※テキスト生成処理はService Worker側へ完全移譲されたため、weatherDataをそのまま渡します）
-            await sendWebPushNotification(user.Subscription, weatherData, userId, user.Lat, user.Lon, user.Label, lang, unit);
+            await sendWebPushNotification(user.Subscription, weatherData, userId, user.Lat, user.Lon, user.Label, lang, unit, showPrecipitation);
         } catch (err) {
-            console.error(`  [エラー] 天気データ取得・生成中に失敗しました:`, err.message);
+            console.error(`   [エラー] 天気データ取得・生成中に失敗しました:`, err.message);
         }
     } else {
-        console.log("  -> 時間外のため通知処理をスキップします。");
+        console.log("   -> 時間外のため通知処理をスキップします。");
     }
 }
 
@@ -177,37 +205,41 @@ async function fetchWeatherData(lat, lon) {
  * @param {string} place - 地点名（ラベル）
  * @param {string} lang - 言語設定 ('ja' / 'en')
  * @param {string} unit - 風速単位設定 ('ms' / 'kn')
+ * @param {boolean|string} showPrecipitation - 降水量表示設定 (true / false)
  */
-async function sendWebPushNotification(subscriptionStr, weatherData, userId, lat, lon, place, lang, unit) {
+async function sendWebPushNotification(subscriptionStr, weatherData, userId, lat, lon, place, lang, unit, showPrecipitation) {
     if (!subscriptionStr || subscriptionStr.trim() === "") {
-        console.log(`  [通知スキップ] ユーザー: ${userId} の Subscription 情報が空欄です。`);
+        console.log(`   [通知スキップ] ユーザー: ${userId} の Subscription 情報が空欄です。`);
         return;
     }
 
     try {
         // スプレッドシートに保存されている文字列をJSONオブジェクトに復元します
         const subscription = JSON.parse(subscriptionStr);
-        // プッシュ通知のペイロード（データ中身）を作成します
-        // タイトルはスマホ側（Service Worker）で固定記述するため、ここでは含めず純粋なデータのみをパッキングします
-        const payload = JSON.stringify({
+        
+        const payloadObj = {
             hourly: weatherData.hourly,
             lat: lat,
             lon: lon,
             place: place,
             lang: lang,
-            unit: unit
-        });
+            unit: unit,
+            showPrecipitation: showPrecipitation
+        };
+        const payload = JSON.stringify(payloadObj);
 
-        console.log(`  -> ユーザー: ${userId} へ Web Push 通知を送信中...`);
+        console.log(`   [DEBUG payload] 実際に送信される全Payloadデータ:`, payload);
+        console.log(`   -> ユーザー: ${userId} へ Web Push 通知を送信中...`);
+        
         // 実際に通知を送信
         await webpush.sendNotification(subscription, payload);
         
-        console.log(`  -> 正常に通知を配信しました。`);
+        console.log(`   -> 正常に通知を配信しました。`);
     } catch (error) {
-        console.error(`  [通知エラー] ユーザー: ${userId} への送信に失敗しました:`, error.message);
+        console.error(`   [通知エラー] ユーザー: ${userId} への送信に失敗しました:`, error.message);
         // もし「410 Gone」のエラーが返ってきた場合、ユーザーがブラウザで通知を拒否したか、期限切れの古い情報であることを示します
         if (error.statusCode === 410) {
-            console.log("  (提示): このSubscriptionは無効化されているため、スプレッドシートから削除することを推奨します。");
+            console.log("   (提示): このSubscriptionは無効化されているため、スプレッドシートから削除することを推奨します。");
         }
     }
 }
