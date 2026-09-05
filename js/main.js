@@ -2222,13 +2222,15 @@ function showShareNotification(status, label) {
             // ダイアログの仕様に合わせ、title属性に直接メッセージを集約
             showAppDialog({
                 title: `${label} をMySpotsに追加しました`,
-                messageKey: 'shareSuccess' // 翻訳ファイルの将来的な拡張用
+                messageKey: 'shareSuccess', // 翻訳ファイルの将来的な拡張用
+                onOk: () => {}
             });
         } else if (status === 'limit') {
             // 既存の上限エラーダイアログの挙動と仕様を完全踏襲
             showAppDialog({
                 title: i18n.t('limitReachedTitle') || "Limit",
-                messageKey: 'limitReached'
+                messageKey: 'limitReached',
+                onOk: () => {}
             });
         } else if (status === 'exists') {
             // 重複時は何もしつけず、サイレントで処理（ログのみ記録）
@@ -2880,6 +2882,9 @@ async function updateLocation(lat, lon, label) {
     try {
         // 実際の描画処理
         await draw(); 
+        
+        // 地点更新に伴い、サイドバーのQRコードを最新のURLで再生成
+        generateSidebarQRCode();
     } catch (err) {
         console.error(`描画エラー [${label}]:`, err);
     } finally {
