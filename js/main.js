@@ -3,8 +3,8 @@ let allData = {};
 
 // 2. 詳細設定の初期値
 const defaultViewConfig = {
-    forecastDays: 7,           // 予報日数（最大16日）
-    tooltipDuration: 3,         // ツールチップ表示時間（s）
+    forecastDays: 16,           // 予報日数（最大16日）
+    tooltipDuration: 5,         // ツールチップ表示時間（s）
     temperatureUnit: 'celsius', // 気温単位
     windSpeedUnit: 'ms',        // 風速単位
     
