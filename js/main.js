@@ -384,7 +384,7 @@ const i18n = {
             btnOK: "OK",
 
             // --- Axes, Legends, etc. ---
-            yAxisWeather: `Weather<br><span style="color: #388ef8;">Precip(mm)</span>`,
+            yAxisWeather: `Weather<br><span style="color: #0000FF;">Precip(mm)</span>`,
             yAxisWind: `Wind Dir<br><span style="color: #ff4500;">Max Gust</span><br>Speed<br>(${viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph'})`,
             yAxisTemp: `<span style="color: #ff4500;">Temp(${viewConfig.temperatureUnit === 'celsius' ? '°C' : '°F'})</span><br>` +
                        `<span style="color: #00ced1;">Sea(${viewConfig.temperatureUnit === 'celsius' ? '°C' : '°F'})</span>`,
