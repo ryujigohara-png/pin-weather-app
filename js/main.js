@@ -177,10 +177,12 @@ const i18n = {
             btnOK: "OK",
 
             // --- グラフ軸・凡例・その他 ---
-            yAxisWeather: "天気<br>降水(mm)",
-            yAxisWind: `風向<br>風速(${viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph'})`,
-            yAxisTemp: `気温(${viewConfig.temperatureUnit === 'celsius' ? '℃' : '℉'})<br>海水(${viewConfig.temperatureUnit === 'celsius' ? '℃' : '℉'})`,
-            yAxisMarine: "波高(m)<br>潮位(m)",
+            yAxisWeather: `天気<br><span style="color: #0000FF;">降水(mm)</span>`,
+            yAxisWind: `風向<br><span style="color: #ff4500;">最大瞬間</span><br>風速<br>(${viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph'})`,
+            yAxisTemp: `<span style="color: #ff4500;">気温(${viewConfig.temperatureUnit === 'celsius' ? '℃' : '℉'})</span><br>` +
+                       `<span style="color: #00ced1;">海水(${viewConfig.temperatureUnit === 'celsius' ? '℃' : '℉'})</span>`,
+            yAxisMarine: `<span style="color: #2ca02c;">波高(m)</span><br>` +
+                         `<span style="color: #1e90ff;">潮位(m)</span>`,
             legendWindTitle: "風向色付：",
             speedunit: viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph',
             disclaimer: "【免責事項】海上気象データは予測モデルに基づく「最寄りの海上地点」の数値であり、実際の局地的な地形や潮流による影響を反映しきれない場合があります。",
@@ -382,10 +384,12 @@ const i18n = {
             btnOK: "OK",
 
             // --- Axes, Legends, etc. ---
-            yAxisWeather: "Weather<br>Precip(mm)",
-            yAxisWind: `Wind Dir<br>Speed(${viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph'})`,
-            yAxisTemp: `Temp(${viewConfig.temperatureUnit === 'celsius' ? '°C' : '°F'})<br>Sea(${viewConfig.temperatureUnit === 'celsius' ? '°C' : '°F'})`,
-            yAxisMarine: "Wave(m)<br>Tide(m)",
+            yAxisWeather: `Weather<br><span style="color: #388ef8;">Precip(mm)</span>`,
+            yAxisWind: `Wind Dir<br><span style="color: #ff4500;">Max Gust</span><br>Speed<br>(${viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph'})`,
+            yAxisTemp: `<span style="color: #ff4500;">Temp(${viewConfig.temperatureUnit === 'celsius' ? '°C' : '°F'})</span><br>` +
+                       `<span style="color: #00ced1;">Sea(${viewConfig.temperatureUnit === 'celsius' ? '°C' : '°F'})</span>`,
+            yAxisMarine: `<span style="color: #2ca02c;">Wave(m)</span><br>` +
+                         `<span style="color: #1e90ff;">Tide(m)</span>`,
             legendWindTitle: "Wind Color:",
             speedunit: viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph',
             disclaimer: "[Disclaimer] Marine weather data is based on forecast models for the 'nearest sea point' and may not reflect local terrain or tidal effects.",
@@ -4342,19 +4346,29 @@ async function draw() {
         let subH = isWidget ? 80 : viewConfig.subHeight;
         let gMargin = viewConfig.graphMargin || 0;
 
-        // --- 3. y軸ラベルの動的更新（i18n辞書の固定値を使わない現在のUnit変数を使用） ---
+        // --- 3. y軸ラベルの動的更新 ---
         const titles = document.querySelectorAll('.y-axis-title');
         if (titles.length >= 4) {
             titles[0].innerHTML = i18n.t('yAxisWeather');
-            titles[1].innerHTML = `${baseWindIcon}${i18n.t('windDir')}<br>(${currentWUnit})`;
-            titles[2].innerHTML = `${i18n.t('temp')}(${currentTUnit})<br>`;
+            
+            // 風エリア：辞書側で定義した4行（風向 / 最大瞬間 / 風速 / 単位）をそのまま反映
+            titles[1].innerHTML = i18n.t('yAxisWind');
+            
+            titles[2].innerHTML = i18n.t('yAxisTemp');
             
             const waveData = allData.data.wave_height ? allData.data.wave_height.slice(startIdx) : [];
             const tideData = allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl.slice(startIdx) : [];
             const hasMarineData = waveData.some(v => v !== 0 && v !== null) || tideData.some(v => v !== 0 && v !== null);
             
-            let marineTitle = hasMarineData ? i18n.t('seawater') : `<span style="color:#FF0000; font-weight:bold; font-size:14px; display:block; margin-top:2px; background-color:transparent;">No Marine Data</span>`;
-            titles[2].innerHTML += marineTitle;
+            let marineTitle = hasMarineData 
+                ? i18n.t('yAxisMarine') 
+                : `<span style="color:#FF0000; font-weight:bold; font-size:14px; display:block; margin-top:2px; background-color:transparent;">No Marine Data</span>`;
+            
+            if (titles[3]) {
+                titles[3].innerHTML = marineTitle;
+            } else {
+                titles[2].innerHTML += `<br>` + marineTitle;
+            }
         }
 
         const labelFS = viewConfig.fontSize;
