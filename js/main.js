@@ -2897,10 +2897,12 @@ const weatherIcons = { 0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️", 45: "�
 function getWindDirText(deg) { return windDirs[Math.round(deg / 22.5) % 16]; }
 
 /**
- * サブルーチン：キャッシュ付きデータ取得
- * 効率的なキャッシュ管理とエラーハンドリングを両立
+ * サブルーチン：キャッシュ付きデータ取得（案1：通信障害時フォールバック＆AbortSignal対応版）
+ * @param {number} lat 緯度
+ * @param {number} lon 経度
+ * @param {AbortSignal} [signal=null] 通信中止用シグナル
  */
-async function fetchWithCache(lat, lon) {
+async function fetchWithCache(lat, lon, signal = null) {
     console.time("  => Sub: Cache Check/Read"); // 【計測】キャッシュ処理開始
     const cacheKey = `weather_cache_${lat.toFixed(3)}_${lon.toFixed(3)}`;
     const cached = localStorage.getItem(cacheKey);
@@ -2929,8 +2931,7 @@ async function fetchWithCache(lat, lon) {
                 console.timeEnd("  => Sub: Cache Check/Read"); // キャッシュヒットで終了
                 return { timestamp: parsed.timestamp, data: parsed.data };
             } else {
-                // 期限切れ、リロード、または設定（日数・単位）変更ならキャッシュを消去
-                localStorage.removeItem(cacheKey);
+                // 期限切れ、リロード、または設定（日数・単位）変更ならキャッシュを一旦スキップ（ただし障害時の最終フォールバック用には保持）
             }
         } catch (e) {
             localStorage.removeItem(cacheKey);
@@ -2948,13 +2949,13 @@ async function fetchWithCache(lat, lon) {
         const [wRes, mRes] = await Promise.all([
             (async () => {
                 console.time("    -> API 1: Weather Fetch"); // 【計測】気象API開始
-                const res = await fetch(wUrl).then(r => { if(!r.ok) throw new Error(); return r.json(); });
+                const res = await fetch(wUrl, { signal }).then(r => { if(!r.ok) throw new Error(); return r.json(); });
                 console.timeEnd("    -> API 1: Weather Fetch"); // 【計測】気象API終了
                 return res;
             })(),
             (async () => {
                 console.time("    -> API 2: Marine Fetch"); // 【計測】海洋API開始
-                const res = await fetch(mUrl).then(r => { if(!r.ok) throw new Error(); return r.json(); });
+                const res = await fetch(mUrl, { signal }).then(r => { if(!r.ok) throw new Error(); return r.json(); });
                 console.timeEnd("    -> API 2: Marine Fetch"); // 【計測】海洋API終了
                 return res;
             })()
@@ -2979,13 +2980,19 @@ async function fetchWithCache(lat, lon) {
 
     } catch (error) {
         console.timeEnd("  => Sub: Total API Fetch Time");
-        console.error("API取得失敗:", error);
-        if (cached) {
+        console.error("API取得失敗またはキャンセル:", error);
+        
+        // 【案1の核心】：通信障害・エラー・キャンセル発生時は、既存のキャッシュ（古くても）を強制返却してグラフを維持する
+        const rawCached = localStorage.getItem(cacheKey);
+        if (rawCached) {
             try {
-                const parsed = JSON.parse(cached);
-                return { timestamp: parsed.timestamp, data: parsed.data };
+                const parsed = JSON.parse(rawCached);
+                if (parsed && parsed.data) {
+                    console.warn("通信障害または中断を検知しました。既存のキャッシュデータをフォールバックとして表示します。");
+                    return { timestamp: parsed.timestamp || now, data: parsed.data };
+                }
             } catch (e) {
-                localStorage.removeItem(cacheKey);
+                // パース失敗時はスキップ
             }
         }
         throw error;
@@ -4207,13 +4214,38 @@ function initScrollHelper() {
 let tooltipTimer = null;
 
 /**
- * メインサブルーチン：描画処理
+ * メインサブルーチン：描画処理（案1：ロード中インジケーター ＆ AbortController連携版）
  */
 async function draw() {
     console.time("Total Draw Process"); // 【計測】全体開始
     
     // 描画の直前に、現在の地点に合わせた風向設定を読み込む
     syncWindFilterWithCurrentSpot();
+
+    // --- 【案1追加】通信中止用の AbortController を生成 ---
+    if (window.currentWeatherAbortController) {
+        window.currentWeatherAbortController.abort(); // 前回の通信が残っていればキャンセル
+    }
+    const abortController = new AbortController();
+    window.currentWeatherAbortController = abortController;
+
+    // --- 【案1追加】画面上部に「ロード中 ＆ 中止ボタン」を表示するインジケーター要素の生成/更新 ---
+    let loaderEl = document.getElementById('weather-loading-indicator');
+    if (!loaderEl) {
+        loaderEl = document.createElement('div');
+        loaderEl.id = 'weather-loading-indicator';
+        loaderEl.style.cssText = "position: fixed; top: 10px; right: 10px; z-index: 10000; background: rgba(0,0,0,0.8); color: #fff; padding: 6px 12px; border-radius: 4px; font-size: 12px; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);";
+        document.body.appendChild(loaderEl);
+    }
+    loaderEl.innerHTML = `<span>⏳ 気象データをロード中...</span><button id="cancel-fetch-btn" style="background: #ff4d4d; color: #fff; border: none; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-size: 11px;">中止</button>`;
+    loaderEl.style.display = 'flex';
+
+    document.getElementById('cancel-fetch-btn').onclick = () => {
+        abortController.abort(); // ユーザーによる手動キャンセル
+        loaderEl.style.display = 'none';
+        console.log("ユーザーによりAPI通信がキャンセルされました。キャッシュデータを表示します。");
+    };
+    // -------------------------------------------------------------
 
     try {
         if (typeof currentLat === 'undefined' || currentLat === null || typeof currentLon === 'undefined' || currentLon === null) {
@@ -4258,7 +4290,12 @@ async function draw() {
         // -----------------------------------------------------------
         
         console.time("1. Data Fetch (Cache)"); // 【計測】データ取得
-        allData = await fetchWithCache(currentLat, currentLon);
+        // --- 【案1修正】AbortControllerのsignalを渡してデータ取得 ---
+        allData = await fetchWithCache(currentLat, currentLon, abortController.signal);
+        
+        // ローディングインジケーターを非表示にする
+        if (loaderEl) loaderEl.style.display = 'none';
+
         // 【draw内の適切な場所に追記】データ確定後にウェルカムバーのテキストを動的更新
         updateWelcomeBarText(currentLabel, viewConfig.forecastDays || 9);
         if (allData) {
@@ -4305,19 +4342,17 @@ async function draw() {
         let subH = isWidget ? 80 : viewConfig.subHeight;
         let gMargin = viewConfig.graphMargin || 0;
 
-        // --- 3. y軸ラベルの動的更新（i18n辞書の固定値を使わず現在のUnit変数を使用） ---
+        // --- 3. y軸ラベルの動的更新（i18n辞書の固定値を使わない現在のUnit変数を使用） ---
         const titles = document.querySelectorAll('.y-axis-title');
         if (titles.length >= 4) {
             titles[0].innerHTML = i18n.t('yAxisWeather');
             titles[1].innerHTML = `${baseWindIcon}${i18n.t('windDir')}<br>(${currentWUnit})`;
-            //titles[2].innerHTML = `${i18n.t('temp')}(${currentTUnit})<br>${i18n.t('seawater')}(${currentTUnit})`;
             titles[2].innerHTML = `${i18n.t('temp')}(${currentTUnit})<br>`;
             
             const waveData = allData.data.wave_height ? allData.data.wave_height.slice(startIdx) : [];
             const tideData = allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl.slice(startIdx) : [];
             const hasMarineData = waveData.some(v => v !== 0 && v !== null) || tideData.some(v => v !== 0 && v !== null);
             
-            //let marineTitle = hasMarineData ? i18n.t('yAxisMarine') : `<br><span style="color:#FF0000; font-weight:bold; font-size:14px; display:block; margin-top:2px; background-color:transparent;">No Marine Data</span>`;
             let marineTitle = hasMarineData ? i18n.t('seawater') : `<span style="color:#FF0000; font-weight:bold; font-size:14px; display:block; margin-top:2px; background-color:transparent;">No Marine Data</span>`;
             titles[2].innerHTML += marineTitle;
         }
@@ -4349,40 +4384,30 @@ async function draw() {
         const pPlotH = 40; 
         const pBaseY = 100; 
 
-        // 【配置修正】天気アイコンの高さによるズレを完全に排除。
-        // 下端（y-min）の0mm位置はそのまま維持し、上端値（y-max）のみを降水量グリッド上端の高さ（60px）の位置まで正確に押し下げて完全に一致させます。
         const valContWeather = document.getElementById('val-svg-weather');
         if (valContWeather) {
             valContWeather.innerHTML = `<div class="y-max" style="padding-top: 50px;">${pMax.toFixed(0)}</div><div class="y-min">0</div>`;
         }
 
-        // 降水量の横線グリッド生成ループ
         for (let v = 0; v <= pMax; v += 5) {
             const gy = pBaseY - (v / pRange) * pPlotH;
             wHtml += `<line x1="0" y1="${gy}" x2="${totalW}" y2="${gy}" class="grid-y-sub" />`;
         }
 
-        // 【追加】ブラウザが現在ダークモードであるかどうかの事実を判定
         const isDarkForPrecip = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        // ダークモード時は黒背景に映える鮮やかなスカイブルー、通常時は既存의 青
         const precipColor = isDarkForPrecip ? "#388ef8" : "#0000FF";
 
         for(let i = startIdx; i < totalDataCount; i++) {
             const x = (i - startIdx) * hScale; 
-            //const icon = weatherIcons[allData.data.weather_code[i]] || "❓";
             const icon = weatherIcons[allData.data.weather_code[i]] || allData.data.weather_code[i];
             wHtml += `<text x="${x}" y="52" font-size="28" text-anchor="middle">${icon}</text>`; 
             const p = allData.data.precipitation ? allData.data.precipitation[i] : 0;
             if (p > 0) {
                 const barH = (p / pRange) * pPlotH;
-                // fill の色指定を判定された precipColor に変更（不透明度や幅などの計算は完全維持）
                 wHtml += `<rect x="${x - (hScale*0.3)}" y="${pBaseY - barH}" width="${hScale*0.6}" height="${barH}" fill="${precipColor}" opacity="0.7" />`;
                 
-                // 【制御の組み込み】graphValuesVisibility が 'hide' でない場合のみ、グラフ上の数値テキストを描画する
                 if (viewConfig.graphValuesVisibility !== 'hide') {
-                    // 【追加修正】降水量の数値テキストも風速と同様に45度左回りに回転させ、綺麗に中心で整列させる
                     const targetY = pBaseY - barH - 7;
-                    // fill の色指定を判定された precipColor に変更（フォントサイズや回転処理は完全維持）
                     wHtml += `<text x="${x}" y="${targetY}" font-size="${labelFS - 1}" font-weight="bold" fill="${precipColor}" text-anchor="middle" transform="rotate(-45, ${x}, ${targetY})">${p.toFixed(1)}</text>`;
                 }
             }
@@ -4390,7 +4415,6 @@ async function draw() {
 
         svgW.innerHTML = wHtml;
         
-        // セクションレンダリング（風速データセットの配列にガストの折れ線データを追加）
         renderSection("svg-wind", "date-wind", [
             { data: allData.data.wind_speed_10m, type: 'bar' },
             { data: allData.data.wind_gusts_10m, type: 'line', cls: 'line-wind-gust' }
@@ -4399,14 +4423,13 @@ async function draw() {
         const hasMarineData = (allData.data.wave_height && allData.data.wave_height.slice(startIdx).some(v => v !== 0 && v !== null));
         renderSection("svg-temps", "date-temp", [{ data: allData.data.temperature_2m, type: 'line', cls: 'line-temp-air' }, { data: allData.data.sea_surface_temperature, type: 'line', cls: 'line-temp-sea' }], subH, 5.0, false, !hasMarineData, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, null);
         
-        // 【追加】マリンデータの有無に応じて、重なっているsticky-labelの表示/非表示をピンポイントで制御
         const marineLabel = document.querySelector('.section-marine .sticky-label');
 
         if (hasMarineData) {
-            if (marineLabel) marineLabel.style.display = ''; // 通常時は表示を元に戻す
+            if (marineLabel) marineLabel.style.display = '';
             renderSection("svg-marine", "date-marine", [{ data: allData.data.wave_height, type: 'line', cls: 'line-wave' }, { data: allData.data.sea_level_height_msl, type: 'line', cls: 'line-tide' }], subH, 0.5, false, true, false, startIdx, hScale, totalW, labelFS, iScale, totalDataCount, drawReferenceTime, null);
         } else {
-            if (marineLabel) marineLabel.style.display = 'none'; // マリンデータがない時は完全に非表示
+            if (marineLabel) marineLabel.style.display = 'none';
             const svgM = document.getElementById('svg-marine');
             const dateM = document.getElementById('date-marine');
             if (svgM) svgM.innerHTML = "";
@@ -4420,6 +4443,12 @@ async function draw() {
 
         console.timeEnd("Total Draw Process");
     } catch (e) { 
+        // ユーザーの手動キャンセル時はエラーを出さずにインジケーターを非表示にしてキャッシュ描画に移行
+        if (loaderEl) loaderEl.style.display = 'none';
+        if (e.name === 'AbortError') {
+            console.log("API通信はユーザーによって正常にキャンセルされました（キャッシュデータを表示します）。");
+            return;
+        }
         console.error("Critical Draw Error:", e);
     }
 }
