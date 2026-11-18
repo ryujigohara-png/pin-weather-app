@@ -2901,20 +2901,38 @@ const weatherIcons = { 0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️", 45: "�
 function getWindDirText(deg) { return windDirs[Math.round(deg / 22.5) % 16]; }
 
 /**
- * サブルーチン：キャッシュ付きデータ取得（案1：通信障害時フォールバック＆AbortSignal対応版）
+ * サブルーチン：キャッシュ付きデータ取得（オフライン・タイムアウト・詳細ステータス通知対応版）
  * @param {number} lat 緯度
  * @param {number} lon 経度
  * @param {AbortSignal} [signal=null] 通信中止用シグナル
+ * @param {Function} [onStatusUpdate=null] 進捗ステータスを通知するコールバック関数
  */
-async function fetchWithCache(lat, lon, signal = null) {
-    console.time("  => Sub: Cache Check/Read"); // 【計測】キャッシュ処理開始
+async function fetchWithCache(lat, lon, signal = null, onStatusUpdate = null) {
+    console.time("  => Sub: Cache Check/Read");
     const cacheKey = `weather_cache_${lat.toFixed(3)}_${lon.toFixed(3)}`;
     const cached = localStorage.getItem(cacheKey);
     const now = Date.now();
 
-    // 予報日数を設定から取得（未定義ならデフォルト9日）
+    // 1. オフライン状態のチェック
+    if (typeof navigator.onLine !== 'undefined' && !navigator.onLine) {
+        console.warn("オフライン状態を検知しました。キャッシュデータを表示します。");
+        if (typeof onStatusUpdate === 'function') {
+            onStatusUpdate('offline');
+        }
+        const rawCached = localStorage.getItem(cacheKey);
+        if (rawCached) {
+            try {
+                const parsed = JSON.parse(rawCached);
+                if (parsed && parsed.data) {
+                    console.timeEnd("  => Sub: Cache Check/Read");
+                    return { timestamp: parsed.timestamp || now, data: parsed.data };
+                }
+            } catch (e) {}
+        }
+        throw new Error("Offline and no cache available.");
+    }
+
     const fDays = viewConfig.forecastDays || 9;
-    // 温度・風速単位を設定から取得
     const tUnit = viewConfig.temperatureUnit || 'celsius';
     const wUnit = viewConfig.windSpeedUnit || 'ms';
 
@@ -2924,51 +2942,52 @@ async function fetchWithCache(lat, lon, signal = null) {
     if (cached) {
         try {
             const parsed = JSON.parse(cached);
-            
-            // 【重要】期限内かつリロードでなく、かつキャッシュされているデータの日数・単位が現在の設定と同じであればキャッシュを返す
-            // ※日数や単位が変更された場合は、強制的に再取得させる必要があるため
             if (!isReload && 
                 (now - parsed.timestamp < CACHE_DURATION) && 
                 (parsed.data && parsed.data.time && parsed.data.time.length === fDays * 24) &&
                 parsed.tUnit === tUnit &&
                 parsed.wUnit === wUnit) {
-                console.timeEnd("  => Sub: Cache Check/Read"); // キャッシュヒットで終了
+                console.timeEnd("  => Sub: Cache Check/Read");
                 return { timestamp: parsed.timestamp, data: parsed.data };
-            } else {
-                // 期限切れ、リロード、または設定（日数・単位）変更ならキャッシュを一旦スキップ（ただし障害時の最終フォールバック用には保持）
             }
         } catch (e) {
             localStorage.removeItem(cacheKey);
         }
     }
-    console.timeEnd("  => Sub: Cache Check/Read"); // キャッシュミスまたは無効で終了
+    console.timeEnd("  => Sub: Cache Check/Read");
 
-    // API取得（forecast_days, temperature_unit, wind_speed_unit を動的に設定）
-    // hourlyパラメータに wind_gusts_10m を追加
     const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code,precipitation&timezone=auto&forecast_days=${fDays}&temperature_unit=${tUnit}&wind_speed_unit=${wUnit}`;
     const mUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=auto&forecast_days=${fDays}&temperature_unit=${tUnit}&cell_selection=sea`;
 
-    console.time("  => Sub: Total API Fetch Time"); // 【計測】並列処理全体の開始
+    console.time("  => Sub: Total API Fetch Time");
     try {
+        // ステータス更新：気象データ取得中
+        if (typeof onStatusUpdate === 'function') {
+            onStatusUpdate('fetching_weather');
+        }
+
         const [wRes, mRes] = await Promise.all([
             (async () => {
-                console.time("    -> API 1: Weather Fetch"); // 【計測】気象API開始
+                console.time("    -> API 1: Weather Fetch");
                 const res = await fetch(wUrl, { signal }).then(r => { if(!r.ok) throw new Error(); return r.json(); });
-                console.timeEnd("    -> API 1: Weather Fetch"); // 【計測】気象API終了
+                console.timeEnd("    -> API 1: Weather Fetch");
                 return res;
             })(),
             (async () => {
-                console.time("    -> API 2: Marine Fetch"); // 【計測】海洋API開始
+                // ステータス更新：海洋気象データ取得中
+                if (typeof onStatusUpdate === 'function') {
+                    onStatusUpdate('fetching_marine');
+                }
+                console.time("    -> API 2: Marine Fetch");
                 const res = await fetch(mUrl, { signal }).then(r => { if(!r.ok) throw new Error(); return r.json(); });
-                console.timeEnd("    -> API 2: Marine Fetch"); // 【計測】海洋API終了
+                console.timeEnd("    -> API 2: Marine Fetch");
                 return res;
             })()
         ]);
-        console.timeEnd("  => Sub: Total API Fetch Time"); // 【計測】並列処理全体の終了
+        console.timeEnd("  => Sub: Total API Fetch Time");
 
-        console.time("  => Sub: Merging & Storage"); // 【計測】データ保存処理
+        console.time("  => Sub: Merging & Storage");
         const mergedData = { ...wRes.hourly, ...mRes.hourly };
-        // キャッシュデータに現在の単位設定を保存
         const cacheData = { 
             timestamp: now, 
             data: mergedData,
@@ -2976,8 +2995,14 @@ async function fetchWithCache(lat, lon, signal = null) {
             wUnit: wUnit
         };
 
-        // 最新データを保存
-        localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+        try {
+            localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+        } catch (storageErr) {
+            console.warn("ローストレージ容量制限または競合エラー:", storageErr);
+            if (typeof onStatusUpdate === 'function') {
+                onStatusUpdate('storage_error');
+            }
+        }
         console.timeEnd("  => Sub: Merging & Storage");
         
         return cacheData;
@@ -2986,7 +3011,6 @@ async function fetchWithCache(lat, lon, signal = null) {
         console.timeEnd("  => Sub: Total API Fetch Time");
         console.error("API取得失敗またはキャンセル:", error);
         
-        // 【案1の核心】：通信障害・エラー・キャンセル発生時は、既存のキャッシュ（古くても）を強制返却してグラフを維持する
         const rawCached = localStorage.getItem(cacheKey);
         if (rawCached) {
             try {
@@ -2995,13 +3019,69 @@ async function fetchWithCache(lat, lon, signal = null) {
                     console.warn("通信障害または中断を検知しました。既存のキャッシュデータをフォールバックとして表示します。");
                     return { timestamp: parsed.timestamp || now, data: parsed.data };
                 }
-            } catch (e) {
-                // パース失敗時はスキップ
-            }
+            } catch (e) {}
         }
         throw error;
     }
 }
+
+/**
+ * 追加サブルーチン：ロード中インジケーターおよびステータスの制御・管理ヘルパー
+ */
+const WeatherLoadingManager = {
+    elementId: 'weather-loading-indicator',
+    timerId: null,
+
+    show(mainText, subText = "", showCancel = true, onCancel = null) {
+        let loaderEl = document.getElementById(this.elementId);
+        if (!loaderEl) {
+            loaderEl = document.createElement('div');
+            loaderEl.id = this.elementId;
+            loaderEl.style.cssText = "position: fixed; top: 10px; right: 10px; z-index: 10000; background: rgba(0,0,0,0.85); color: #fff; padding: 8px 14px; border-radius: 6px; font-size: 12px; display: flex; align-items: center; gap: 10px; box-shadow: 0 3px 8px rgba(0,0,0,0.4); font-family: sans-serif;";
+            document.body.appendChild(loaderEl);
+        }
+
+        loaderEl.innerHTML = `
+            <div style="display:flex; flex-direction:column; gap:2px;">
+                <span style="font-weight:bold;">${mainText}</span>
+                ${subText ? `<span style="font-size:10px; color:#ccc;">${subText}</span>` : ''}
+            </div>
+            ${showCancel ? `<button id="cancel-fetch-btn" style="background: #ff4d4d; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; white-space: nowrap;">中止</button>` : ''}
+        `;
+        loaderEl.style.display = 'flex';
+
+        if (showCancel) {
+            const cancelBtn = document.getElementById('cancel-fetch-btn');
+            if (cancelBtn && typeof onCancel === 'function') {
+                cancelBtn.onclick = onCancel;
+            }
+        }
+    },
+
+    hide() {
+        const loaderEl = document.getElementById(this.elementId);
+        if (loaderEl) {
+            loaderEl.style.display = 'none';
+        }
+        this.clearTimeoutWatch();
+    },
+
+    startTimeoutWatch(onTimeout) {
+        this.clearTimeoutWatch();
+        this.timerId = setTimeout(() => {
+            if (typeof onTimeout === 'function') {
+                onTimeout();
+            }
+        }, 5000);
+    },
+
+    clearTimeoutWatch() {
+        if (this.timerId) {
+            clearTimeout(this.timerId);
+            this.timerId = null;
+        }
+    }
+};
 
 /**
  * 外部気象サービスを現在の座標で開く
@@ -4218,7 +4298,7 @@ function initScrollHelper() {
 let tooltipTimer = null;
 
 /**
- * メインサブルーチン：描画処理（案1：ロード中インジケーター ＆ AbortController連携版）
+ * メインサブルーチン：描画処理（プロセス別詳細ステータス・電波不安定・タイムアウト・描画高負荷検知対応版）
  */
 async function draw() {
     console.time("Total Draw Process"); // 【計測】全体開始
@@ -4226,44 +4306,68 @@ async function draw() {
     // 描画の直前に、現在の地点に合わせた風向設定を読み込む
     syncWindFilterWithCurrentSpot();
 
-    // --- 【案1追加】通信中止用の AbortController を生成 ---
+    // --- 通信中止用の AbortController を生成 ---
     if (window.currentWeatherAbortController) {
         window.currentWeatherAbortController.abort(); // 前回の通信が残っていればキャンセル
     }
     const abortController = new AbortController();
     window.currentWeatherAbortController = abortController;
 
-    // --- 【案1追加】画面上部に「ロード中 ＆ 中止ボタン」を表示するインジケーター要素の生成/更新 ---
+    // --- ステータスインジケーター要素の生成/更新 ---
     let loaderEl = document.getElementById('weather-loading-indicator');
     if (!loaderEl) {
         loaderEl = document.createElement('div');
         loaderEl.id = 'weather-loading-indicator';
-        loaderEl.style.cssText = "position: fixed; top: 10px; right: 10px; z-index: 10000; background: rgba(0,0,0,0.8); color: #fff; padding: 6px 12px; border-radius: 4px; font-size: 12px; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);";
+        loaderEl.style.cssText = "position: fixed; top: 10px; right: 10px; z-index: 10000; background: rgba(0,0,0,0.85); color: #fff; padding: 8px 14px; border-radius: 6px; font-size: 12px; display: flex; align-items: center; gap: 10px; box-shadow: 0 3px 8px rgba(0,0,0,0.4); font-family: sans-serif;";
         document.body.appendChild(loaderEl);
     }
-    loaderEl.innerHTML = `<span>⏳ 気象データをロード中...</span><button id="cancel-fetch-btn" style="background: #ff4d4d; color: #fff; border: none; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-size: 11px;">中止</button>`;
-    loaderEl.style.display = 'flex';
 
-    document.getElementById('cancel-fetch-btn').onclick = () => {
-        abortController.abort(); // ユーザーによる手動キャンセル
-        loaderEl.style.display = 'none';
-        console.log("ユーザーによりAPI通信がキャンセルされました。キャッシュデータを表示します。");
+    // ステータス更新用のヘルパー関数
+    let timeoutTimer = null;
+    const updateLoaderText = (mainText, subText = "") => {
+        loaderEl.innerHTML = `
+            <div style="display:flex; flex-direction:column; gap:2px;">
+                <span style="font-weight:bold;">${mainText}</span>
+                ${subText ? `<span style="font-size:10px; color:#ccc;">${subText}</span>` : ''}
+            </div>
+            <button id="cancel-fetch-btn" style="background: #ff4d4d; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; white-space: nowrap;">中止</button>
+        `;
+        loaderEl.style.display = 'flex';
+
+        const cancelBtn = document.getElementById('cancel-fetch-btn');
+        if (cancelBtn) {
+            cancelBtn.onclick = () => {
+                abortController.abort();
+                loaderEl.style.display = 'none';
+                if (timeoutTimer) clearTimeout(timeoutTimer);
+                console.log("ユーザーによりAPI通信がキャンセルされました。キャッシュデータを表示します。");
+            };
+        }
     };
-    // -------------------------------------------------------------
+
+    // 初期状態：キャッシュ確認中
+    updateLoaderText("⏳ キャッシュを確認中…", currentLabel);
+
+    // 5秒以上通信が返らない場合のタイムアウト（電波不安定）検知タイマー
+    timeoutTimer = setTimeout(() => {
+        updateLoaderText("⚠️ 電波状況が不安定です（応答待ち）", "接続を待っています…");
+    }, 5000);
 
     try {
         if (typeof currentLat === 'undefined' || currentLat === null || typeof currentLon === 'undefined' || currentLon === null) {
             console.warn("Location coordinates are undefined. Redirecting to initApp...");
             if (typeof initApp === 'function') { await initApp(); }
+            if (loaderEl) loaderEl.style.display = 'none';
+            if (timeoutTimer) clearTimeout(timeoutTimer);
             return;
         }
 
         const params = new URLSearchParams(window.location.search);
         const isWidget = params.get('mode') === 'widget';
         
-        // --- 1. ウィジェットモード時のパラメータ反映（確実に最新を反映） ---
+        // --- 1. ウィジェットモード時のパラメータ反映 ---
         if (isWidget) {
-            document.body.classList.add('widget-mode'); // 【追加】親要素（body）にwidgetモードの目印クラスを付与
+            document.body.classList.add('widget-mode');
             if (params.get('theme')!== null) viewConfig.themeMode = params.get('theme');
             if (params.get('display')!== null) viewConfig.displayMode = params.get('display');
             if (params.get('tUnit')) viewConfig.temperatureUnit = params.get('tUnit');
@@ -4272,35 +4376,45 @@ async function draw() {
             if (params.get('thM') !== null) viewConfig.windThresholdMid  = parseFloat(params.get('thM'));
             if (params.get('thL') !== null) viewConfig.windThresholdLow  = parseFloat(params.get('thL'));
 
-            // 【追加仕様】widget表示の時はツールチップ非表示、グラフ内数値表示設定にする
             viewConfig.welcomeBarVisibility = 'hide';
             viewConfig.tooltipVisibility = 'hide';
             viewConfig.graphValuesVisibility = 'show';
 
-            // ナビ表示制御
             const nav = document.querySelector('.nav-container') || document.querySelector('nav');
             if (nav) nav.style.display = 'none';
-            applyEnvVisuals(); // ウィジェットモードのテーマ・背景色を即座に反映
+            applyEnvVisuals();
         }
 
-        // --- 2. 【重要】反映されない単位テキストの再計算と辞書の更新 ---
-        const currentWUnit = viewConfig.windSpeedUnit === 'ms' ? 'm/s' : (viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : viewConfig.windSpeedUnit);
+        // --- 2. 単位テキストの再計算と辞書の更新 ---
+        const currentWUnit = viewConfig.windSpeedUnit === 'ms' ? 'm/s' : (viewConfig.windSpeedUnit === 'km/h' ? 'km/h' : viewConfig.windSpeedUnit);
         const currentTUnit = viewConfig.temperatureUnit === 'celsius' ? '℃' : '℉';
 
-        // i18n辞書の動的プロパティを現在の設定で上書き（ツールチップ等に反映）
         if (typeof i18n !== 'undefined' && i18n.dict[i18n._currentLang]) {
             i18n.dict[i18n._currentLang].speedunit = currentWUnit;
         }
-        // -----------------------------------------------------------
         
-        console.time("1. Data Fetch (Cache)"); // 【計測】データ取得
-        // --- 【案1修正】AbortControllerのsignalを渡してデータ取得 ---
-        allData = await fetchWithCache(currentLat, currentLon, abortController.signal);
+        console.time("1. Data Fetch (Cache)");
         
-        // ローディングインジケーターを非表示にする
-        if (loaderEl) loaderEl.style.display = 'none';
+        // fetchWithCache にステータス変化を受け取るコールバックを渡して実行
+        allData = await fetchWithCache(currentLat, currentLon, abortController.signal, (status) => {
+            if (status === 'offline') {
+                updateLoaderText("📡 オフラインです", "キャッシュデータを表示しています");
+            } else if (status === 'fetching_weather') {
+                updateLoaderText("⏳ 気象データをロード中…", "Open-Meteo 気象API");
+            } else if (status === 'fetching_marine') {
+                updateLoaderText("⏳ 海洋気象データをロード中…", "Open-Meteo 海洋API");
+            } else if (status === 'storage_error') {
+                updateLoaderText("⚠️ ストレージ書き込みエラー", "容量または競合を確認中…");
+            }
+        });
+        
+        // 通信成功・完了につきタイムアウトタイマーをクリア
+        if (timeoutTimer) clearTimeout(timeoutTimer);
 
-        // 【draw内の適切な場所に追記】データ確定後にウェルカムバーのテキストを動的更新
+        // 【描画高負荷の計測開始】
+        updateLoaderText("⚙️ データを解析・グラフ描画中…", "DOMおよびSVGを構築中");
+        const drawStartTime = performance.now();
+
         updateWelcomeBarText(currentLabel, viewConfig.forecastDays || 9);
         if (allData) {
             const summaryText = generateWeatherSummary(allData.data, currentLabel);
@@ -4311,17 +4425,17 @@ async function draw() {
         }
         console.timeEnd("1. Data Fetch (Cache)");
 
-        // ==========================================================
-        // 【提案追記】起動時またはデータ更新時、テキストモードなら中身をレンダリングする
-        // ==========================================================
         if (viewConfig.displayMode === 'text' && typeof renderTextMode === 'function' && allData) {
             renderTextMode(allData);
         }
 
         const svgW = document.getElementById('svg-weather');
-        if (!svgW || !allData || !allData.data) return;
+        if (!svgW || !allData || !allData.data) {
+            if (loaderEl) loaderEl.style.display = 'none';
+            return;
+        }
 
-        console.time("2. Layout Setup"); // 【計測】計算とレイアウト設定
+        console.time("2. Layout Setup");
         
         const currentSpot = mySpots.find(s => 
             Math.abs(s.lat - currentLat) < 0.0001 && 
@@ -4350,10 +4464,7 @@ async function draw() {
         const titles = document.querySelectorAll('.y-axis-title');
         if (titles.length >= 4) {
             titles[0].innerHTML = i18n.t('yAxisWeather');
-            
-            // 風エリア：辞書側で定義した4行（風向 / 最大瞬間 / 風速 / 単位）をそのまま反映
             titles[1].innerHTML = i18n.t('yAxisWind');
-            
             titles[2].innerHTML = i18n.t('yAxisTemp');
             
             const waveData = allData.data.wave_height ? allData.data.wave_height.slice(startIdx) : [];
@@ -4390,7 +4501,7 @@ async function draw() {
         }
         console.timeEnd("2. Layout Setup");
 
-        // --- 4. Weather Icon & Rain View 以降の描画ロジックを維持 ---
+        // --- 4. Weather Icon & Rain View 以降の描画ロジック ---
         let wHtml = "";
         const pData = allData.data.precipitation ? allData.data.precipitation.slice(startIdx) : [];
         const pMax = Math.ceil(Math.max(...pData, 1.0) / 5) * 5; 
@@ -4455,10 +4566,20 @@ async function draw() {
         initScrollEvent(hScale, startIdx);
         initTooltipEvent(startIdx, hScale, totalW, labelFS, drawReferenceTime);
 
+        // 描画処理にかかった時間を計測し、もし1.5秒以上かかっていればコンソールに高負荷を記録
+        const drawDuration = performance.now() - drawStartTime;
+        if (drawDuration > 1500) {
+            console.warn(`[高負荷検知] グラフの描画処理に時間がかかりました: ${drawDuration.toFixed(1)}ms`);
+        }
+
+        // すべての処理が完了したらローディングインジケーターを非表示
+        if (loaderEl) loaderEl.style.display = 'none';
+
         console.timeEnd("Total Draw Process");
     } catch (e) { 
-        // ユーザーの手動キャンセル時はエラーを出さずにインジケーターを非表示にしてキャッシュ描画に移行
         if (loaderEl) loaderEl.style.display = 'none';
+        if (timeoutTimer) clearTimeout(timeoutTimer);
+        
         if (e.name === 'AbortError') {
             console.log("API通信はユーザーによって正常にキャンセルされました（キャッシュデータを表示します）。");
             return;
