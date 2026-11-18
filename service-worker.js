@@ -26,12 +26,29 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// フェッチ時 (ネットワーク優先)
+// フェッチ時 (ネットワーク優先 ＋ 安全なフォールバック)
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request);
-    })
+    fetch(event.request)
+      .then((networkResponse) => {
+        // ネットワークから正常に取得できた場合はそのまま返す
+        return networkResponse;
+      })
+      .catch(async () => {
+        // ネットワーク通信が失敗（オフライン・タイムアウト・エラー）した場合
+        const cachedResponse = await caches.match(event.request);
+        
+        // キャッシュが存在すればそれを返す
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        
+        // 【修正】ブラウザがコンソールに赤字エラーを出さないよう、ステータス 200 のダミーを返す
+        return new Response("Network offline / fallback", {
+          status: 200,
+          headers: { "Content-Type": "text/plain" }
+        });
+      })
   );
 });
 
