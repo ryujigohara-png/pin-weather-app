@@ -451,6 +451,11 @@ svg { width: 100%; display: block; overflow: visible; }
     color: #444;
 }
 
+/* 降水量y軸ラベルの色（ライト：#0000FF / ダーク：#388ef8） */
+.precip-axis-label {
+    color: #0000FF;
+}
+
 .y-max {
     position: absolute;
     top: -10px;
@@ -1118,6 +1123,7 @@ html[data-theme="dark"] {
         color: #fff !important;
     }
     & .y-axis-values { color: #cbd5e1; }
+    & .precip-axis-label { color: #388ef8;}
 
     /* 詳細設定 */
     & .view-settings-body {
