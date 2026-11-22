@@ -11,7 +11,7 @@ const defaultViewConfig = {
     // --- 新設：表示フラグの既定値（デフォルトに戻すボタンとも連動） ---
     themeMode: 'system',           // テーマモード ('system' or 'light' or 'dark')
     displayMode: 'graph',          // 【追加】初期表示モード ('text' or 'graph')
-    tooltipVisibility: 'hide',     // ツールチップ表示設定 ('show' or 'hide')
+    tooltipVisibility: 'show',     // ツールチップ表示設定 ('show' or 'hide')
     graphValuesVisibility: 'show', // グラフ内数値表示設定 ('show' or 'hide')
     welcomeBarVisibility: 'show',  // 【追加】ウェルカムバー表示設定 ('show' or 'hide')
     showPrecipitation: true,       // 【追加】降水量表示トグル設定 (初期値: true = ON)
@@ -150,7 +150,7 @@ const i18n = {
             optShow: "表示する",
             optHide: "表示しない",
             optDefaultShow: "表示する（デフォルト）",
-            optDefaultHide: "表示する（デフォルト）",
+            optDefaultHide: "表示しない（デフォルト）",
             cfgTempUnit: "温度単位",
             cfgWindUnit: "風速単位",
             cfgWindThresholds: "風速色付しきい値",
@@ -177,7 +177,7 @@ const i18n = {
             btnOK: "OK",
 
             // --- グラフ軸・凡例・その他 ---
-            yAxisWeather: `天気<br><span style="color: #0000FF;">降水(mm)</span>`,
+            yAxisWeather: `天気<br><span class="precip-axis-label">降水(mm)</span>`,
             yAxisWind: `風向<br><span style="color: #ff4500;">最大瞬間</span><br>風速<br>(${viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph'})`,
             yAxisTemp: `<span style="color: #ff4500;">気温(${viewConfig.temperatureUnit === 'celsius' ? '℃' : '℉'})</span><br>` +
                        `<span style="color: #00ced1;">海水(${viewConfig.temperatureUnit === 'celsius' ? '℃' : '℉'})</span>`,
@@ -384,7 +384,7 @@ const i18n = {
             btnOK: "OK",
 
             // --- Axes, Legends, etc. ---
-            yAxisWeather: `Weather<br><span style="color: #0000FF;">Precip(mm)</span>`,
+            yAxisWeather: `Weather<br><span class="precip-axis-label">Precip(mm)</span>`,
             yAxisWind: `Wind Dir<br><span style="color: #ff4500;">Max Gust</span><br>Speed<br>(${viewConfig.windSpeedUnit === 'ms' ? 'm/s' : viewConfig.windSpeedUnit === 'kn' ? 'kn' : viewConfig.windSpeedUnit === 'kmh' ? 'km/h' : 'mph'})`,
             yAxisTemp: `<span style="color: #ff4500;">Temp(${viewConfig.temperatureUnit === 'celsius' ? '°C' : '°F'})</span><br>` +
                        `<span style="color: #00ced1;">Sea(${viewConfig.temperatureUnit === 'celsius' ? '°C' : '°F'})</span>`,
@@ -4466,15 +4466,15 @@ async function draw() {
             titles[0].innerHTML = i18n.t('yAxisWeather');
             titles[1].innerHTML = i18n.t('yAxisWind');
             titles[2].innerHTML = i18n.t('yAxisTemp');
-            
+
             const waveData = allData.data.wave_height ? allData.data.wave_height.slice(startIdx) : [];
             const tideData = allData.data.sea_level_height_msl ? allData.data.sea_level_height_msl.slice(startIdx) : [];
             const hasMarineData = waveData.some(v => v !== 0 && v !== null) || tideData.some(v => v !== 0 && v !== null);
-            
-            let marineTitle = hasMarineData 
-                ? i18n.t('yAxisMarine') 
+
+            let marineTitle = hasMarineData
+                ? i18n.t('yAxisMarine')
                 : `<span style="color:#FF0000; font-weight:bold; font-size:14px; display:block; margin-top:2px; background-color:transparent;">No Marine Data</span>`;
-            
+
             if (titles[3]) {
                 titles[3].innerHTML = marineTitle;
             } else {
@@ -4519,7 +4519,8 @@ async function draw() {
             wHtml += `<line x1="0" y1="${gy}" x2="${totalW}" y2="${gy}" class="grid-y-sub" />`;
         }
 
-        const isDarkForPrecip = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        //const isDarkForPrecip = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const isDarkForPrecip = document.documentElement.getAttribute('data-theme') === 'dark';
         const precipColor = isDarkForPrecip ? "#388ef8" : "#0000FF";
 
         for(let i = startIdx; i < totalDataCount; i++) {
